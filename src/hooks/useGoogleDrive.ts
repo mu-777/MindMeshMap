@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { MindMap, MapMeta } from '../types';
 
-const FOLDER_NAME = 'MindMapDAG';
+const FOLDER_NAME = 'MindMeshMap';
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 const UPLOAD_API_BASE = 'https://www.googleapis.com/upload/drive/v3';
 
