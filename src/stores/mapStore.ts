@@ -22,6 +22,7 @@ interface MapState {
   addNode: (node: Omit<MapNode, 'id'>, parentId?: string, sourceHandle?: string, targetHandle?: string) => string;
   updateNode: (nodeId: string, updates: Partial<MapNode>) => void;
   deleteNode: (nodeId: string) => void;
+  deleteNodes: (nodeIds: string[]) => void;
   updateNodePositions: (positions: { id: string; position: { x: number; y: number } }[]) => void;
 
   // エッジ操作
@@ -176,6 +177,41 @@ export const useMapStore = create<MapState>((set, get) => ({
         nodes: currentMap.nodes.filter((node) => node.id !== nodeId),
         edges: currentMap.edges.filter(
           (edge) => edge.source !== nodeId && edge.target !== nodeId
+        ),
+        updatedAt: new Date().toISOString(),
+      },
+      isDirty: true,
+    });
+  },
+
+  deleteNodes: (nodeIds) => {
+    const { currentMap, saveToHistory } = get();
+    if (!currentMap || nodeIds.length === 0) return;
+
+    // ルートノードは削除しない（エッジで参照されていないノード）
+    const nodesToDelete = nodeIds.filter((nodeId) => {
+      const incomingEdges = currentMap.edges.filter((e) => e.target === nodeId);
+      const isRoot = incomingEdges.length === 0;
+      // ルートノードで、かつ削除後にノードが残らない場合は削除しない
+      if (isRoot && currentMap.nodes.length - nodeIds.length < 1) {
+        return false;
+      }
+      return true;
+    });
+
+    if (nodesToDelete.length === 0) return;
+
+    const deleteSet = new Set(nodesToDelete);
+
+    saveToHistory();
+
+    // ノードと関連するエッジを削除
+    set({
+      currentMap: {
+        ...currentMap,
+        nodes: currentMap.nodes.filter((node) => !deleteSet.has(node.id)),
+        edges: currentMap.edges.filter(
+          (edge) => !deleteSet.has(edge.source) && !deleteSet.has(edge.target)
         ),
         updatedAt: new Date().toISOString(),
       },

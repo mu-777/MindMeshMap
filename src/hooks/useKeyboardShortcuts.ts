@@ -61,14 +61,16 @@ function adjustPositionToAvoidOverlap(
 
 export function useKeyboardShortcuts() {
   const { fitView, zoomIn, zoomOut, getViewport } = useReactFlow();
-  const { currentMap, addNode, deleteNode, undo, redo, setLayoutDirection } = useMapStore();
+  const { currentMap, addNode, deleteNode, deleteNodes, undo, redo, setLayoutDirection } = useMapStore();
   const {
     selectedNodeId,
+    selectedNodeIds,
     lastSelectedNodeId,
     editingNodeId,
     setSelectedNodeId,
     setEditingNodeId,
     setHelpModalOpen,
+    clearMultiSelection,
   } = useUIStore();
   const { getActionForKey } = useKeybindStore();
   const { applyLayout } = useAutoLayout();
@@ -242,7 +244,12 @@ export function useKeyboardShortcuts() {
         }
 
         case 'deleteNode': {
-          if (activeNodeId) {
+          // 複数ノード選択時は複数削除
+          if (selectedNodeIds.length > 0) {
+            deleteNodes(selectedNodeIds);
+            clearMultiSelection();
+            setSelectedNodeId(null);
+          } else if (activeNodeId) {
             deleteNode(activeNodeId);
             setSelectedNodeId(null);
           }
@@ -361,17 +368,20 @@ export function useKeyboardShortcuts() {
     [
       currentMap,
       selectedNodeId,
+      selectedNodeIds,
       lastSelectedNodeId,
       editingNodeId,
       getActionForKey,
       addNode,
       deleteNode,
+      deleteNodes,
       undo,
       redo,
       setLayoutDirection,
       setSelectedNodeId,
       setEditingNodeId,
       setHelpModalOpen,
+      clearMultiSelection,
       fitView,
       zoomIn,
       zoomOut,

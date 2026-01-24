@@ -3,7 +3,6 @@ import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useAutoLayout } from '../../hooks/useAutoLayout';
-import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useGoogleDrive } from '../../hooks/useGoogleDrive';
 import { LayoutDirection } from '../../types';
 
@@ -26,8 +25,7 @@ export function Toolbar() {
     setDirty,
   } = useMapStore();
   const { toggleSidebar, setHelpModalOpen } = useUIStore();
-  const { isSignedIn, userName } = useAuthStore();
-  const { signIn, signOut } = useGoogleAuth();
+  const { isSignedIn } = useAuthStore();
   const { saveMap, isLoading } = useGoogleDrive();
   const { applyLayout } = useAutoLayout();
 
@@ -218,27 +216,6 @@ export function Toolbar() {
             />
           </svg>
         </button>
-
-        <div className="h-6 w-px bg-gray-700" />
-
-        {isSignedIn ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">{userName}</span>
-            <button
-              onClick={signOut}
-              className="rounded px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-            >
-              ログアウト
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={signIn}
-            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-          >
-            Googleでログイン
-          </button>
-        )}
       </div>
     </div>
   );

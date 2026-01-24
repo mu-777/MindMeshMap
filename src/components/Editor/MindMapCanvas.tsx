@@ -70,7 +70,7 @@ export function MindMapCanvas() {
       type: 'custom' as const,
       position: node.position,
       data: { content: node.content },
-      selected: node.id === selectedNodeId || selectedNodeIds.has(node.id),
+      selected: node.id === selectedNodeId || selectedNodeIds.includes(node.id),
     }));
   }, [currentMap, selectedNodeId, selectedNodeIds]);
 
@@ -91,16 +91,8 @@ export function MindMapCanvas() {
   // ノード変更ハンドラ
   const onNodesChange = useCallback(
     (changes: NodeChange<CustomNodeType>[]) => {
-      // 選択変更を処理
-      for (const change of changes) {
-        if (change.type === 'select') {
-          if (change.selected) {
-            setSelectedNodeId(change.id);
-          } else if (selectedNodeId === change.id) {
-            setSelectedNodeId(null);
-          }
-        }
-      }
+      // 選択変更はCustomNodeのhandleClickで処理するため、ここでは無視
+      // （React Flowの内部選択管理がselectedNodeIdsを上書きしないようにする）
 
       // 位置変更を処理
       const positionChanges = changes.filter(

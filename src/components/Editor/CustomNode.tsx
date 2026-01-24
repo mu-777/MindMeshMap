@@ -14,7 +14,7 @@ export type CustomNodeType = Node<CustomNodeData, 'custom'>;
 
 function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) {
   const { updateNode } = useMapStore();
-  const { editingNodeId, setEditingNodeId, setSelectedNodeId } = useUIStore();
+  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection } = useUIStore();
   const isEditing = editingNodeId === id;
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -55,15 +55,21 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     setEditingNodeId(id);
   }, [id, setEditingNodeId]);
 
-  // クリックで選択
+  // クリックで選択（Shift+クリックで複数選択）
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!isEditing) {
-        setSelectedNodeId(id);
+        if (e.shiftKey) {
+          // Shift+クリックで複数選択をトグル
+          toggleNodeSelection(id);
+        } else {
+          // 通常クリックで単一選択
+          setSelectedNodeId(id);
+        }
       }
     },
-    [id, isEditing, setSelectedNodeId]
+    [id, isEditing, setSelectedNodeId, toggleNodeSelection]
   );
 
   // 編集中のキーイベント処理

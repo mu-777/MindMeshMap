@@ -4,6 +4,7 @@ import { useMapStore } from '../../stores/mapStore';
 import { useGoogleDrive } from '../../hooks/useGoogleDrive';
 import { MapMeta } from '../../types';
 import { MapListItem } from './MapListItem';
+import { GoogleAuthButton } from '../Auth/GoogleAuthButton';
 
 export function MapList() {
   const { isSignedIn } = useAuthStore();
@@ -84,11 +85,12 @@ export function MapList() {
             d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
           />
         </svg>
-        <p className="mb-2 text-sm text-gray-400">
+        <p className="mb-4 text-sm text-gray-400">
           Googleでログインすると
           <br />
           マップを保存・同期できます
         </p>
+        <GoogleAuthButton />
       </div>
     );
   }
@@ -150,6 +152,11 @@ export function MapList() {
             ))}
           </ul>
         )}
+      </div>
+
+      {/* ユーザー情報 */}
+      <div className="border-t border-gray-700 p-3">
+        <GoogleAuthButton />
       </div>
     </div>
   );
