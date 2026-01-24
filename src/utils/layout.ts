@@ -6,9 +6,7 @@ const elk = new ELK();
 // ELK方向マッピング
 const directionMap: Record<LayoutDirection, string> = {
   DOWN: 'DOWN',
-  UP: 'UP',
   RIGHT: 'RIGHT',
-  LEFT: 'LEFT',
 };
 
 export interface LayoutResult {

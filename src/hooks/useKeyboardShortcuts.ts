@@ -72,14 +72,8 @@ export function useKeyboardShortcuts() {
                 case 'DOWN':
                   childPosition = { x: activeNode.position.x, y: activeNode.position.y + 120 };
                   break;
-                case 'UP':
-                  childPosition = { x: activeNode.position.x, y: activeNode.position.y - 120 };
-                  break;
                 case 'RIGHT':
                   childPosition = { x: activeNode.position.x + 200, y: activeNode.position.y };
-                  break;
-                case 'LEFT':
-                  childPosition = { x: activeNode.position.x - 200, y: activeNode.position.y };
                   break;
               }
 
@@ -117,12 +111,10 @@ export function useKeyboardShortcuts() {
 
               switch (direction) {
                 case 'DOWN':
-                case 'UP':
                   // 縦方向レイアウトの場合、兄弟は横に配置
                   siblingPosition = { x: activeNode.position.x + 200, y: activeNode.position.y };
                   break;
                 case 'RIGHT':
-                case 'LEFT':
                   // 横方向レイアウトの場合、兄弟は縦に配置
                   siblingPosition = { x: activeNode.position.x, y: activeNode.position.y + 100 };
                   break;
@@ -259,7 +251,7 @@ export function useKeyboardShortcuts() {
 
         case 'toggleLayoutDirection': {
           if (currentMap) {
-            const directions: LayoutDirection[] = ['DOWN', 'RIGHT', 'UP', 'LEFT'];
+            const directions: LayoutDirection[] = ['DOWN', 'RIGHT'];
             const currentIndex = directions.indexOf(currentMap.layoutDirection);
             const nextDirection = directions[(currentIndex + 1) % directions.length];
             setLayoutDirection(nextDirection);

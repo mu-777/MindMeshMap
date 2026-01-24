@@ -10,9 +10,7 @@ import { LayoutDirection } from '../../types';
 
 const layoutDirectionLabels: Record<LayoutDirection, string> = {
   DOWN: '↓ 下向き',
-  UP: '↑ 上向き',
   RIGHT: '→ 右向き',
-  LEFT: '← 左向き',
 };
 
 export function Toolbar() {
