@@ -2,6 +2,8 @@
 
 循環を許容するグラフ構造のマインドマップをブラウザ上で編集できるWYSIWYGエディタです。
 
+**🔗 デモ**: https://mu-777.github.io/MindMeshMap/
+
 ## 概要
 
 従来のマインドマップはツリー構造に限定されていますが、本エディタは**循環を含むグラフ構造**をサポートします。これにより、概念間の相互関係や循環的な依存関係を自然に表現できます。
@@ -96,9 +98,7 @@
 ツールバーのドロップダウンから選択できます：
 
 - **↓ 下向き**: ルートが上、子が下（デフォルト）
-- **↑ 上向き**: ルートが下、子が上
 - **→ 右向き**: ルートが左、子が右
-- **← 左向き**: ルートが右、子が左
 
 ### Google Driveへの保存
 
@@ -204,7 +204,7 @@ interface MindMap {
   name: string;
   createdAt: string;
   updatedAt: string;
-  layoutDirection: 'DOWN' | 'UP' | 'RIGHT' | 'LEFT';
+  layoutDirection: 'DOWN' | 'RIGHT';
   nodes: MapNode[];
   edges: MapEdge[];
 }
