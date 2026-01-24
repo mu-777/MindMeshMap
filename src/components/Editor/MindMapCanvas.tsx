@@ -1,0 +1,282 @@
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  Connection,
+  applyNodeChanges,
+  applyEdgeChanges,
+  MarkerType,
+  useReactFlow,
+  type NodeChange,
+  type EdgeChange,
+  type Node,
+  type OnConnectEnd,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+
+import { CustomNode, type CustomNodeType } from './CustomNode';
+import { CustomEdge, type CustomEdgeType } from './CustomEdge';
+import { useMapStore } from '../../stores/mapStore';
+import { useUIStore } from '../../stores/uiStore';
+
+const nodeTypes = {
+  custom: CustomNode,
+};
+
+const edgeTypes = {
+  custom: CustomEdge,
+};
+
+const defaultEdgeOptions = {
+  type: 'custom',
+  markerEnd: {
+    type: MarkerType.ArrowClosed,
+    width: 20,
+    height: 20,
+    color: '#6b7280',
+  },
+};
+
+export function MindMapCanvas() {
+  const {
+    currentMap,
+    createNewMap,
+    updateNode,
+    updateNodePositions,
+    addNode,
+    addEdge: storeAddEdge,
+  } = useMapStore();
+  const { selectedNodeId, setSelectedNodeId, setEditingNodeId } = useUIStore();
+  const { screenToFlowPosition } = useReactFlow();
+  const connectingInfo = useRef<{ nodeId: string | null; handleId: string | null }>({
+    nodeId: null,
+    handleId: null,
+  });
+
+  // 初回マウント時に新規マップを作成
+  useEffect(() => {
+    if (!currentMap) {
+      createNewMap();
+    }
+  }, [currentMap, createNewMap]);
+
+  // ノードをReact Flow形式に変換
+  const nodes: CustomNodeType[] = useMemo(() => {
+    if (!currentMap) return [];
+    return currentMap.nodes.map((node) => ({
+      id: node.id,
+      type: 'custom' as const,
+      position: node.position,
+      data: { content: node.content },
+      selected: node.id === selectedNodeId,
+    }));
+  }, [currentMap, selectedNodeId]);
+
+  // エッジをReact Flow形式に変換
+  const edges: CustomEdgeType[] = useMemo(() => {
+    if (!currentMap) return [];
+    return currentMap.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+      type: 'custom' as const,
+      data: { label: edge.label },
+    }));
+  }, [currentMap]);
+
+  // ノード変更ハンドラ
+  const onNodesChange = useCallback(
+    (changes: NodeChange<CustomNodeType>[]) => {
+      // 選択変更を処理
+      for (const change of changes) {
+        if (change.type === 'select') {
+          if (change.selected) {
+            setSelectedNodeId(change.id);
+          } else if (selectedNodeId === change.id) {
+            setSelectedNodeId(null);
+          }
+        }
+      }
+
+      // 位置変更を処理
+      const positionChanges = changes.filter(
+        (c): c is NodeChange<CustomNodeType> & { type: 'position'; position: { x: number; y: number } } =>
+          c.type === 'position' && 'position' in c && c.position !== undefined
+      );
+      if (positionChanges.length > 0) {
+        const positions = positionChanges.map((c) => ({
+          id: c.id,
+          position: c.position,
+        }));
+        updateNodePositions(positions);
+      }
+
+      // React Flowの内部状態を更新
+      const newNodes = applyNodeChanges(changes, nodes);
+
+      // 削除されたノードを処理
+      const removedNodes = changes.filter((c) => c.type === 'remove');
+      for (const removed of removedNodes) {
+        if (removed.id === selectedNodeId) {
+          setSelectedNodeId(null);
+        }
+      }
+
+      return newNodes;
+    },
+    [nodes, selectedNodeId, setSelectedNodeId, updateNodePositions]
+  );
+
+  // エッジ変更ハンドラ
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange<CustomEdgeType>[]) => {
+      return applyEdgeChanges(changes, edges);
+    },
+    [edges]
+  );
+
+  // エッジ接続開始時に接続元ノードとハンドルを記録
+  const onConnectStart = useCallback(
+    (_event: MouseEvent | TouchEvent, params: { nodeId: string | null; handleId: string | null }) => {
+      connectingInfo.current = {
+        nodeId: params.nodeId,
+        handleId: params.handleId,
+      };
+    },
+    []
+  );
+
+  // 新しいエッジ接続ハンドラ
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      if (connection.source && connection.target) {
+        storeAddEdge(
+          connection.source,
+          connection.target,
+          connection.sourceHandle || undefined,
+          connection.targetHandle || undefined
+        );
+      }
+    },
+    [storeAddEdge]
+  );
+
+  // エッジ接続終了時（空白にドロップした場合、新しいノードを作成）
+  const onConnectEnd: OnConnectEnd = useCallback(
+    (event) => {
+      const { nodeId, handleId } = connectingInfo.current;
+      if (!nodeId) return;
+
+      const targetIsPane = (event.target as Element).classList.contains('react-flow__pane');
+
+      if (targetIsPane && event instanceof MouseEvent && currentMap) {
+        // スクリーン座標をFlow座標に変換
+        const position = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+
+        // レイアウト方向に応じてハンドルを決定
+        const direction = currentMap.layoutDirection;
+        const sourceHandle = handleId || (direction === 'RIGHT' ? 'right' : 'bottom');
+        const targetHandle = direction === 'RIGHT' ? 'left' : 'top';
+
+        // 新しいノードを作成
+        const newNodeId = addNode(
+          {
+            content: JSON.stringify({
+              type: 'doc',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: '新しいノード' }] }],
+            }),
+            position,
+          },
+          nodeId,
+          sourceHandle,
+          targetHandle
+        );
+
+        if (newNodeId) {
+          setSelectedNodeId(newNodeId);
+          setEditingNodeId(newNodeId);
+        }
+      }
+
+      connectingInfo.current = { nodeId: null, handleId: null };
+    },
+    [screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, currentMap]
+  );
+
+  // キャンバスクリックで選択解除
+  const onPaneClick = useCallback(() => {
+    setSelectedNodeId(null);
+    setEditingNodeId(null);
+  }, [setSelectedNodeId, setEditingNodeId]);
+
+  // ノードサイズ変更時のハンドラ
+  const onNodeDragStop = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      updateNode(node.id, { position: node.position });
+    },
+    [updateNode]
+  );
+
+  if (!currentMap) {
+    return (
+      <div className="flex h-full items-center justify-center text-gray-400">
+        読み込み中...
+      </div>
+    );
+  }
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onConnectStart={onConnectStart}
+      onConnect={onConnect}
+      onConnectEnd={onConnectEnd}
+      onPaneClick={onPaneClick}
+      onNodeDragStop={onNodeDragStop}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      defaultEdgeOptions={defaultEdgeOptions}
+      fitView
+      fitViewOptions={{ padding: 0.2 }}
+      minZoom={0.1}
+      maxZoom={2}
+      className="bg-gray-900"
+      proOptions={{ hideAttribution: true }}
+    >
+      <Background color="#374151" gap={20} />
+      <Controls className="!bg-gray-800 !border-gray-700 [&>button]:!bg-gray-700 [&>button]:!border-gray-600 [&>button]:!text-gray-300 [&>button:hover]:!bg-gray-600" />
+      <MiniMap
+        nodeColor="#3b82f6"
+        maskColor="rgba(0, 0, 0, 0.8)"
+        className="!bg-gray-800 !border-gray-700"
+      />
+
+      {/* 矢印マーカー定義 */}
+      <svg>
+        <defs>
+          <marker
+            id="arrow"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#6b7280" />
+          </marker>
+        </defs>
+      </svg>
+    </ReactFlow>
+  );
+}
