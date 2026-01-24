@@ -10,7 +10,7 @@ export interface MindMap {
 }
 
 // レイアウト方向
-export type LayoutDirection = 'DOWN' | 'RIGHT' | 'UP' | 'LEFT';
+export type LayoutDirection = 'DOWN' | 'RIGHT';
 
 // ノード
 export interface MapNode {
