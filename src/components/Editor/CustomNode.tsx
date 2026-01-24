@@ -75,12 +75,21 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
           e.preventDefault();
           e.stopPropagation();
           setEditingNodeId(null);
+          return;
         }
-        // 他のキーはTiptapに任せる
+        // Ctrl+Enterで編集終了してノード選択状態に
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+          setEditingNodeId(null);
+          setSelectedNodeId(id);
+          return;
+        }
+        // 他のキーはTiptapに任せる（Enterは改行として動作）
         e.stopPropagation();
       }
     },
-    [isEditing, setEditingNodeId]
+    [isEditing, setEditingNodeId, setSelectedNodeId, id]
   );
 
   return (

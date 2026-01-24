@@ -9,10 +9,58 @@ import {
   getParentNodes,
   getNearestNodeInDirection,
 } from '../utils/graphTraversal';
-import { LayoutDirection } from '../types';
+import { LayoutDirection, MapNode } from '../types';
+
+// ノード位置が既存のノードと重複しているかチェックし、重複している場合は位置をずらす
+// offsetDirection: 'x' = X方向のみ, 'y' = Y方向のみ, 'both' = 両方向
+function adjustPositionToAvoidOverlap(
+  position: { x: number; y: number },
+  existingNodes: MapNode[],
+  offsetDirection: 'x' | 'y' | 'both' = 'both'
+): { x: number; y: number } {
+  let adjustedPosition = { ...position };
+  let attempts = 0;
+  const maxAttempts = 20;
+  const offsetStep = 100; // ノードサイズを考慮したオフセット
+  // ノードサイズに基づいた重複判定のしきい値
+  const thresholdX = 150; // ノードの最小幅
+  const thresholdY = 60;  // ノードの概算高さ
+
+  while (attempts < maxAttempts) {
+    const hasOverlap = existingNodes.some((node) => {
+      const dx = Math.abs(node.position.x - adjustedPosition.x);
+      const dy = Math.abs(node.position.y - adjustedPosition.y);
+
+      // offsetDirectionに応じて重複判定の方向を決める
+      if (offsetDirection === 'x') {
+        // X方向にオフセットする場合、同じY座標帯にあるノードとのX方向の重複をチェック
+        return dy < thresholdY && dx < thresholdX;
+      } else if (offsetDirection === 'y') {
+        // Y方向にオフセットする場合、同じX座標帯にあるノードとのY方向の重複をチェック
+        return dx < thresholdX && dy < thresholdY;
+      } else {
+        // 両方向の場合
+        return dx < thresholdX && dy < thresholdY;
+      }
+    });
+
+    if (!hasOverlap) {
+      break;
+    }
+
+    // 重複している場合は指定された方向に位置をずらす
+    adjustedPosition = {
+      x: adjustedPosition.x + (offsetDirection === 'y' ? 0 : offsetStep),
+      y: adjustedPosition.y + (offsetDirection === 'x' ? 0 : offsetStep),
+    };
+    attempts++;
+  }
+
+  return adjustedPosition;
+}
 
 export function useKeyboardShortcuts() {
-  const { fitView, zoomIn, zoomOut } = useReactFlow();
+  const { fitView, zoomIn, zoomOut, getViewport } = useReactFlow();
   const { currentMap, addNode, deleteNode, undo, redo, setLayoutDirection } = useMapStore();
   const {
     selectedNodeId,
@@ -24,6 +72,27 @@ export function useKeyboardShortcuts() {
   } = useUIStore();
   const { getActionForKey } = useKeybindStore();
   const { applyLayout } = useAutoLayout();
+
+  // ノードがビューポート内に表示されているかチェック
+  const isNodeInViewport = useCallback(
+    (nodePosition: { x: number; y: number }) => {
+      const viewport = getViewport();
+      // ビューポートの表示範囲を計算（おおよその値）
+      const viewportWidth = window.innerWidth / viewport.zoom;
+      const viewportHeight = window.innerHeight / viewport.zoom;
+      const viewportX = -viewport.x / viewport.zoom;
+      const viewportY = -viewport.y / viewport.zoom;
+
+      const margin = 100; // マージンを設けて少し余裕を持たせる
+      return (
+        nodePosition.x >= viewportX - margin &&
+        nodePosition.x <= viewportX + viewportWidth + margin &&
+        nodePosition.y >= viewportY - margin &&
+        nodePosition.y <= viewportY + viewportHeight + margin
+      );
+    },
+    [getViewport]
+  );
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -67,15 +136,24 @@ export function useKeyboardShortcuts() {
               // 子ノードの位置はレイアウト方向に応じて設定
               const direction = currentMap.layoutDirection;
               let childPosition = { x: activeNode.position.x, y: activeNode.position.y };
+              let sourceHandle: string;
+              let targetHandle: string;
 
               switch (direction) {
                 case 'DOWN':
                   childPosition = { x: activeNode.position.x, y: activeNode.position.y + 120 };
+                  sourceHandle = 'bottom';
+                  targetHandle = 'top';
                   break;
                 case 'RIGHT':
                   childPosition = { x: activeNode.position.x + 200, y: activeNode.position.y };
+                  sourceHandle = 'right';
+                  targetHandle = 'left';
                   break;
               }
+
+              // 既存ノードとの重複を避ける
+              const adjustedPosition = adjustPositionToAvoidOverlap(childPosition, currentMap.nodes);
 
               const newNodeId = addNode(
                 {
@@ -83,14 +161,18 @@ export function useKeyboardShortcuts() {
                     type: 'doc',
                     content: [{ type: 'paragraph', content: [{ type: 'text', text: '新しいノード' }] }],
                   }),
-                  position: childPosition,
+                  position: adjustedPosition,
                 },
-                activeNodeId
+                activeNodeId,
+                sourceHandle,
+                targetHandle
               );
               if (newNodeId) {
                 setSelectedNodeId(newNodeId);
-                // レイアウトを適用して正しい位置に配置
-                setTimeout(() => applyLayout(), 10);
+                // ノードがビューポート外の場合は全体表示
+                if (!isNodeInViewport(adjustedPosition)) {
+                  setTimeout(() => fitView({ padding: 0.2 }), 50);
+                }
               }
             }
           }
@@ -108,17 +190,29 @@ export function useKeyboardShortcuts() {
               // 兄弟ノードの位置はレイアウト方向に応じて設定
               const direction = currentMap.layoutDirection;
               let siblingPosition = { x: activeNode.position.x, y: activeNode.position.y };
+              let sourceHandle: string | undefined;
+              let targetHandle: string | undefined;
+              let offsetDirection: 'x' | 'y';
 
               switch (direction) {
                 case 'DOWN':
                   // 縦方向レイアウトの場合、兄弟は横に配置
                   siblingPosition = { x: activeNode.position.x + 200, y: activeNode.position.y };
+                  sourceHandle = 'bottom';
+                  targetHandle = 'top';
+                  offsetDirection = 'x'; // 重複時はX方向のみにオフセット
                   break;
                 case 'RIGHT':
                   // 横方向レイアウトの場合、兄弟は縦に配置
                   siblingPosition = { x: activeNode.position.x, y: activeNode.position.y + 100 };
+                  sourceHandle = 'right';
+                  targetHandle = 'left';
+                  offsetDirection = 'y'; // 重複時はY方向のみにオフセット
                   break;
               }
+
+              // 既存ノードとの重複を避ける（レイアウト方向に応じた方向にのみオフセット）
+              const adjustedPosition = adjustPositionToAvoidOverlap(siblingPosition, currentMap.nodes, offsetDirection);
 
               const newNodeId = addNode(
                 {
@@ -126,14 +220,18 @@ export function useKeyboardShortcuts() {
                     type: 'doc',
                     content: [{ type: 'paragraph', content: [{ type: 'text', text: '新しいノード' }] }],
                   }),
-                  position: siblingPosition,
+                  position: adjustedPosition,
                 },
-                parentId // 親がいない場合は undefined になり、独立ノードになる
+                parentId, // 親がいない場合は undefined になり、独立ノードになる
+                sourceHandle,
+                targetHandle
               );
               if (newNodeId) {
                 setSelectedNodeId(newNodeId);
-                // レイアウトを適用
-                setTimeout(() => applyLayout(), 10);
+                // ノードがビューポート外の場合は全体表示
+                if (!isNodeInViewport(adjustedPosition)) {
+                  setTimeout(() => fitView({ padding: 0.2 }), 50);
+                }
               }
             }
           } else if (currentMap && currentMap.nodes.length > 0) {
@@ -147,7 +245,6 @@ export function useKeyboardShortcuts() {
           if (activeNodeId) {
             deleteNode(activeNodeId);
             setSelectedNodeId(null);
-            applyLayout();
           }
           break;
         }
@@ -279,6 +376,7 @@ export function useKeyboardShortcuts() {
       zoomIn,
       zoomOut,
       applyLayout,
+      isNodeInViewport,
     ]
   );
 

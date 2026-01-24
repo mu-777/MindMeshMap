@@ -11,18 +11,18 @@ function AppContent() {
   const { isSidebarOpen, isHelpModalOpen, setHelpModalOpen } = useUIStore();
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-gray-900">
-      {/* サイドバー */}
-      {isSidebarOpen && (
-        <div className="w-64 flex-shrink-0 border-r border-gray-700 bg-gray-800">
-          <MapList />
-        </div>
-      )}
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-900">
+      {/* ツールバー（最上部に固定） */}
+      <Toolbar />
 
-      {/* メインエリア */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* ツールバー */}
-        <Toolbar />
+      {/* メインエリア（サイドバー + キャンバス） */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* サイドバー */}
+        {isSidebarOpen && (
+          <div className="w-64 flex-shrink-0 border-r border-gray-700 bg-gray-800">
+            <MapList />
+          </div>
+        )}
 
         {/* キャンバス */}
         <div className="flex-1 overflow-hidden">

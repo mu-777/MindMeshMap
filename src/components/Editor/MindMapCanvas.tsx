@@ -3,8 +3,8 @@ import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   Connection,
+  ConnectionMode,
   applyNodeChanges,
   applyEdgeChanges,
   MarkerType,
@@ -48,7 +48,7 @@ export function MindMapCanvas() {
     addNode,
     addEdge: storeAddEdge,
   } = useMapStore();
-  const { selectedNodeId, setSelectedNodeId, setEditingNodeId } = useUIStore();
+  const { selectedNodeId, selectedNodeIds, setSelectedNodeId, toggleNodeSelection, clearMultiSelection, setEditingNodeId } = useUIStore();
   const { screenToFlowPosition } = useReactFlow();
   const connectingInfo = useRef<{ nodeId: string | null; handleId: string | null }>({
     nodeId: null,
@@ -70,9 +70,9 @@ export function MindMapCanvas() {
       type: 'custom' as const,
       position: node.position,
       data: { content: node.content },
-      selected: node.id === selectedNodeId,
+      selected: node.id === selectedNodeId || selectedNodeIds.has(node.id),
     }));
-  }, [currentMap, selectedNodeId]);
+  }, [currentMap, selectedNodeId, selectedNodeIds]);
 
   // エッジをReact Flow形式に変換
   const edges: CustomEdgeType[] = useMemo(() => {
@@ -210,11 +210,26 @@ export function MindMapCanvas() {
     [screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, currentMap]
   );
 
+  // ノードクリック（Shift+クリックで複数選択）
+  const onNodeClick = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      if (event.shiftKey) {
+        // Shift+クリックで複数選択をトグル
+        toggleNodeSelection(node.id);
+      } else {
+        // 通常クリックは単一選択
+        setSelectedNodeId(node.id);
+      }
+    },
+    [toggleNodeSelection, setSelectedNodeId]
+  );
+
   // キャンバスクリックで選択解除
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
+    clearMultiSelection();
     setEditingNodeId(null);
-  }, [setSelectedNodeId, setEditingNodeId]);
+  }, [setSelectedNodeId, clearMultiSelection, setEditingNodeId]);
 
   // ノードサイズ変更時のハンドラ
   const onNodeDragStop = useCallback(
@@ -241,11 +256,13 @@ export function MindMapCanvas() {
       onConnectStart={onConnectStart}
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
+      onNodeClick={onNodeClick}
       onPaneClick={onPaneClick}
       onNodeDragStop={onNodeDragStop}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       defaultEdgeOptions={defaultEdgeOptions}
+      connectionMode={ConnectionMode.Loose}
       fitView
       fitViewOptions={{ padding: 0.2 }}
       minZoom={0.1}
@@ -255,11 +272,6 @@ export function MindMapCanvas() {
     >
       <Background color="#374151" gap={20} />
       <Controls className="!bg-gray-800 !border-gray-700 [&>button]:!bg-gray-700 [&>button]:!border-gray-600 [&>button]:!text-gray-300 [&>button:hover]:!bg-gray-600" />
-      <MiniMap
-        nodeColor="#3b82f6"
-        maskColor="rgba(0, 0, 0, 0.8)"
-        className="!bg-gray-800 !border-gray-700"
-      />
 
       {/* 矢印マーカー定義 */}
       <svg>
