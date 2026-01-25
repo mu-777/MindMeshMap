@@ -49,11 +49,31 @@ export function MindMapCanvas() {
     addEdge: storeAddEdge,
   } = useMapStore();
   const { selectedNodeId, selectedNodeIds, setSelectedNodeId, toggleNodeSelection, clearMultiSelection, setEditingNodeId } = useUIStore();
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView, getViewport } = useReactFlow();
   const connectingInfo = useRef<{ nodeId: string | null; handleId: string | null }>({
     nodeId: null,
     handleId: null,
   });
+
+  // ノードがビューポート内に表示されているかチェック
+  const isNodeInViewport = useCallback(
+    (nodePosition: { x: number; y: number }) => {
+      const viewport = getViewport();
+      const viewportWidth = window.innerWidth / viewport.zoom;
+      const viewportHeight = window.innerHeight / viewport.zoom;
+      const viewportX = -viewport.x / viewport.zoom;
+      const viewportY = -viewport.y / viewport.zoom;
+
+      const margin = 100;
+      return (
+        nodePosition.x >= viewportX - margin &&
+        nodePosition.x <= viewportX + viewportWidth + margin &&
+        nodePosition.y >= viewportY - margin &&
+        nodePosition.y <= viewportY + viewportHeight + margin
+      );
+    },
+    [getViewport]
+  );
 
   // 初回マウント時に新規マップを作成
   useEffect(() => {
@@ -194,12 +214,16 @@ export function MindMapCanvas() {
         if (newNodeId) {
           setSelectedNodeId(newNodeId);
           setEditingNodeId(newNodeId);
+          // ノードがビューポート外の場合は全体表示
+          if (!isNodeInViewport(position)) {
+            setTimeout(() => fitView({ padding: 0.2 }), 50);
+          }
         }
       }
 
       connectingInfo.current = { nodeId: null, handleId: null };
     },
-    [screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, currentMap]
+    [screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, currentMap, isNodeInViewport, fitView]
   );
 
   // ノードクリック（Shift+クリックで複数選択）
