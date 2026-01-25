@@ -6,6 +6,8 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 
+const LONG_PRESS_DURATION = 500; // 長押し判定時間（ミリ秒）
+
 export type CustomNodeData = {
   content: string;
 };
@@ -14,9 +16,11 @@ export type CustomNodeType = Node<CustomNodeData, 'custom'>;
 
 function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) {
   const { updateNode } = useMapStore();
-  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection } = useUIStore();
+  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu } = useUIStore();
   const isEditing = editingNodeId === id;
   const containerRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Tiptapエディタの初期化
   const editor = useEditor({
@@ -98,6 +102,73 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     [isEditing, setEditingNodeId, setSelectedNodeId, id]
   );
 
+  // 右クリックでコンテキストメニュー表示
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openContextMenu(id, e.clientX, e.clientY);
+    },
+    [id, openContextMenu]
+  );
+
+  // 長押しタイマーをクリア
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    touchStartPosRef.current = null;
+  }, []);
+
+  // タッチ開始（長押し検出開始）
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (isEditing) return;
+
+      const touch = e.touches[0];
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+      longPressTimerRef.current = setTimeout(() => {
+        if (touchStartPosRef.current) {
+          openContextMenu(id, touchStartPosRef.current.x, touchStartPosRef.current.y);
+        }
+      }, LONG_PRESS_DURATION);
+    },
+    [id, isEditing, openContextMenu]
+  );
+
+  // タッチ移動（指が動いたら長押しキャンセル）
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (!touchStartPosRef.current) return;
+
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+      const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+
+      // 10px以上動いたらキャンセル
+      if (dx > 10 || dy > 10) {
+        clearLongPressTimer();
+      }
+    },
+    [clearLongPressTimer]
+  );
+
+  // タッチ終了
+  const handleTouchEnd = useCallback(() => {
+    clearLongPressTimer();
+  }, [clearLongPressTimer]);
+
+  // コンポーネントアンマウント時にタイマーをクリア
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div
       ref={containerRef}
@@ -110,6 +181,11 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onKeyDown={handleKeyDown}
+      onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
     >
       {/* 上側ハンドル */}
       <Handle

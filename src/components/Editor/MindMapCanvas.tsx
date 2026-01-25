@@ -18,6 +18,7 @@ import '@xyflow/react/dist/style.css';
 
 import { CustomNode, type CustomNodeType } from './CustomNode';
 import { CustomEdge, type CustomEdgeType } from './CustomEdge';
+import { ContextMenu } from './ContextMenu';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 
@@ -48,7 +49,7 @@ export function MindMapCanvas() {
     addNode,
     addEdge: storeAddEdge,
   } = useMapStore();
-  const { selectedNodeId, selectedNodeIds, setSelectedNodeId, toggleNodeSelection, clearMultiSelection, setEditingNodeId } = useUIStore();
+  const { selectedNodeId, selectedNodeIds, setSelectedNodeId, toggleNodeSelection, clearMultiSelection, setEditingNodeId, closeContextMenu } = useUIStore();
   const { screenToFlowPosition, fitView, getViewport } = useReactFlow();
   const connectingInfo = useRef<{ nodeId: string | null; handleId: string | null }>({
     nodeId: null,
@@ -266,7 +267,8 @@ export function MindMapCanvas() {
     setSelectedNodeId(null);
     clearMultiSelection();
     setEditingNodeId(null);
-  }, [setSelectedNodeId, clearMultiSelection, setEditingNodeId]);
+    closeContextMenu();
+  }, [setSelectedNodeId, clearMultiSelection, setEditingNodeId, closeContextMenu]);
 
   // ノードサイズ変更時のハンドラ
   const onNodeDragStop = useCallback(
@@ -285,6 +287,8 @@ export function MindMapCanvas() {
   }
 
   return (
+    <>
+    <ContextMenu />
     <ReactFlow
       nodes={nodes}
       edges={edges}
@@ -327,5 +331,6 @@ export function MindMapCanvas() {
         </defs>
       </svg>
     </ReactFlow>
+    </>
   );
 }

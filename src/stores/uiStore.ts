@@ -1,9 +1,16 @@
 import { create } from 'zustand';
 import { UIState } from '../types';
 
+export interface ContextMenuState {
+  nodeId: string;
+  x: number;
+  y: number;
+}
+
 interface UIStoreState extends UIState {
   lastSelectedNodeId: string | null;
   selectedNodeIds: string[];
+  contextMenu: ContextMenuState | null;
   setSelectedNodeId: (nodeId: string | null) => void;
   toggleNodeSelection: (nodeId: string) => void;
   clearMultiSelection: () => void;
@@ -12,6 +19,8 @@ interface UIStoreState extends UIState {
   toggleSidebar: () => void;
   setHelpModalOpen: (open: boolean) => void;
   toggleHelpModal: () => void;
+  openContextMenu: (nodeId: string, x: number, y: number) => void;
+  closeContextMenu: () => void;
 }
 
 export const useUIStore = create<UIStoreState>((set) => ({
@@ -21,6 +30,7 @@ export const useUIStore = create<UIStoreState>((set) => ({
   editingNodeId: null,
   isSidebarOpen: true,
   isHelpModalOpen: false,
+  contextMenu: null,
 
   setSelectedNodeId: (nodeId) =>
     set((state) => ({
@@ -62,4 +72,8 @@ export const useUIStore = create<UIStoreState>((set) => ({
   setHelpModalOpen: (open) => set({ isHelpModalOpen: open }),
 
   toggleHelpModal: () => set((state) => ({ isHelpModalOpen: !state.isHelpModalOpen })),
+
+  openContextMenu: (nodeId, x, y) => set({ contextMenu: { nodeId, x, y } }),
+
+  closeContextMenu: () => set({ contextMenu: null }),
 }));
