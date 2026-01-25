@@ -183,8 +183,6 @@ export function MindMapCanvas() {
       const { nodeId, handleId } = connectingInfo.current;
       if (!nodeId) return;
 
-      const targetIsPane = (event.target as Element).classList.contains('react-flow__pane');
-
       // MouseEventまたはTouchEventから座標を取得
       let clientX: number | undefined;
       let clientY: number | undefined;
@@ -197,7 +195,18 @@ export function MindMapCanvas() {
         clientY = event.changedTouches[0].clientY;
       }
 
-      if (targetIsPane && clientX !== undefined && clientY !== undefined && currentMap) {
+      if (clientX === undefined || clientY === undefined || !currentMap) {
+        connectingInfo.current = { nodeId: null, handleId: null };
+        return;
+      }
+
+      // ドロップ位置の要素を取得（タッチイベントではevent.targetがドラッグ開始位置を指すため）
+      const elementAtPoint = document.elementFromPoint(clientX, clientY);
+      const targetIsPane = elementAtPoint?.classList.contains('react-flow__pane') ?? false;
+      // ノード上にドロップした場合は新規作成しない
+      const isOverNode = elementAtPoint?.closest('.react-flow__node') !== null;
+
+      if (targetIsPane || (!isOverNode && elementAtPoint?.closest('.react-flow'))) {
         // スクリーン座標をFlow座標に変換
         const position = screenToFlowPosition({
           x: clientX,
