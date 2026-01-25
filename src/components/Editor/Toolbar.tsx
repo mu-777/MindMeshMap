@@ -143,7 +143,7 @@ export function Toolbar() {
   return (
     <div className="flex h-12 items-center justify-between border-b border-gray-700 bg-gray-800 px-2 md:px-4">
       {/* 左側：アプリ名・ファイル操作 */}
-      <div className="flex items-center gap-1 md:gap-2">
+      <div className="flex flex-shrink-0 items-center gap-1 md:gap-2">
         <button
           onClick={toggleSidebar}
           className="rounded p-1.5 text-gray-400 hover:bg-gray-700 hover:text-white md:p-2"
@@ -273,7 +273,7 @@ export function Toolbar() {
       </div>
 
       {/* 中央：マップ名（クリックで編集可能） */}
-      <div className="flex min-w-0 flex-1 items-center justify-center gap-1 px-2 md:flex-none md:gap-2">
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-1 px-2 md:gap-2">
         {isEditingTitle ? (
           <input
             ref={titleInputRef}
@@ -282,12 +282,12 @@ export function Toolbar() {
             onChange={handleTitleChange}
             onBlur={handleTitleSubmit}
             onKeyDown={handleTitleKeyDown}
-            className="w-full max-w-[200px] rounded border border-blue-500 bg-gray-700 px-2 py-0.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded border border-blue-500 bg-gray-700 px-2 py-0.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         ) : (
           <button
             onClick={handleTitleClick}
-            className="max-w-[120px] truncate rounded px-2 py-0.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white md:max-w-none"
+            className="truncate rounded px-2 py-0.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
             title="クリックしてタイトルを編集"
           >
             {currentMap?.name || '無題のマップ'}
@@ -298,7 +298,7 @@ export function Toolbar() {
 
       {/* 右側：レイアウト・ズーム・認証 */}
       {/* デスクトップ表示 */}
-      <div className="hidden items-center gap-2 md:flex">
+      <div className="hidden flex-shrink-0 items-center gap-2 md:flex">
         <select
           value={currentMap?.layoutDirection || 'DOWN'}
           onChange={handleLayoutDirectionChange}
@@ -343,7 +343,7 @@ export function Toolbar() {
       </div>
 
       {/* モバイル表示：⋮ドロップダウン */}
-      <div className="relative md:hidden" ref={toolMenuRef}>
+      <div className="relative flex-shrink-0 md:hidden" ref={toolMenuRef}>
         <button
           onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
           className="rounded p-2 text-gray-400 hover:bg-gray-700 hover:text-white"
