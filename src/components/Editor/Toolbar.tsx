@@ -273,7 +273,7 @@ export function Toolbar() {
       </div>
 
       {/* 中央：マップ名（クリックで編集可能） */}
-      <div className="flex min-w-0 flex-1 items-center justify-center gap-1 px-2 md:gap-2">
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden px-2 md:gap-2">
         {isEditingTitle ? (
           <input
             ref={titleInputRef}
@@ -282,18 +282,18 @@ export function Toolbar() {
             onChange={handleTitleChange}
             onBlur={handleTitleSubmit}
             onKeyDown={handleTitleKeyDown}
-            className="w-full rounded border border-blue-500 bg-gray-700 px-2 py-0.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="max-w-full rounded border border-blue-500 bg-gray-700 px-2 py-0.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         ) : (
           <button
             onClick={handleTitleClick}
-            className="truncate rounded px-2 py-0.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+            className="min-w-0 max-w-full truncate rounded px-2 py-0.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
             title="クリックしてタイトルを編集"
           >
             {currentMap?.name || '無題のマップ'}
           </button>
         )}
-        {isDirty && <span className="text-xs text-yellow-500">*</span>}
+        {isDirty && <span className="flex-shrink-0 text-xs text-yellow-500">*</span>}
       </div>
 
       {/* 右側：レイアウト・ズーム・認証 */}
