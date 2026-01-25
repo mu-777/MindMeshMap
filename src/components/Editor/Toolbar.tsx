@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -17,6 +17,7 @@ export function Toolbar() {
     currentFileId,
     isDirty,
     createNewMap,
+    updateMap,
     setLayoutDirection,
     undo,
     redo,
@@ -28,6 +29,50 @@ export function Toolbar() {
   const { isSignedIn } = useAuthStore();
   const { saveMap, isLoading } = useGoogleDrive();
   const { applyLayout } = useAutoLayout();
+
+  // タイトル編集用のstate
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editingTitle, setEditingTitle] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // タイトル編集開始時にフォーカス
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditingTitle]);
+
+  const handleTitleClick = useCallback(() => {
+    setEditingTitle(currentMap?.name || '');
+    setIsEditingTitle(true);
+  }, [currentMap?.name]);
+
+  const handleTitleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setEditingTitle(e.target.value);
+    },
+    []
+  );
+
+  const handleTitleSubmit = useCallback(() => {
+    const trimmedTitle = editingTitle.trim();
+    if (trimmedTitle && trimmedTitle !== currentMap?.name) {
+      updateMap({ name: trimmedTitle });
+    }
+    setIsEditingTitle(false);
+  }, [editingTitle, currentMap?.name, updateMap]);
+
+  const handleTitleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        handleTitleSubmit();
+      } else if (e.key === 'Escape') {
+        setIsEditingTitle(false);
+      }
+    },
+    [handleTitleSubmit]
+  );
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
@@ -165,11 +210,28 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* 中央：マップ名 */}
+      {/* 中央：マップ名（クリックで編集可能） */}
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-300">
-          {currentMap?.name || '無題のマップ'}
-        </span>
+        {isEditingTitle ? (
+          <input
+            ref={titleInputRef}
+            type="text"
+            value={editingTitle}
+            onChange={handleTitleChange}
+            onBlur={handleTitleSubmit}
+            onKeyDown={handleTitleKeyDown}
+            className="rounded border border-blue-500 bg-gray-700 px-2 py-0.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            style={{ minWidth: '120px' }}
+          />
+        ) : (
+          <button
+            onClick={handleTitleClick}
+            className="rounded px-2 py-0.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+            title="クリックしてタイトルを編集"
+          >
+            {currentMap?.name || '無題のマップ'}
+          </button>
+        )}
         {isDirty && <span className="text-xs text-yellow-500">*</span>}
       </div>
 
