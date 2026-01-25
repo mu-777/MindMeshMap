@@ -17,8 +17,9 @@ export function useAutoLayout() {
     }
     selectedNodeIds.forEach((id) => selectedIds.add(id));
 
-    // 選択されたノードがある場合、選択されたノードとその関連ノードだけをレイアウト
-    if (selectedIds.size > 0) {
+    // 選択されたノードが複数ある場合のみ、選択されたノードとその関連ノードだけをレイアウト
+    // 1つだけ選択されている場合や何も選択されていない場合は全ノードをレイアウト
+    if (selectedIds.size > 1) {
       // 選択されたノードに関連するエッジを取得
       const relatedEdges = currentMap.edges.filter(
         (edge) => selectedIds.has(edge.source) || selectedIds.has(edge.target)
