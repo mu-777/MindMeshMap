@@ -185,11 +185,23 @@ export function MindMapCanvas() {
 
       const targetIsPane = (event.target as Element).classList.contains('react-flow__pane');
 
-      if (targetIsPane && event instanceof MouseEvent && currentMap) {
+      // MouseEventまたはTouchEventから座標を取得
+      let clientX: number | undefined;
+      let clientY: number | undefined;
+
+      if (event instanceof MouseEvent) {
+        clientX = event.clientX;
+        clientY = event.clientY;
+      } else if (event instanceof TouchEvent && event.changedTouches.length > 0) {
+        clientX = event.changedTouches[0].clientX;
+        clientY = event.changedTouches[0].clientY;
+      }
+
+      if (targetIsPane && clientX !== undefined && clientY !== undefined && currentMap) {
         // スクリーン座標をFlow座標に変換
         const position = screenToFlowPosition({
-          x: event.clientX,
-          y: event.clientY,
+          x: clientX,
+          y: clientY,
         });
 
         // レイアウト方向に応じてハンドルを決定
