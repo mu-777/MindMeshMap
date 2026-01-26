@@ -408,6 +408,12 @@ export function MindMapCanvas() {
   return (
     <>
     <ContextMenu />
+    <div
+      className="h-full w-full"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
     <ReactFlow
       nodes={nodes}
       edges={edges}
@@ -419,9 +425,6 @@ export function MindMapCanvas() {
       onNodeClick={onNodeClick}
       onPaneClick={onPaneClick}
       onDoubleClick={onDoubleClick}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
       onNodeDragStop={onNodeDragStop}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
@@ -454,6 +457,7 @@ export function MindMapCanvas() {
         </defs>
       </svg>
     </ReactFlow>
+    </div>
     </>
   );
 }
