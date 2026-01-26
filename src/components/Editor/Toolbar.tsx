@@ -141,9 +141,9 @@ export function Toolbar() {
   }, [applyLayout]);
 
   return (
-    <div className="flex h-12 items-center justify-between border-b border-gray-700 bg-gray-800 px-2 md:px-4">
+    <div className="relative flex h-12 items-center justify-between border-b border-gray-700 bg-gray-800 px-2 md:px-4">
       {/* 左側：アプリ名・ファイル操作 */}
-      <div className="flex flex-shrink-0 items-center gap-1 md:gap-2">
+      <div className="z-10 flex flex-shrink-0 items-center gap-1 md:gap-2">
         <button
           onClick={toggleSidebar}
           className="rounded p-1.5 text-gray-400 hover:bg-gray-700 hover:text-white md:p-2"
@@ -272,8 +272,8 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* 中央：マップ名（クリックで編集可能） */}
-      <div className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden px-2 md:gap-2">
+      {/* 中央：マップ名（クリックで編集可能）- 絶対位置でブラウザ中央に配置 */}
+      <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1 md:gap-2">
         {isEditingTitle ? (
           <input
             ref={titleInputRef}
@@ -298,7 +298,7 @@ export function Toolbar() {
 
       {/* 右側：レイアウト・ズーム・認証 */}
       {/* デスクトップ表示 */}
-      <div className="hidden flex-shrink-0 items-center gap-2 md:flex">
+      <div className="z-10 hidden flex-shrink-0 items-center gap-2 md:flex">
         <select
           value={currentMap?.layoutDirection || 'DOWN'}
           onChange={handleLayoutDirectionChange}
@@ -343,7 +343,7 @@ export function Toolbar() {
       </div>
 
       {/* モバイル表示：⋮ドロップダウン */}
-      <div className="relative flex-shrink-0 md:hidden" ref={toolMenuRef}>
+      <div className="relative z-10 flex-shrink-0 md:hidden" ref={toolMenuRef}>
         <button
           onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
           className="rounded p-2 text-gray-400 hover:bg-gray-700 hover:text-white"
