@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -15,6 +16,7 @@ export type CustomNodeData = {
 export type CustomNodeType = Node<CustomNodeData, 'custom'>;
 
 function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) {
+  const { t } = useTranslation();
   const { updateNode } = useMapStore();
   const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu } = useUIStore();
   const isEditing = editingNodeId === id;
@@ -27,7 +29,7 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: 'テキストを入力...',
+        placeholder: t('editor.placeholder'),
       }),
     ],
     content: (() => {

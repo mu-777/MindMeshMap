@@ -1,15 +1,15 @@
+import { useTranslation } from 'react-i18next';
 import { Modal } from './Modal';
 import { useKeybindStore } from '../../stores/keybindStore';
-import { keybindDescriptions } from '../../config/defaultKeybinds';
 import { KeybindAction } from '../../types';
 
 interface KeyboardShortcutHelpProps {
   onClose: () => void;
 }
 
-const shortcutGroups: { title: string; actions: KeybindAction[] }[] = [
+const shortcutGroups: { titleKey: string; actions: KeybindAction[] }[] = [
   {
-    title: 'ノード操作',
+    titleKey: 'shortcuts.nodeOperations',
     actions: [
       'createChildNode',
       'createSiblingNode',
@@ -19,7 +19,7 @@ const shortcutGroups: { title: string; actions: KeybindAction[] }[] = [
     ],
   },
   {
-    title: 'ナビゲーション',
+    titleKey: 'shortcuts.navigation',
     actions: [
       'selectParent',
       'selectChild',
@@ -28,16 +28,17 @@ const shortcutGroups: { title: string; actions: KeybindAction[] }[] = [
     ],
   },
   {
-    title: '編集',
+    titleKey: 'shortcuts.editing',
     actions: ['undo', 'redo', 'save'],
   },
   {
-    title: '表示',
+    titleKey: 'shortcuts.view',
     actions: ['zoomIn', 'zoomOut', 'fitView', 'toggleLayoutDirection'],
   },
 ];
 
 export function KeyboardShortcutHelp({ onClose }: KeyboardShortcutHelpProps) {
+  const { t } = useTranslation();
   const { keybinds } = useKeybindStore();
 
   const formatKey = (key: string) => {
@@ -50,12 +51,12 @@ export function KeyboardShortcutHelp({ onClose }: KeyboardShortcutHelpProps) {
   };
 
   return (
-    <Modal isOpen={true} onClose={onClose} title="キーボードショートカット">
+    <Modal isOpen={true} onClose={onClose} title={t('shortcuts.title')}>
       <div className="space-y-6">
         {shortcutGroups.map((group) => (
-          <div key={group.title}>
+          <div key={group.titleKey}>
             <h3 className="mb-3 text-sm font-medium text-gray-400">
-              {group.title}
+              {t(group.titleKey)}
             </h3>
             <div className="space-y-2">
               {group.actions.map((action) => (
@@ -64,7 +65,7 @@ export function KeyboardShortcutHelp({ onClose }: KeyboardShortcutHelpProps) {
                   className="flex items-center justify-between rounded bg-gray-700/50 px-3 py-2"
                 >
                   <span className="text-sm text-gray-300">
-                    {keybindDescriptions[action]}
+                    {t(`keybinds.${action}`)}
                   </span>
                   <kbd className="rounded bg-gray-600 px-2 py-1 font-mono text-xs text-gray-200">
                     {formatKey(keybinds[action])}
@@ -77,7 +78,7 @@ export function KeyboardShortcutHelp({ onClose }: KeyboardShortcutHelpProps) {
 
         <div className="border-t border-gray-700 pt-4">
           <p className="text-center text-xs text-gray-500">
-            ? キーでこのヘルプを表示
+            {t('shortcuts.helpHint')}
           </p>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapMeta } from '../../types';
 
 interface MapListItemProps {
@@ -14,13 +15,18 @@ function MapListItemComponent({
   onOpen,
   onDelete,
 }: MapListItemProps) {
-  const formattedDate = new Date(map.updatedAt).toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const { t, i18n } = useTranslation();
+
+  const formattedDate = new Date(map.updatedAt).toLocaleDateString(
+    i18n.language === 'ja' ? 'ja-JP' : 'en-US',
+    {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }
+  );
 
   return (
     <li
@@ -63,7 +69,7 @@ function MapListItemComponent({
           onDelete();
         }}
         className="ml-2 rounded p-1 text-gray-500 opacity-0 transition-opacity hover:bg-gray-600 hover:text-red-400 group-hover:opacity-100"
-        title="削除"
+        title={t('common.delete')}
       >
         <svg
           className="h-4 w-4"

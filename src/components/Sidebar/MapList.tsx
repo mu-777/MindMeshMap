@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/authStore';
 import { useMapStore } from '../../stores/mapStore';
 import { useGoogleDrive } from '../../hooks/useGoogleDrive';
@@ -7,6 +8,7 @@ import { MapListItem } from './MapListItem';
 import { GoogleAuthButton } from '../Auth/GoogleAuthButton';
 
 export function MapList() {
+  const { t } = useTranslation();
   const { isSignedIn } = useAuthStore();
   const { currentFileId, isDirty, setDirty } = useMapStore();
   const { listMaps, loadMap, deleteMap, isLoading, error } = useGoogleDrive();
@@ -34,9 +36,7 @@ export function MapList() {
   const handleOpenMap = useCallback(
     async (fileId: string) => {
       if (isDirty) {
-        const confirm = window.confirm(
-          '保存されていない変更があります。続行しますか？'
-        );
+        const confirm = window.confirm(t('dialogs.unsavedChangesContinue'));
         if (!confirm) return;
       }
 
@@ -46,16 +46,16 @@ export function MapList() {
         setDirty(false);
       } catch (err) {
         console.error('Failed to load map:', err);
-        alert('マップの読み込みに失敗しました');
+        alert(t('dialogs.loadFailed'));
       }
     },
-    [isDirty, loadMap, setCurrentMap, setDirty]
+    [isDirty, loadMap, setCurrentMap, setDirty, t]
   );
 
   // マップを削除
   const handleDeleteMap = useCallback(
     async (fileId: string, name: string) => {
-      const confirm = window.confirm(`"${name}" を削除しますか？`);
+      const confirm = window.confirm(t('dialogs.deleteConfirm', { name }));
       if (!confirm) return;
 
       try {
@@ -63,10 +63,10 @@ export function MapList() {
         await fetchMaps();
       } catch (err) {
         console.error('Failed to delete map:', err);
-        alert('削除に失敗しました');
+        alert(t('dialogs.deleteFailed'));
       }
     },
-    [deleteMap, fetchMaps]
+    [deleteMap, fetchMaps, t]
   );
 
   if (!isSignedIn) {
@@ -86,9 +86,7 @@ export function MapList() {
           />
         </svg>
         <p className="mb-4 text-sm text-gray-400">
-          Googleでログインすると
-          <br />
-          マップを保存・同期できます
+          {t('mapList.signInPrompt')}
         </p>
         <GoogleAuthButton />
       </div>
@@ -99,12 +97,12 @@ export function MapList() {
     <div className="flex h-full flex-col">
       {/* ヘッダー */}
       <div className="flex items-center justify-between border-b border-gray-700 px-4 py-3">
-        <h2 className="text-sm font-medium text-gray-300">マップ一覧</h2>
+        <h2 className="text-sm font-medium text-gray-300">{t('mapList.title')}</h2>
         <button
           onClick={fetchMaps}
           disabled={isLoading}
           className="rounded p-1 text-gray-400 hover:bg-gray-700 hover:text-white disabled:opacity-50"
-          title="更新"
+          title={t('common.refresh')}
         >
           <svg
             className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
@@ -137,7 +135,7 @@ export function MapList() {
           </div>
         ) : maps.length === 0 ? (
           <div className="p-4 text-center text-sm text-gray-500">
-            マップがありません
+            {t('mapList.noMaps')}
           </div>
         ) : (
           <ul className="divide-y divide-gray-700">

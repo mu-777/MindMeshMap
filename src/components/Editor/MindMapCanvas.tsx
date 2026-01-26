@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ReactFlow,
   Background,
@@ -44,6 +45,7 @@ const defaultEdgeOptions = {
 const LONG_PRESS_DELAY = 500; // ミリ秒
 
 export function MindMapCanvas() {
+  const { t } = useTranslation();
   const {
     currentMap,
     createNewMap,
@@ -231,7 +233,7 @@ export function MindMapCanvas() {
           {
             content: JSON.stringify({
               type: 'doc',
-              content: [{ type: 'paragraph', content: [{ type: 'text', text: '新しいノード' }] }],
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: t('editor.newNode') }] }],
             }),
             position,
           },
@@ -252,7 +254,7 @@ export function MindMapCanvas() {
 
       connectingInfo.current = { nodeId: null, handleId: null };
     },
-    [screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, currentMap, isNodeInViewport, fitView]
+    [screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, currentMap, isNodeInViewport, fitView, t]
   );
 
   // ノードクリック（Shift+クリックで複数選択）
@@ -298,7 +300,7 @@ export function MindMapCanvas() {
         {
           content: JSON.stringify({
             type: 'doc',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: '新しいノード' }] }],
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: t('editor.newNode') }] }],
           }),
           position,
         },
@@ -312,7 +314,7 @@ export function MindMapCanvas() {
         setEditingNodeId(newNodeId);
       }
     },
-    [currentMap, screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId]
+    [currentMap, screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, t]
   );
 
   // ペインのダブルクリックハンドラ（デスクトップ用）
@@ -400,7 +402,7 @@ export function MindMapCanvas() {
   if (!currentMap) {
     return (
       <div className="flex h-full items-center justify-center text-gray-400">
-        読み込み中...
+        {t('common.loading')}
       </div>
     );
   }

@@ -1,4 +1,5 @@
 import { memo, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -25,6 +26,7 @@ function CustomEdgeComponent({
   data,
   selected,
 }: EdgeProps<CustomEdgeType>) {
+  const { t } = useTranslation();
   const { updateEdge, deleteEdge } = useMapStore();
   const [isEditing, setIsEditing] = useState(false);
   const [labelValue, setLabelValue] = useState(data?.label || '');
@@ -123,12 +125,12 @@ function CustomEdgeComponent({
                 ${selected ? 'opacity-100' : ''}
               `}
             >
-              <span>{data?.label || '+ ラベル'}</span>
+              <span>{data?.label || t('editor.addLabel')}</span>
               {selected && (
                 <button
                   onClick={handleDelete}
                   className="ml-1 rounded bg-red-500/20 px-1 text-red-400 hover:bg-red-500/40"
-                  title="エッジを削除"
+                  title={t('editor.deleteEdge')}
                 >
                   ×
                 </button>

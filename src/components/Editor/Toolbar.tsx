@@ -1,10 +1,12 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useAutoLayout } from '../../hooks/useAutoLayout';
 import { useGoogleDrive } from '../../hooks/useGoogleDrive';
 import { LayoutDirection } from '../../types';
+import { LanguageSwitcher } from '../Common/LanguageSwitcher';
 
 // メニュー外クリックで閉じるためのカスタムフック
 function useClickOutside(
@@ -27,12 +29,8 @@ function useClickOutside(
   }, [ref, handler]);
 }
 
-const layoutDirectionLabels: Record<LayoutDirection, string> = {
-  DOWN: '↓ 下向き',
-  RIGHT: '→ 右向き',
-};
-
 export function Toolbar() {
+  const { t } = useTranslation();
   const {
     currentMap,
     currentFileId,
@@ -107,13 +105,11 @@ export function Toolbar() {
 
   const handleNewMap = useCallback(() => {
     if (isDirty) {
-      const confirm = window.confirm(
-        '保存されていない変更があります。新しいマップを作成しますか？'
-      );
+      const confirm = window.confirm(t('dialogs.unsavedChangesNew'));
       if (!confirm) return;
     }
     createNewMap();
-  }, [isDirty, createNewMap]);
+  }, [isDirty, createNewMap, t]);
 
   const handleSave = useCallback(async () => {
     if (!currentMap || !isSignedIn) return;
@@ -121,12 +117,12 @@ export function Toolbar() {
     try {
       await saveMap(currentMap, currentFileId);
       setDirty(false);
-      alert('保存しました');
+      alert(t('dialogs.savedSuccess'));
     } catch (error) {
       console.error('Save failed:', error);
-      alert('保存に失敗しました');
+      alert(t('dialogs.saveFailed'));
     }
-  }, [currentMap, currentFileId, isSignedIn, saveMap, setDirty]);
+  }, [currentMap, currentFileId, isSignedIn, saveMap, setDirty, t]);
 
   const handleLayoutDirectionChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -147,7 +143,7 @@ export function Toolbar() {
         <button
           onClick={toggleSidebar}
           className="rounded p-1.5 text-gray-400 hover:bg-gray-700 hover:text-white md:p-2"
-          title="サイドバー切替"
+          title={t('toolbar.toggleSidebar')}
         >
           <svg
             className="h-5 w-5"
@@ -173,7 +169,7 @@ export function Toolbar() {
         <button
           onClick={handleNewMap}
           className="rounded p-1.5 text-gray-300 hover:bg-gray-700 hover:text-white md:px-3 md:py-1.5"
-          title="新規マップ"
+          title={t('toolbar.newMap')}
         >
           {/* モバイル：アイコン、デスクトップ：テキスト */}
           <svg
@@ -189,7 +185,7 @@ export function Toolbar() {
               d="M12 4v16m8-8H4"
             />
           </svg>
-          <span className="hidden text-sm md:inline">新規</span>
+          <span className="hidden text-sm md:inline">{t('common.new')}</span>
         </button>
 
         {isSignedIn && (
@@ -205,7 +201,7 @@ export function Toolbar() {
               }
               disabled:cursor-not-allowed disabled:opacity-50
             `}
-            title="保存"
+            title={t('common.save')}
           >
             {/* モバイル：アイコン、デスクトップ：テキスト */}
             <svg
@@ -222,7 +218,7 @@ export function Toolbar() {
               />
             </svg>
             <span className="hidden text-sm md:inline">
-              {isLoading ? '保存中...' : '保存'}
+              {isLoading ? t('common.saving') : t('common.save')}
             </span>
           </button>
         )}
@@ -233,7 +229,7 @@ export function Toolbar() {
           onClick={() => undo()}
           disabled={!canUndo}
           className="rounded p-1.5 text-gray-400 hover:bg-gray-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 md:p-2"
-          title="元に戻す (Ctrl+Z)"
+          title={t('toolbar.undo')}
         >
           <svg
             className="h-4 w-4"
@@ -254,7 +250,7 @@ export function Toolbar() {
           onClick={() => redo()}
           disabled={!canRedo}
           className="rounded p-1.5 text-gray-400 hover:bg-gray-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 md:p-2"
-          title="やり直し (Ctrl+Shift+Z)"
+          title={t('toolbar.redo')}
         >
           <svg
             className="h-4 w-4"
@@ -288,9 +284,9 @@ export function Toolbar() {
           <button
             onClick={handleTitleClick}
             className="min-w-0 max-w-full truncate rounded px-2 py-0.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-            title="クリックしてタイトルを編集"
+            title={t('toolbar.clickToEditTitle')}
           >
-            {currentMap?.name || '無題のマップ'}
+            {currentMap?.name || t('toolbar.untitledMap')}
           </button>
         )}
         {isDirty && <span className="flex-shrink-0 text-xs text-yellow-500">*</span>}
@@ -304,19 +300,16 @@ export function Toolbar() {
           onChange={handleLayoutDirectionChange}
           className="rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-gray-300 focus:border-blue-500 focus:outline-none"
         >
-          {Object.entries(layoutDirectionLabels).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
+          <option value="DOWN">↓ {t('toolbar.layoutDown')}</option>
+          <option value="RIGHT">→ {t('toolbar.layoutRight')}</option>
         </select>
 
         <button
           onClick={handleAutoLayout}
           className="rounded px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-          title="自動レイアウト"
+          title={t('toolbar.autoLayout')}
         >
-          整列
+          {t('toolbar.align')}
         </button>
 
         <div className="h-6 w-px bg-gray-700" />
@@ -324,7 +317,7 @@ export function Toolbar() {
         <button
           onClick={() => setHelpModalOpen(true)}
           className="rounded p-2 text-gray-400 hover:bg-gray-700 hover:text-white"
-          title="ヘルプ (?)"
+          title={t('toolbar.helpShortcut')}
         >
           <svg
             className="h-4 w-4"
@@ -340,6 +333,8 @@ export function Toolbar() {
             />
           </svg>
         </button>
+
+        <LanguageSwitcher />
       </div>
 
       {/* モバイル表示：⋮ドロップダウン */}
@@ -347,7 +342,7 @@ export function Toolbar() {
         <button
           onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
           className="rounded p-2 text-gray-400 hover:bg-gray-700 hover:text-white"
-          title="メニュー"
+          title={t('common.menu')}
         >
           <svg
             className="h-5 w-5"
@@ -369,7 +364,7 @@ export function Toolbar() {
             {/* レイアウト方向 */}
             <div className="px-3 py-2">
               <label className="mb-1 block text-xs text-gray-400">
-                レイアウト方向
+                {t('toolbar.layoutDirection')}
               </label>
               <select
                 value={currentMap?.layoutDirection || 'DOWN'}
@@ -379,11 +374,8 @@ export function Toolbar() {
                 }}
                 className="w-full rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-gray-300 focus:border-blue-500 focus:outline-none"
               >
-                {Object.entries(layoutDirectionLabels).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
+                <option value="DOWN">↓ {t('toolbar.layoutDown')}</option>
+                <option value="RIGHT">→ {t('toolbar.layoutRight')}</option>
               </select>
             </div>
 
@@ -410,7 +402,7 @@ export function Toolbar() {
                   d="M4 6h16M4 12h16M4 18h7"
                 />
               </svg>
-              整列
+              {t('toolbar.align')}
             </button>
 
             {/* ヘルプ */}
@@ -434,8 +426,15 @@ export function Toolbar() {
                   d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              ヘルプ
+              {t('common.help')}
             </button>
+
+            <div className="my-1 h-px bg-gray-700" />
+
+            {/* 言語切替 */}
+            <div className="px-3 py-2">
+              <LanguageSwitcher />
+            </div>
           </div>
         )}
       </div>

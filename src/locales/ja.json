@@ -1,0 +1,77 @@
+{
+  "common": {
+    "save": "保存",
+    "saving": "保存中...",
+    "delete": "削除",
+    "cancel": "キャンセル",
+    "loading": "読み込み中...",
+    "refresh": "更新",
+    "menu": "メニュー",
+    "help": "ヘルプ",
+    "new": "新規"
+  },
+  "toolbar": {
+    "toggleSidebar": "サイドバー切替",
+    "newMap": "新規マップ",
+    "undo": "元に戻す (Ctrl+Z)",
+    "redo": "やり直し (Ctrl+Shift+Z)",
+    "clickToEditTitle": "クリックしてタイトルを編集",
+    "untitledMap": "無題のマップ",
+    "autoLayout": "自動レイアウト",
+    "align": "整列",
+    "helpShortcut": "ヘルプ (?)",
+    "layoutDirection": "レイアウト方向",
+    "layoutDown": "下向き",
+    "layoutRight": "右向き"
+  },
+  "auth": {
+    "signInWithGoogle": "Googleでログイン",
+    "signOut": "ログアウト"
+  },
+  "mapList": {
+    "title": "マップ一覧",
+    "noMaps": "マップがありません",
+    "signInPrompt": "Googleでログインするとマップを保存・同期できます"
+  },
+  "shortcuts": {
+    "title": "キーボードショートカット",
+    "nodeOperations": "ノード操作",
+    "navigation": "ナビゲーション",
+    "editing": "編集",
+    "view": "表示",
+    "helpHint": "? キーでこのヘルプを表示"
+  },
+  "keybinds": {
+    "createChildNode": "子ノード作成",
+    "createSiblingNode": "兄弟ノード作成",
+    "deleteNode": "ノード削除",
+    "editNode": "ノード編集",
+    "finishEdit": "編集終了",
+    "selectParent": "親ノードへ移動",
+    "selectChild": "子ノードへ移動",
+    "selectPrevSibling": "前の兄弟へ移動",
+    "selectNextSibling": "次の兄弟へ移動",
+    "undo": "元に戻す",
+    "redo": "やり直し",
+    "save": "保存",
+    "zoomIn": "拡大",
+    "zoomOut": "縮小",
+    "fitView": "全体表示",
+    "toggleLayoutDirection": "レイアウト方向切替"
+  },
+  "editor": {
+    "newNode": "新しいノード",
+    "placeholder": "テキストを入力...",
+    "addLabel": "+ ラベル",
+    "deleteEdge": "エッジを削除"
+  },
+  "dialogs": {
+    "unsavedChangesNew": "保存されていない変更があります。新しいマップを作成しますか？",
+    "unsavedChangesContinue": "保存されていない変更があります。続行しますか？",
+    "deleteConfirm": "\"{{name}}\" を削除しますか？",
+    "savedSuccess": "保存しました",
+    "saveFailed": "保存に失敗しました",
+    "loadFailed": "マップの読み込みに失敗しました",
+    "deleteFailed": "削除に失敗しました"
+  }
+}
