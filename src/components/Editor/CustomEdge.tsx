@@ -1,4 +1,4 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BaseEdge,
@@ -8,6 +8,9 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import { useMapStore } from '../../stores/mapStore';
+import { useUIStore } from '../../stores/uiStore';
+
+const LONG_PRESS_DURATION = 500; // 長押し判定時間（ミリ秒）
 
 export type CustomEdgeData = {
   label?: string;
@@ -28,8 +31,11 @@ function CustomEdgeComponent({
 }: EdgeProps<CustomEdgeType>) {
   const { t } = useTranslation();
   const { updateEdge, deleteEdge } = useMapStore();
+  const { openContextMenu } = useUIStore();
   const [isEditing, setIsEditing] = useState(false);
   const [labelValue, setLabelValue] = useState(data?.label || '');
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -80,8 +86,88 @@ function CustomEdgeComponent({
     [id, deleteEdge]
   );
 
+  // 右クリックでコンテキストメニュー表示
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openContextMenu('edge', id, e.clientX, e.clientY);
+    },
+    [id, openContextMenu]
+  );
+
+  // 長押しタイマーをクリア
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    touchStartPosRef.current = null;
+  }, []);
+
+  // タッチ開始（長押し検出開始）
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (isEditing) return;
+
+      const touch = e.touches[0];
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+      longPressTimerRef.current = setTimeout(() => {
+        if (touchStartPosRef.current) {
+          openContextMenu('edge', id, touchStartPosRef.current.x, touchStartPosRef.current.y);
+        }
+      }, LONG_PRESS_DURATION);
+    },
+    [id, isEditing, openContextMenu]
+  );
+
+  // タッチ移動（指が動いたら長押しキャンセル）
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (!touchStartPosRef.current) return;
+
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+      const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+
+      // 10px以上動いたらキャンセル
+      if (dx > 10 || dy > 10) {
+        clearLongPressTimer();
+      }
+    },
+    [clearLongPressTimer]
+  );
+
+  // タッチ終了
+  const handleTouchEnd = useCallback(() => {
+    clearLongPressTimer();
+  }, [clearLongPressTimer]);
+
+  // コンポーネントアンマウント時にタイマーをクリア
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
+
   return (
     <>
+      {/* インタラクション用の透明なパス（クリック/タップ領域を広げる） */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={20}
+        onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={{ cursor: 'pointer' }}
+      />
       <BaseEdge
         id={id}
         path={edgePath}
