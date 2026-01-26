@@ -161,7 +161,7 @@ export function useKeyboardShortcuts() {
                 {
                   content: JSON.stringify({
                     type: 'doc',
-                    content: [{ type: 'paragraph', content: [{ type: 'text', text: '新しいノード' }] }],
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'New Node' }] }],
                   }),
                   position: adjustedPosition,
                 },
@@ -220,7 +220,7 @@ export function useKeyboardShortcuts() {
                 {
                   content: JSON.stringify({
                     type: 'doc',
-                    content: [{ type: 'paragraph', content: [{ type: 'text', text: '新しいノード' }] }],
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'New Node' }] }],
                   }),
                   position: adjustedPosition,
                 },
