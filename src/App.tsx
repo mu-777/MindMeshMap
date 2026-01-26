@@ -19,7 +19,7 @@ function AppContent() {
       <div className="flex flex-1 overflow-hidden">
         {/* サイドバー */}
         {isSidebarOpen && (
-          <div className="w-64 flex-shrink-0 border-r border-gray-700 bg-gray-800">
+          <div className="w-48 flex-shrink-0 border-r border-gray-700 bg-gray-800 sm:w-56 md:w-64">
             <MapList />
           </div>
         )}
