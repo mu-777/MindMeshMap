@@ -17,8 +17,13 @@ function MapListItemComponent({
 }: MapListItemProps) {
   const { t, i18n } = useTranslation();
 
+  const localeMap: Record<string, string> = {
+    ja: 'ja-JP',
+    zh: 'zh-CN',
+    en: 'en-US',
+  };
   const formattedDate = new Date(map.updatedAt).toLocaleDateString(
-    i18n.language === 'ja' ? 'ja-JP' : 'en-US',
+    localeMap[i18n.language] || 'en-US',
     {
       year: 'numeric',
       month: 'short',
