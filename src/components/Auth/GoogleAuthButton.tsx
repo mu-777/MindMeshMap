@@ -1,7 +1,9 @@
+import { useTranslation } from 'react-i18next';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useAuthStore } from '../../stores/authStore';
 
 export function GoogleAuthButton() {
+  const { t } = useTranslation();
   const { isSignedIn, signIn, signOut } = useGoogleAuth();
   const { userName, userEmail } = useAuthStore();
 
@@ -16,7 +18,7 @@ export function GoogleAuthButton() {
           onClick={signOut}
           className="rounded bg-gray-700 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-600"
         >
-          ログアウト
+          {t('auth.signOut')}
         </button>
       </div>
     );
@@ -45,7 +47,7 @@ export function GoogleAuthButton() {
           d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
         />
       </svg>
-      Googleでログイン
+      {t('auth.signInWithGoogle')}
     </button>
   );
 }

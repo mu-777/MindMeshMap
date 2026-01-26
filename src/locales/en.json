@@ -1,0 +1,77 @@
+{
+  "common": {
+    "save": "Save",
+    "saving": "Saving...",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "refresh": "Refresh",
+    "menu": "Menu",
+    "help": "Help",
+    "new": "New"
+  },
+  "toolbar": {
+    "toggleSidebar": "Toggle Sidebar",
+    "newMap": "New Map",
+    "undo": "Undo (Ctrl+Z)",
+    "redo": "Redo (Ctrl+Shift+Z)",
+    "clickToEditTitle": "Click to edit title",
+    "untitledMap": "Untitled Map",
+    "autoLayout": "Auto Layout",
+    "align": "Align",
+    "helpShortcut": "Help (?)",
+    "layoutDirection": "Layout Direction",
+    "layoutDown": "Down",
+    "layoutRight": "Right"
+  },
+  "auth": {
+    "signInWithGoogle": "Sign in with Google",
+    "signOut": "Sign Out"
+  },
+  "mapList": {
+    "title": "Maps",
+    "noMaps": "No maps",
+    "signInPrompt": "Sign in with Google to save and sync your maps"
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "nodeOperations": "Node Operations",
+    "navigation": "Navigation",
+    "editing": "Editing",
+    "view": "View",
+    "helpHint": "Press ? to show this help"
+  },
+  "keybinds": {
+    "createChildNode": "Create Child Node",
+    "createSiblingNode": "Create Sibling Node",
+    "deleteNode": "Delete Node",
+    "editNode": "Edit Node",
+    "finishEdit": "Finish Edit",
+    "selectParent": "Go to Parent",
+    "selectChild": "Go to Child",
+    "selectPrevSibling": "Go to Previous Sibling",
+    "selectNextSibling": "Go to Next Sibling",
+    "undo": "Undo",
+    "redo": "Redo",
+    "save": "Save",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "fitView": "Fit View",
+    "toggleLayoutDirection": "Toggle Layout Direction"
+  },
+  "editor": {
+    "newNode": "New node",
+    "placeholder": "Enter text...",
+    "addLabel": "+ Label",
+    "deleteEdge": "Delete edge"
+  },
+  "dialogs": {
+    "unsavedChangesNew": "You have unsaved changes. Create a new map anyway?",
+    "unsavedChangesContinue": "You have unsaved changes. Continue anyway?",
+    "deleteConfirm": "Delete \"{{name}}\"?",
+    "savedSuccess": "Saved successfully",
+    "saveFailed": "Failed to save",
+    "loadFailed": "Failed to load map",
+    "deleteFailed": "Failed to delete"
+  }
+}
