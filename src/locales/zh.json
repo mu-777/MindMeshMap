@@ -1,0 +1,77 @@
+{
+  "common": {
+    "save": "保存",
+    "saving": "保存中...",
+    "delete": "删除",
+    "cancel": "取消",
+    "loading": "加载中...",
+    "refresh": "刷新",
+    "menu": "菜单",
+    "help": "帮助",
+    "new": "新建"
+  },
+  "toolbar": {
+    "toggleSidebar": "切换侧边栏",
+    "newMap": "新建地图",
+    "undo": "撤销 (Ctrl+Z)",
+    "redo": "重做 (Ctrl+Shift+Z)",
+    "clickToEditTitle": "点击编辑标题",
+    "untitledMap": "未命名地图",
+    "autoLayout": "自动布局",
+    "align": "对齐",
+    "helpShortcut": "帮助 (?)",
+    "layoutDirection": "布局方向",
+    "layoutDown": "向下",
+    "layoutRight": "向右"
+  },
+  "auth": {
+    "signInWithGoogle": "使用Google登录",
+    "signOut": "退出登录"
+  },
+  "mapList": {
+    "title": "地图列表",
+    "noMaps": "暂无地图",
+    "signInPrompt": "使用Google登录以保存和同步您的地图"
+  },
+  "shortcuts": {
+    "title": "键盘快捷键",
+    "nodeOperations": "节点操作",
+    "navigation": "导航",
+    "editing": "编辑",
+    "view": "视图",
+    "helpHint": "按 ? 键显示此帮助"
+  },
+  "keybinds": {
+    "createChildNode": "创建子节点",
+    "createSiblingNode": "创建兄弟节点",
+    "deleteNode": "删除节点",
+    "editNode": "编辑节点",
+    "finishEdit": "完成编辑",
+    "selectParent": "移动到父节点",
+    "selectChild": "移动到子节点",
+    "selectPrevSibling": "移动到上一个兄弟节点",
+    "selectNextSibling": "移动到下一个兄弟节点",
+    "undo": "撤销",
+    "redo": "重做",
+    "save": "保存",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "fitView": "适应视图",
+    "toggleLayoutDirection": "切换布局方向"
+  },
+  "editor": {
+    "newNode": "新节点",
+    "placeholder": "输入文本...",
+    "addLabel": "+ 标签",
+    "deleteEdge": "删除连线"
+  },
+  "dialogs": {
+    "unsavedChangesNew": "您有未保存的更改。确定要创建新地图吗？",
+    "unsavedChangesContinue": "您有未保存的更改。确定要继续吗？",
+    "deleteConfirm": "确定要删除 \"{{name}}\" 吗？",
+    "savedSuccess": "保存成功",
+    "saveFailed": "保存失败",
+    "loadFailed": "加载地图失败",
+    "deleteFailed": "删除失败"
+  }
+}
