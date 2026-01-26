@@ -271,13 +271,18 @@ export function useKeyboardShortcuts() {
 
         case 'selectParent': {
           if (currentMap && currentMap.nodes.length > 0) {
+            // 選択されているノードがない場合は、まず直近選択されていたノードを選択
+            if (!selectedNodeId && lastSelectedNodeId) {
+              const lastNode = currentMap.nodes.find((n) => n.id === lastSelectedNodeId);
+              if (lastNode) {
+                setSelectedNodeId(lastSelectedNodeId);
+                break;
+              }
+            }
             const nodeId = activeNodeId || currentMap.nodes[0].id;
             const targetNode = getNearestNodeInDirection(nodeId, 'up', currentMap.nodes);
             if (targetNode) {
               setSelectedNodeId(targetNode.id);
-            } else if (!selectedNodeId && lastSelectedNodeId) {
-              // 方向にノードがない場合、直近のノードを選択
-              setSelectedNodeId(lastSelectedNodeId);
             }
           }
           break;
@@ -285,12 +290,18 @@ export function useKeyboardShortcuts() {
 
         case 'selectChild': {
           if (currentMap && currentMap.nodes.length > 0) {
+            // 選択されているノードがない場合は、まず直近選択されていたノードを選択
+            if (!selectedNodeId && lastSelectedNodeId) {
+              const lastNode = currentMap.nodes.find((n) => n.id === lastSelectedNodeId);
+              if (lastNode) {
+                setSelectedNodeId(lastSelectedNodeId);
+                break;
+              }
+            }
             const nodeId = activeNodeId || currentMap.nodes[0].id;
             const targetNode = getNearestNodeInDirection(nodeId, 'down', currentMap.nodes);
             if (targetNode) {
               setSelectedNodeId(targetNode.id);
-            } else if (!selectedNodeId && lastSelectedNodeId) {
-              setSelectedNodeId(lastSelectedNodeId);
             }
           }
           break;
@@ -298,12 +309,18 @@ export function useKeyboardShortcuts() {
 
         case 'selectPrevSibling': {
           if (currentMap && currentMap.nodes.length > 0) {
+            // 選択されているノードがない場合は、まず直近選択されていたノードを選択
+            if (!selectedNodeId && lastSelectedNodeId) {
+              const lastNode = currentMap.nodes.find((n) => n.id === lastSelectedNodeId);
+              if (lastNode) {
+                setSelectedNodeId(lastSelectedNodeId);
+                break;
+              }
+            }
             const nodeId = activeNodeId || currentMap.nodes[0].id;
             const targetNode = getNearestNodeInDirection(nodeId, 'left', currentMap.nodes);
             if (targetNode) {
               setSelectedNodeId(targetNode.id);
-            } else if (!selectedNodeId && lastSelectedNodeId) {
-              setSelectedNodeId(lastSelectedNodeId);
             }
           }
           break;
@@ -311,12 +328,18 @@ export function useKeyboardShortcuts() {
 
         case 'selectNextSibling': {
           if (currentMap && currentMap.nodes.length > 0) {
+            // 選択されているノードがない場合は、まず直近選択されていたノードを選択
+            if (!selectedNodeId && lastSelectedNodeId) {
+              const lastNode = currentMap.nodes.find((n) => n.id === lastSelectedNodeId);
+              if (lastNode) {
+                setSelectedNodeId(lastSelectedNodeId);
+                break;
+              }
+            }
             const nodeId = activeNodeId || currentMap.nodes[0].id;
             const targetNode = getNearestNodeInDirection(nodeId, 'right', currentMap.nodes);
             if (targetNode) {
               setSelectedNodeId(targetNode.id);
-            } else if (!selectedNodeId && lastSelectedNodeId) {
-              setSelectedNodeId(lastSelectedNodeId);
             }
           }
           break;
