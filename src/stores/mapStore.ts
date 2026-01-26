@@ -39,7 +39,7 @@ interface MapState {
   saveToHistory: () => void;
 }
 
-const createEmptyMap = (name: string = '新しいマップ'): MindMap => {
+const createEmptyMap = (name: string = 'New Map'): MindMap => {
   const rootNodeId = generateId();
   return {
     id: generateId(),
@@ -52,7 +52,7 @@ const createEmptyMap = (name: string = '新しいマップ'): MindMap => {
         id: rootNodeId,
         content: JSON.stringify({
           type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'ルートノード' }] }],
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Root Node' }] }],
         }),
         position: { x: 0, y: 0 },
       },
