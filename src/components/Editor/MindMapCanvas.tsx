@@ -40,6 +40,9 @@ const defaultEdgeOptions = {
   },
 };
 
+// ダブルクリック/ダブルタップ検出用の定数
+const DOUBLE_TAP_DELAY = 300; // ミリ秒
+
 export function MindMapCanvas() {
   const {
     currentMap,
@@ -55,6 +58,10 @@ export function MindMapCanvas() {
     nodeId: null,
     handleId: null,
   });
+
+  // ダブルタップ検出用
+  const lastTapTimeRef = useRef<number>(0);
+  const lastTapPositionRef = useRef<{ x: number; y: number } | null>(null);
 
   // ノードがビューポート内に表示されているかチェック
   const isNodeInViewport = useCallback(
@@ -270,6 +277,92 @@ export function MindMapCanvas() {
     closeContextMenu();
   }, [setSelectedNodeId, clearMultiSelection, setEditingNodeId, closeContextMenu]);
 
+  // ダブルクリック/ダブルタップで新しいノードを作成
+  const createNodeAtPosition = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!currentMap) return;
+
+      // ノード上にドロップした場合は新規作成しない
+      const elementAtPoint = document.elementFromPoint(clientX, clientY);
+      const isOverNode = elementAtPoint?.closest('.react-flow__node') !== null;
+      if (isOverNode) return;
+
+      // スクリーン座標をFlow座標に変換
+      const position = screenToFlowPosition({
+        x: clientX,
+        y: clientY,
+      });
+
+      // エッジに接続されていない独立したノードを作成
+      const newNodeId = addNode(
+        {
+          content: JSON.stringify({
+            type: 'doc',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: '新しいノード' }] }],
+          }),
+          position,
+        },
+        undefined, // 親ノードなし
+        undefined,
+        undefined
+      );
+
+      if (newNodeId) {
+        setSelectedNodeId(newNodeId);
+        setEditingNodeId(newNodeId);
+      }
+    },
+    [currentMap, screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId]
+  );
+
+  // ペインのダブルクリックハンドラ（デスクトップ用）
+  const onDoubleClick = useCallback(
+    (event: React.MouseEvent) => {
+      // ノード上でのダブルクリックは編集モードになるので無視
+      const target = event.target as HTMLElement;
+      if (target.closest('.react-flow__node')) return;
+
+      createNodeAtPosition(event.clientX, event.clientY);
+    },
+    [createNodeAtPosition]
+  );
+
+  // タッチスタートでダブルタップを検出（モバイル用）
+  const onTouchStart = useCallback(
+    (event: React.TouchEvent) => {
+      // ノード上でのタッチは無視
+      const target = event.target as HTMLElement;
+      if (target.closest('.react-flow__node')) return;
+
+      const touch = event.touches[0];
+      const now = Date.now();
+      const lastTapTime = lastTapTimeRef.current;
+      const lastTapPosition = lastTapPositionRef.current;
+
+      // 位置の許容範囲（ピクセル）
+      const TAP_DISTANCE_THRESHOLD = 30;
+
+      if (
+        lastTapPosition &&
+        now - lastTapTime < DOUBLE_TAP_DELAY &&
+        Math.abs(touch.clientX - lastTapPosition.x) < TAP_DISTANCE_THRESHOLD &&
+        Math.abs(touch.clientY - lastTapPosition.y) < TAP_DISTANCE_THRESHOLD
+      ) {
+        // ダブルタップ検出
+        event.preventDefault();
+        createNodeAtPosition(touch.clientX, touch.clientY);
+        // リセット
+        lastTapTimeRef.current = 0;
+        lastTapPositionRef.current = null;
+      } else {
+        // 最初のタップを記録
+        lastTapTimeRef.current = now;
+        lastTapPositionRef.current = { x: touch.clientX, y: touch.clientY };
+      }
+    },
+    [createNodeAtPosition]
+  );
+
   // ノードサイズ変更時のハンドラ
   const onNodeDragStop = useCallback(
     (_event: React.MouseEvent, node: Node) => {
@@ -299,6 +392,8 @@ export function MindMapCanvas() {
       onConnectEnd={onConnectEnd}
       onNodeClick={onNodeClick}
       onPaneClick={onPaneClick}
+      onDoubleClick={onDoubleClick}
+      onTouchStart={onTouchStart}
       onNodeDragStop={onNodeDragStop}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
