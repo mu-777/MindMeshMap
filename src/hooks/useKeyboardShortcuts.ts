@@ -189,28 +189,63 @@ export function useKeyboardShortcuts() {
             const activeNode = currentMap.nodes.find((n) => n.id === activeNodeId);
 
             if (activeNode) {
-              // 兄弟ノードの位置はレイアウト方向に応じて設定
+              // 選択中のノードと親を接続しているエッジを探す
+              const parentEdge = parentId
+                ? currentMap.edges.find((e) => e.source === parentId && e.target === activeNodeId)
+                : undefined;
+
+              // エッジがあればそのハンドルを使用、なければレイアウト方向に応じたデフォルト値
               const direction = currentMap.layoutDirection;
               let siblingPosition = { x: activeNode.position.x, y: activeNode.position.y };
               let sourceHandle: string | undefined;
               let targetHandle: string | undefined;
               let offsetDirection: 'x' | 'y';
 
-              switch (direction) {
-                case 'DOWN':
-                  // 縦方向レイアウトの場合、兄弟は横に配置
-                  siblingPosition = { x: activeNode.position.x + 200, y: activeNode.position.y };
-                  sourceHandle = 'bottom';
-                  targetHandle = 'top';
-                  offsetDirection = 'x'; // 重複時はX方向のみにオフセット
-                  break;
-                case 'RIGHT':
-                  // 横方向レイアウトの場合、兄弟は縦に配置
-                  siblingPosition = { x: activeNode.position.x, y: activeNode.position.y + 100 };
-                  sourceHandle = 'right';
-                  targetHandle = 'left';
-                  offsetDirection = 'y'; // 重複時はY方向のみにオフセット
-                  break;
+              if (parentEdge?.sourceHandle) {
+                // 親との接続エッジと同じハンドルを使用
+                sourceHandle = parentEdge.sourceHandle;
+                targetHandle = parentEdge.targetHandle;
+
+                // ハンドルに応じて位置とオフセット方向を決定
+                switch (sourceHandle) {
+                  case 'bottom':
+                  case 'top':
+                    // 縦方向の接続の場合、兄弟は横に配置
+                    siblingPosition = { x: activeNode.position.x + 200, y: activeNode.position.y };
+                    offsetDirection = 'x';
+                    break;
+                  case 'right':
+                  case 'left':
+                    // 横方向の接続の場合、兄弟は縦に配置
+                    siblingPosition = { x: activeNode.position.x, y: activeNode.position.y + 100 };
+                    offsetDirection = 'y';
+                    break;
+                  default:
+                    // フォールバック：レイアウト方向に応じる
+                    if (direction === 'DOWN') {
+                      siblingPosition = { x: activeNode.position.x + 200, y: activeNode.position.y };
+                      offsetDirection = 'x';
+                    } else {
+                      siblingPosition = { x: activeNode.position.x, y: activeNode.position.y + 100 };
+                      offsetDirection = 'y';
+                    }
+                }
+              } else {
+                // エッジがない、またはハンドル情報がない場合はレイアウト方向に応じたデフォルト
+                switch (direction) {
+                  case 'DOWN':
+                    siblingPosition = { x: activeNode.position.x + 200, y: activeNode.position.y };
+                    sourceHandle = 'bottom';
+                    targetHandle = 'top';
+                    offsetDirection = 'x';
+                    break;
+                  case 'RIGHT':
+                    siblingPosition = { x: activeNode.position.x, y: activeNode.position.y + 100 };
+                    sourceHandle = 'right';
+                    targetHandle = 'left';
+                    offsetDirection = 'y';
+                    break;
+                }
               }
 
               // 既存ノードとの重複を避ける（レイアウト方向に応じた方向にのみオフセット）
