@@ -109,7 +109,7 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      openContextMenu(id, e.clientX, e.clientY);
+      openContextMenu('node', id, e.clientX, e.clientY);
     },
     [id, openContextMenu]
   );
@@ -133,7 +133,7 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
 
       longPressTimerRef.current = setTimeout(() => {
         if (touchStartPosRef.current) {
-          openContextMenu(id, touchStartPosRef.current.x, touchStartPosRef.current.y);
+          openContextMenu('node', id, touchStartPosRef.current.x, touchStartPosRef.current.y);
         }
       }, LONG_PRESS_DURATION);
     },

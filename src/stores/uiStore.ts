@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { UIState } from '../types';
 
 export interface ContextMenuState {
-  nodeId: string;
+  type: 'node' | 'edge';
+  id: string;
   x: number;
   y: number;
 }
@@ -19,7 +20,7 @@ interface UIStoreState extends UIState {
   toggleSidebar: () => void;
   setHelpModalOpen: (open: boolean) => void;
   toggleHelpModal: () => void;
-  openContextMenu: (nodeId: string, x: number, y: number) => void;
+  openContextMenu: (type: 'node' | 'edge', id: string, x: number, y: number) => void;
   closeContextMenu: () => void;
 }
 
@@ -73,7 +74,7 @@ export const useUIStore = create<UIStoreState>((set) => ({
 
   toggleHelpModal: () => set((state) => ({ isHelpModalOpen: !state.isHelpModalOpen })),
 
-  openContextMenu: (nodeId, x, y) => set({ contextMenu: { nodeId, x, y } }),
+  openContextMenu: (type, id, x, y) => set({ contextMenu: { type, id, x, y } }),
 
   closeContextMenu: () => set({ contextMenu: null }),
 }));

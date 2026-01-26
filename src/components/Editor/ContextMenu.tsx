@@ -6,7 +6,7 @@ import { useMapStore } from '../../stores/mapStore';
 export function ContextMenu() {
   const { t } = useTranslation();
   const { contextMenu, closeContextMenu } = useUIStore();
-  const { deleteNode } = useMapStore();
+  const { deleteNode, deleteEdge } = useMapStore();
   const menuRef = useRef<HTMLDivElement>(null);
 
   // メニュー外クリックで閉じる
@@ -31,10 +31,14 @@ export function ContextMenu() {
   // 削除処理
   const handleDelete = useCallback(() => {
     if (contextMenu) {
-      deleteNode(contextMenu.nodeId);
+      if (contextMenu.type === 'node') {
+        deleteNode(contextMenu.id);
+      } else {
+        deleteEdge(contextMenu.id);
+      }
       closeContextMenu();
     }
-  }, [contextMenu, deleteNode, closeContextMenu]);
+  }, [contextMenu, deleteNode, deleteEdge, closeContextMenu]);
 
   if (!contextMenu) return null;
 
