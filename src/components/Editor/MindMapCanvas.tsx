@@ -40,8 +40,8 @@ const defaultEdgeOptions = {
   },
 };
 
-// ダブルクリック/ダブルタップ検出用の定数
-const DOUBLE_TAP_DELAY = 300; // ミリ秒
+// 長押し検出用の定数
+const LONG_PRESS_DELAY = 500; // ミリ秒
 
 export function MindMapCanvas() {
   const {
@@ -59,9 +59,9 @@ export function MindMapCanvas() {
     handleId: null,
   });
 
-  // ダブルタップ検出用
-  const lastTapTimeRef = useRef<number>(0);
-  const lastTapPositionRef = useRef<{ x: number; y: number } | null>(null);
+  // 長押し検出用
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressPositionRef = useRef<{ x: number; y: number } | null>(null);
 
   // ノードがビューポート内に表示されているかチェック
   const isNodeInViewport = useCallback(
@@ -327,7 +327,7 @@ export function MindMapCanvas() {
     [createNodeAtPosition]
   );
 
-  // タッチスタートでダブルタップを検出（モバイル用）
+  // タッチスタートで長押しタイマーを開始（モバイル用）
   const onTouchStart = useCallback(
     (event: React.TouchEvent) => {
       // ノード上でのタッチは無視
@@ -335,33 +335,59 @@ export function MindMapCanvas() {
       if (target.closest('.react-flow__node')) return;
 
       const touch = event.touches[0];
-      const now = Date.now();
-      const lastTapTime = lastTapTimeRef.current;
-      const lastTapPosition = lastTapPositionRef.current;
+      const clientX = touch.clientX;
+      const clientY = touch.clientY;
 
-      // 位置の許容範囲（ピクセル）
-      const TAP_DISTANCE_THRESHOLD = 30;
-
-      if (
-        lastTapPosition &&
-        now - lastTapTime < DOUBLE_TAP_DELAY &&
-        Math.abs(touch.clientX - lastTapPosition.x) < TAP_DISTANCE_THRESHOLD &&
-        Math.abs(touch.clientY - lastTapPosition.y) < TAP_DISTANCE_THRESHOLD
-      ) {
-        // ダブルタップ検出
-        event.preventDefault();
-        createNodeAtPosition(touch.clientX, touch.clientY);
-        // リセット
-        lastTapTimeRef.current = 0;
-        lastTapPositionRef.current = null;
-      } else {
-        // 最初のタップを記録
-        lastTapTimeRef.current = now;
-        lastTapPositionRef.current = { x: touch.clientX, y: touch.clientY };
+      // 前のタイマーをクリア
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
       }
+
+      // 位置を記録
+      longPressPositionRef.current = { x: clientX, y: clientY };
+
+      // 長押しタイマーを開始
+      longPressTimerRef.current = setTimeout(() => {
+        createNodeAtPosition(clientX, clientY);
+        longPressTimerRef.current = null;
+        longPressPositionRef.current = null;
+      }, LONG_PRESS_DELAY);
     },
     [createNodeAtPosition]
   );
+
+  // タッチ移動で長押しをキャンセル（モバイル用）
+  const onTouchMove = useCallback(
+    (event: React.TouchEvent) => {
+      if (!longPressTimerRef.current || !longPressPositionRef.current) return;
+
+      const touch = event.touches[0];
+      const startPos = longPressPositionRef.current;
+
+      // 位置の許容範囲（ピクセル）
+      const MOVE_THRESHOLD = 10;
+
+      // 指が動いたらキャンセル
+      if (
+        Math.abs(touch.clientX - startPos.x) > MOVE_THRESHOLD ||
+        Math.abs(touch.clientY - startPos.y) > MOVE_THRESHOLD
+      ) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+        longPressPositionRef.current = null;
+      }
+    },
+    []
+  );
+
+  // タッチ終了で長押しをキャンセル（モバイル用）
+  const onTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressPositionRef.current = null;
+  }, []);
 
   // ノードサイズ変更時のハンドラ
   const onNodeDragStop = useCallback(
@@ -394,6 +420,8 @@ export function MindMapCanvas() {
       onPaneClick={onPaneClick}
       onDoubleClick={onDoubleClick}
       onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
       onNodeDragStop={onNodeDragStop}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
