@@ -1,0 +1,47 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="nodeGlow">
+      <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Mesh connections - simplified and unified -->
+  <g stroke="#5b9fe6" stroke-width="2" fill="none" opacity="0.5" stroke-linecap="round">
+    <!-- Left to middle -->
+    <path d="M 72.5 100 Q 86.25 85 100 85" />
+    <path d="M 72.5 100 Q 86.25 115 100 115" />
+
+    <!-- Middle internal mesh - curved to the right -->
+    <path d="M 100 85 Q 105 100 100 115" />
+
+    <!-- Middle to right - non-tree connections -->
+    <path d="M 100 85 Q 113.75 70 127.5 70" />
+    <path d="M 100 85 Q 113.75 110 127.5 110" />
+    <path d="M 100 115 Q 113.75 90 127.5 90" />
+    <path d="M 100 115 Q 113.75 130 127.5 130" />
+
+    <!-- Right internal mesh - curved to the right, connecting outside nodes -->
+    <path d="M 129.5 70 Q 135 80 129.5 90" />
+    <path d="M 129.5 110 Q 135 120 129.5 130" />
+  </g>
+
+  <!-- Nodes - all unified -->
+  <g filter="url(#nodeGlow)">
+    <!-- Left - 1 node -->
+    <circle cx="72.5" cy="100" r="7" fill="#5b9fe6" stroke="#63b3ed" stroke-width="2"/>
+
+    <!-- Middle - 2 nodes -->
+    <circle cx="100" cy="85" r="7" fill="#5b9fe6" stroke="#63b3ed" stroke-width="2"/>
+    <circle cx="100" cy="115" r="7" fill="#5b9fe6" stroke="#63b3ed" stroke-width="2"/>
+
+    <!-- Right - 4 nodes -->
+    <circle cx="127.5" cy="70" r="7" fill="#5b9fe6" stroke="#63b3ed" stroke-width="2"/>
+    <circle cx="127.5" cy="90" r="7" fill="#5b9fe6" stroke="#63b3ed" stroke-width="2"/>
+    <circle cx="127.5" cy="110" r="7" fill="#5b9fe6" stroke="#63b3ed" stroke-width="2"/>
+    <circle cx="127.5" cy="130" r="7" fill="#5b9fe6" stroke="#63b3ed" stroke-width="2"/>
+  </g>
+</svg>
