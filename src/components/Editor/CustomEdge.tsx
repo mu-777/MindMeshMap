@@ -110,6 +110,9 @@ function CustomEdgeComponent({
     (e: React.TouchEvent) => {
       if (isEditing) return;
 
+      // 親要素への伝播を止めて、背景の長押しノード作成を防ぐ
+      e.stopPropagation();
+
       const touch = e.touches[0];
       touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
 

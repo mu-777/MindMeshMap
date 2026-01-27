@@ -332,9 +332,10 @@ export function MindMapCanvas() {
   // タッチスタートで長押しタイマーを開始（モバイル用）
   const onTouchStart = useCallback(
     (event: React.TouchEvent) => {
-      // ノード上でのタッチは無視
+      // ノードまたはエッジ上でのタッチは無視（それぞれ独自の長押しハンドリングを持つ）
       const target = event.target as HTMLElement;
       if (target.closest('.react-flow__node')) return;
+      if (target.closest('.react-flow__edge')) return;
 
       const touch = event.touches[0];
       const clientX = touch.clientX;
