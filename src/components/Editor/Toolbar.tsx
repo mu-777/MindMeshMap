@@ -160,9 +160,10 @@ export function Toolbar() {
           </svg>
         </button>
 
-        <span className="hidden font-semibold text-blue-400 md:inline">
-          MindMeshMap
-        </span>
+        <div className="hidden items-center gap-1.5 md:flex">
+          <img src="/logo.svg" alt="MindMeshMap" className="h-6 w-6" />
+          <span className="font-semibold text-blue-400">MindMeshMap</span>
+        </div>
 
         <div className="hidden h-6 w-px bg-gray-700 md:block" />
 
