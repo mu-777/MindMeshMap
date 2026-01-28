@@ -61,7 +61,7 @@ function adjustPositionToAvoidOverlap(
 
 export function useKeyboardShortcuts() {
   const { fitView, zoomIn, zoomOut, getViewport } = useReactFlow();
-  const { currentMap, addNode, deleteNode, deleteNodes, undo, redo, setLayoutDirection } = useMapStore();
+  const { currentMap, addNode, deleteNode, deleteNodes, updateNode, undo, redo, setLayoutDirection } = useMapStore();
   const {
     selectedNodeId,
     selectedNodeIds,
@@ -115,10 +115,41 @@ export function useKeyboardShortcuts() {
         alt: event.altKey,
       };
 
-      const action = getActionForKey(event.key, modifiers);
-
       // 選択中のノードID（未選択の場合は直近選択されていたノード）
       const activeNodeId = selectedNodeId || lastSelectedNodeId;
+
+      // SHIFT + 矢印キー: 選択中のノードの位置を移動
+      if (modifiers.shift && !modifiers.ctrl && !modifiers.alt) {
+        const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+        if (arrowKeys.includes(event.key) && activeNodeId && currentMap) {
+          event.preventDefault();
+          const activeNode = currentMap.nodes.find((n) => n.id === activeNodeId);
+          if (activeNode) {
+            const moveAmount = 10; // 移動量（ピクセル）
+            let newPosition = { ...activeNode.position };
+
+            switch (event.key) {
+              case 'ArrowUp':
+                newPosition.y -= moveAmount;
+                break;
+              case 'ArrowDown':
+                newPosition.y += moveAmount;
+                break;
+              case 'ArrowLeft':
+                newPosition.x -= moveAmount;
+                break;
+              case 'ArrowRight':
+                newPosition.x += moveAmount;
+                break;
+            }
+
+            updateNode(activeNodeId, { position: newPosition });
+          }
+          return;
+        }
+      }
+
+      const action = getActionForKey(event.key, modifiers);
 
       if (!action) {
         // ヘルプ表示（?キー）
@@ -414,6 +445,7 @@ export function useKeyboardShortcuts() {
       addNode,
       deleteNode,
       deleteNodes,
+      updateNode,
       undo,
       redo,
       setLayoutDirection,
