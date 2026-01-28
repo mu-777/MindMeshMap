@@ -161,7 +161,7 @@ export function Toolbar() {
         </button>
 
         <div className="hidden items-center gap-1.5 md:flex">
-          <img src="/logo.svg" alt="MindMeshMap" className="h-6 w-6" />
+          <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="MindMeshMap" className="h-6 w-6" />
           <span className="font-semibold text-blue-400">MindMeshMap</span>
         </div>
 
