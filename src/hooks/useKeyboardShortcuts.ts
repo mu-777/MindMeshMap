@@ -69,6 +69,7 @@ export function useKeyboardShortcuts() {
     editingNodeId,
     setSelectedNodeId,
     setEditingNodeId,
+    setPendingEditChar,
     setHelpModalOpen,
     clearMultiSelection,
   } = useUIStore();
@@ -116,19 +117,34 @@ export function useKeyboardShortcuts() {
 
       const action = getActionForKey(event.key, modifiers);
 
+      // 選択中のノードID（未選択の場合は直近選択されていたノード）
+      const activeNodeId = selectedNodeId || lastSelectedNodeId;
+
       if (!action) {
         // ヘルプ表示（?キー）
         if (event.key === '?' || (event.shiftKey && event.key === '/')) {
           event.preventDefault();
           setHelpModalOpen(true);
+          return;
+        }
+
+        // ノードが選択されている状態で、印刷可能文字が入力された場合、編集モードに入る
+        // 条件: 単一文字、Ctrl/Alt/Metaキーなし、ノードが選択されている
+        if (
+          activeNodeId &&
+          event.key.length === 1 &&
+          !modifiers.ctrl &&
+          !modifiers.alt
+        ) {
+          event.preventDefault();
+          setSelectedNodeId(activeNodeId);
+          setPendingEditChar(event.key);
+          setEditingNodeId(activeNodeId);
         }
         return;
       }
 
       event.preventDefault();
-
-      // 選択中のノードID（未選択の場合は直近選択されていたノード）
-      const activeNodeId = selectedNodeId || lastSelectedNodeId;
 
       switch (action) {
         case 'createChildNode': {
@@ -403,6 +419,7 @@ export function useKeyboardShortcuts() {
       setLayoutDirection,
       setSelectedNodeId,
       setEditingNodeId,
+      setPendingEditChar,
       setHelpModalOpen,
       clearMultiSelection,
       fitView,

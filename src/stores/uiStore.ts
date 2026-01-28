@@ -12,10 +12,12 @@ interface UIStoreState extends UIState {
   lastSelectedNodeId: string | null;
   selectedNodeIds: string[];
   contextMenu: ContextMenuState | null;
+  pendingEditChar: string | null;
   setSelectedNodeId: (nodeId: string | null) => void;
   toggleNodeSelection: (nodeId: string) => void;
   clearMultiSelection: () => void;
   setEditingNodeId: (nodeId: string | null) => void;
+  setPendingEditChar: (char: string | null) => void;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
   setHelpModalOpen: (open: boolean) => void;
@@ -32,6 +34,7 @@ export const useUIStore = create<UIStoreState>((set) => ({
   isSidebarOpen: true,
   isHelpModalOpen: false,
   contextMenu: null,
+  pendingEditChar: null,
 
   setSelectedNodeId: (nodeId) =>
     set((state) => ({
@@ -65,6 +68,8 @@ export const useUIStore = create<UIStoreState>((set) => ({
     set({ selectedNodeIds: [] }),
 
   setEditingNodeId: (nodeId) => set({ editingNodeId: nodeId }),
+
+  setPendingEditChar: (char) => set({ pendingEditChar: char }),
 
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
 

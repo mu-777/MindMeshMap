@@ -18,7 +18,7 @@ export type CustomNodeType = Node<CustomNodeData, 'custom'>;
 function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) {
   const { t } = useTranslation();
   const { updateNode } = useMapStore();
-  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu } = useUIStore();
+  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu, pendingEditChar, setPendingEditChar } = useUIStore();
   const isEditing = editingNodeId === id;
   const containerRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,10 +51,16 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     if (editor) {
       editor.setEditable(isEditing);
       if (isEditing) {
+        // pendingEditCharがある場合、内容をクリアしてその文字から編集開始
+        if (pendingEditChar) {
+          editor.commands.clearContent();
+          editor.commands.insertContent(pendingEditChar);
+          setPendingEditChar(null);
+        }
         editor.commands.focus('end');
       }
     }
-  }, [editor, isEditing]);
+  }, [editor, isEditing, pendingEditChar, setPendingEditChar]);
 
   // ダブルクリックで編集モードに
   const handleDoubleClick = useCallback(() => {
