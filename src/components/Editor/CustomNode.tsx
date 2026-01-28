@@ -23,6 +23,8 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
   const containerRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressTriggeredRef = useRef<boolean>(false);
+  const dragDetectedRef = useRef<boolean>(false);
 
   // Tiptapエディタの初期化
   const editor = useEditor({
@@ -136,8 +138,11 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
 
       const touch = e.touches[0];
       touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+      longPressTriggeredRef.current = false;
+      dragDetectedRef.current = false;
 
       longPressTimerRef.current = setTimeout(() => {
+        longPressTriggeredRef.current = true;
         if (touchStartPosRef.current) {
           openContextMenu('node', id, touchStartPosRef.current.x, touchStartPosRef.current.y);
         }
@@ -155,18 +160,26 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
       const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
       const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
 
-      // 10px以上動いたらキャンセル
+      // 10px以上動いたらドラッグと判定して長押しキャンセル
       if (dx > 10 || dy > 10) {
+        dragDetectedRef.current = true;
         clearLongPressTimer();
       }
     },
     [clearLongPressTimer]
   );
 
-  // タッチ終了
+  // タッチ終了（モバイルではタップで編集モードに入る）
   const handleTouchEnd = useCallback(() => {
+    const wasLongPress = longPressTriggeredRef.current;
+    const wasDrag = dragDetectedRef.current;
     clearLongPressTimer();
-  }, [clearLongPressTimer]);
+
+    // 長押しでもドラッグでもない通常のタップの場合、編集モードに入る
+    if (!wasLongPress && !wasDrag && !isEditing) {
+      setEditingNodeId(id);
+    }
+  }, [clearLongPressTimer, id, isEditing, setEditingNodeId]);
 
   // コンポーネントアンマウント時にタイマーをクリア
   useEffect(() => {
