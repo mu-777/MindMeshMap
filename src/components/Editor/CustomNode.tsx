@@ -25,6 +25,7 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredRef = useRef<boolean>(false);
   const dragDetectedRef = useRef<boolean>(false);
+  const touchStartTimeRef = useRef<number | null>(null);
 
   // Tiptapエディタの初期化
   const editor = useEditor({
@@ -69,11 +70,24 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     setEditingNodeId(id);
   }, [id, setEditingNodeId]);
 
-  // クリックで選択（Shift+クリックで複数選択）
+  // クリックで選択（Shift+クリックで複数選択、モバイルタップで編集モード）
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!isEditing) {
+        // モバイルタップの場合（最近のタッチがあり、長押しでもドラッグでもない場合）
+        const touchStartTime = touchStartTimeRef.current;
+        const wasRecentTouch = touchStartTime !== null && Date.now() - touchStartTime < 500;
+        const wasLongPress = longPressTriggeredRef.current;
+        const wasDrag = dragDetectedRef.current;
+
+        if (wasRecentTouch && !wasLongPress && !wasDrag) {
+          // モバイルタップで編集モードに入る
+          touchStartTimeRef.current = null;
+          setEditingNodeId(id);
+          return;
+        }
+
         if (e.shiftKey) {
           // Shift+クリックで複数選択をトグル
           toggleNodeSelection(id);
@@ -83,7 +97,7 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
         }
       }
     },
-    [id, isEditing, setSelectedNodeId, toggleNodeSelection]
+    [id, isEditing, setSelectedNodeId, toggleNodeSelection, setEditingNodeId]
   );
 
   // 編集中のキーイベント処理
@@ -140,6 +154,7 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
       touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
       longPressTriggeredRef.current = false;
       dragDetectedRef.current = false;
+      touchStartTimeRef.current = Date.now();
 
       longPressTimerRef.current = setTimeout(() => {
         longPressTriggeredRef.current = true;
@@ -177,8 +192,12 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
 
     // 長押しでもドラッグでもない通常のタップの場合、編集モードに入る
     if (!wasLongPress && !wasDrag && !isEditing) {
+      // touchStartTimeRefをクリアして、handleClickで二重処理されないようにする
+      touchStartTimeRef.current = null;
       setEditingNodeId(id);
     }
+    // 注: handleClickでもタップを検出できるようにtouchStartTimeRefは
+    // 長押し・ドラッグの場合のみここでクリアしない（handleClickでフォールバック処理）
   }, [clearLongPressTimer, id, isEditing, setEditingNodeId]);
 
   // コンポーネントアンマウント時にタイマーをクリア
