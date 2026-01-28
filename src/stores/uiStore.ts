@@ -47,19 +47,25 @@ export const useUIStore = create<UIStoreState>((set) => ({
 
   toggleNodeSelection: (nodeId) =>
     set((state) => {
-      const index = state.selectedNodeIds.indexOf(nodeId);
+      // 現在のselectedNodeIdも含めた選択リストを作成
+      let currentSelectedIds = [...state.selectedNodeIds];
+      if (state.selectedNodeId && !currentSelectedIds.includes(state.selectedNodeId)) {
+        currentSelectedIds.push(state.selectedNodeId);
+      }
+
+      const index = currentSelectedIds.indexOf(nodeId);
       let newSelectedNodeIds: string[];
       if (index >= 0) {
         // 既に選択されていたら解除
-        newSelectedNodeIds = state.selectedNodeIds.filter((id) => id !== nodeId);
+        newSelectedNodeIds = currentSelectedIds.filter((id) => id !== nodeId);
       } else {
         // 選択されていなければ追加
-        newSelectedNodeIds = [...state.selectedNodeIds, nodeId];
+        newSelectedNodeIds = [...currentSelectedIds, nodeId];
       }
       return {
         selectedNodeIds: newSelectedNodeIds,
-        // 複数選択モードでは単一選択をクリアしない（最初のノードをactiveNodeIdとして使えるように）
-        selectedNodeId: state.selectedNodeId,
+        // 複数選択モードではselectedNodeIdをクリア（selectedNodeIdsで管理）
+        selectedNodeId: null,
         lastSelectedNodeId: nodeId,
       };
     }),

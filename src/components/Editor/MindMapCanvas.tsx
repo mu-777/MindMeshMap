@@ -61,6 +61,10 @@ export function MindMapCanvas() {
     handleId: null,
   });
 
+  // 複数ノードドラッグ用
+  const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const isDraggingMultiple = useRef<boolean>(false);
+
   // 長押し検出用
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -392,9 +396,83 @@ export function MindMapCanvas() {
     longPressPositionRef.current = null;
   }, []);
 
-  // ノードサイズ変更時のハンドラ
+  // 複数ノードドラッグ開始
+  const onNodeDragStart = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      // 選択されたノードを取得（単一選択 + 複数選択）
+      const allSelectedIds = new Set<string>();
+      if (selectedNodeId) allSelectedIds.add(selectedNodeId);
+      selectedNodeIds.forEach((id) => allSelectedIds.add(id));
+
+      // ドラッグ対象のノードが選択されていない場合は、単一ノードのドラッグ
+      if (!allSelectedIds.has(node.id)) {
+        isDraggingMultiple.current = false;
+        dragStartPositions.current.clear();
+        return;
+      }
+
+      // 複数ノードが選択されている場合
+      if (allSelectedIds.size > 1 && currentMap) {
+        isDraggingMultiple.current = true;
+        dragStartPositions.current.clear();
+
+        // 選択されているノードの初期位置を記録
+        allSelectedIds.forEach((nodeId) => {
+          const mapNode = currentMap.nodes.find((n) => n.id === nodeId);
+          if (mapNode) {
+            dragStartPositions.current.set(nodeId, { ...mapNode.position });
+          }
+        });
+      } else {
+        isDraggingMultiple.current = false;
+        dragStartPositions.current.clear();
+      }
+    },
+    [selectedNodeId, selectedNodeIds, currentMap]
+  );
+
+  // 複数ノードドラッグ中
+  const onNodeDrag = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (!isDraggingMultiple.current || !currentMap) return;
+
+      // ドラッグされているノードの初期位置を取得
+      const startPos = dragStartPositions.current.get(node.id);
+      if (!startPos) return;
+
+      // 移動量を計算
+      const deltaX = node.position.x - startPos.x;
+      const deltaY = node.position.y - startPos.y;
+
+      // 他の選択されたノードも同じ量だけ移動
+      const positions: { id: string; position: { x: number; y: number } }[] = [];
+      dragStartPositions.current.forEach((originalPos, nodeId) => {
+        if (nodeId !== node.id) {
+          positions.push({
+            id: nodeId,
+            position: {
+              x: originalPos.x + deltaX,
+              y: originalPos.y + deltaY,
+            },
+          });
+        }
+      });
+
+      if (positions.length > 0) {
+        updateNodePositions(positions);
+      }
+    },
+    [currentMap, updateNodePositions]
+  );
+
+  // ノードドラッグ終了
   const onNodeDragStop = useCallback(
     (_event: React.MouseEvent, node: Node) => {
+      if (isDraggingMultiple.current) {
+        // 複数ドラッグ終了時：最終位置を保存
+        isDraggingMultiple.current = false;
+        dragStartPositions.current.clear();
+      }
       updateNode(node.id, { position: node.position });
     },
     [updateNode]
@@ -428,6 +506,8 @@ export function MindMapCanvas() {
       onConnectEnd={onConnectEnd}
       onNodeClick={onNodeClick}
       onPaneClick={onPaneClick}
+      onNodeDragStart={onNodeDragStart}
+      onNodeDrag={onNodeDrag}
       onNodeDragStop={onNodeDragStop}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
