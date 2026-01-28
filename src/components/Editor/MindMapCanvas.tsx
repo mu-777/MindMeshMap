@@ -247,7 +247,7 @@ export function MindMapCanvas() {
           setEditingNodeId(newNodeId);
           // ノードがビューポート外の場合は全体表示
           if (!isNodeInViewport(position)) {
-            setTimeout(() => fitView({ padding: 0.2 }), 50);
+            setTimeout(() => fitView({ padding: 0.5 }), 50);
           }
         }
       }
@@ -434,7 +434,7 @@ export function MindMapCanvas() {
       defaultEdgeOptions={defaultEdgeOptions}
       connectionMode={ConnectionMode.Loose}
       fitView
-      fitViewOptions={{ padding: 0.2 }}
+      fitViewOptions={{ padding: 0.5 }}
       minZoom={0.1}
       maxZoom={2}
       className="bg-gray-900"

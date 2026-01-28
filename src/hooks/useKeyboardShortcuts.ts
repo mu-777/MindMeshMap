@@ -189,7 +189,7 @@ export function useKeyboardShortcuts() {
                 setSelectedNodeId(newNodeId);
                 // ノードがビューポート外の場合は全体表示
                 if (!isNodeInViewport(adjustedPosition)) {
-                  setTimeout(() => fitView({ padding: 0.2 }), 50);
+                  setTimeout(() => fitView({ padding: 0.5 }), 50);
                 }
               }
             }
@@ -248,7 +248,7 @@ export function useKeyboardShortcuts() {
                 setSelectedNodeId(newNodeId);
                 // ノードがビューポート外の場合は全体表示
                 if (!isNodeInViewport(adjustedPosition)) {
-                  setTimeout(() => fitView({ padding: 0.2 }), 50);
+                  setTimeout(() => fitView({ padding: 0.5 }), 50);
                 }
               }
             }
@@ -388,7 +388,7 @@ export function useKeyboardShortcuts() {
         }
 
         case 'fitView': {
-          fitView({ padding: 0.2 });
+          fitView({ padding: 0.5 });
           break;
         }
 
