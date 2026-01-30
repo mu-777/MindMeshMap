@@ -22,7 +22,26 @@ export function markAsVisited(): void {
   localStorage.setItem(FIRST_VISIT_KEY, 'true');
 }
 
-/** 初回ユーザー向けのデフォルトマップを生成 */
+/**
+ * 初回ユーザー向けのデフォルトマップを生成（DAG構造）
+ *
+ * ツリーではなく、複数の親を持つノードを含めることで
+ * MindMeshMap の「自由な構造」をデモンストレーションする。
+ *
+ * 構造:
+ *   "MindMeshMap の使い方"
+ *   ├──→ "ノードを追加する"
+ *   │     ├──→ "Tab で子ノード追加"
+ *   │     ├──→ "Enter で兄弟ノード追加"
+ *   │     └──→ "ハンドルからドラッグで接続"  ←─┐
+ *   ├──→ "ノードを編集する"                     │
+ *   │     ├──→ "ダブルクリックで編集開始"        │
+ *   │     ├──→ "Escape で編集完了"               │
+ *   │     └──→ "Ctrl+S / Google Drive で保存" ←─┼─┐
+ *   ├──→ "ノードをつなげる" ─────────────────────┘ │
+ *   └──→ "整理・保存する" ────────────────────────┘
+ *         └──→ "自動レイアウトで整理"
+ */
 export function createDefaultMap(t: TFunction): MindMap {
   // ノードID生成
   const rootId = generateId();
@@ -32,34 +51,32 @@ export function createDefaultMap(t: TFunction): MindMap {
   const editId = generateId();
   const editStartId = generateId();
   const editEndId = generateId();
+  const connectId = generateId();
+  const dragConnectId = generateId();
   const organizeId = generateId();
-  const moveNodeId = generateId();
   const autoLayoutId = generateId();
   const saveId = generateId();
-  const loginId = generateId();
-  const saveShortcutId = generateId();
 
-  // ノード定義（position は auto-layout 前の初期配置）
+  // ノード定義（position は fitView 前の初期配置）
   const nodes = [
     // ルート
     { id: rootId, content: textContent(t('defaultMap.root')), position: { x: 0, y: 250 } },
     // レベル1
-    { id: addNodesId, content: textContent(t('defaultMap.addNodes')), position: { x: 300, y: 50 } },
+    { id: addNodesId, content: textContent(t('defaultMap.addNodes')), position: { x: 300, y: 30 } },
     { id: editId, content: textContent(t('defaultMap.edit')), position: { x: 300, y: 200 } },
-    { id: organizeId, content: textContent(t('defaultMap.organize')), position: { x: 300, y: 350 } },
-    { id: saveId, content: textContent(t('defaultMap.save')), position: { x: 300, y: 500 } },
+    { id: connectId, content: textContent(t('defaultMap.connect')), position: { x: 300, y: 370 } },
+    { id: organizeId, content: textContent(t('defaultMap.organize')), position: { x: 300, y: 500 } },
     // レベル2 - ノードを追加する
-    { id: addChildId, content: textContent(t('defaultMap.addChild')), position: { x: 650, y: 20 } },
-    { id: addSiblingId, content: textContent(t('defaultMap.addSibling')), position: { x: 650, y: 80 } },
-    // レベル2 - 編集する
-    { id: editStartId, content: textContent(t('defaultMap.editStart')), position: { x: 650, y: 170 } },
-    { id: editEndId, content: textContent(t('defaultMap.editEnd')), position: { x: 650, y: 230 } },
-    // レベル2 - 整理する
-    { id: moveNodeId, content: textContent(t('defaultMap.moveNode')), position: { x: 650, y: 320 } },
-    { id: autoLayoutId, content: textContent(t('defaultMap.autoLayout')), position: { x: 650, y: 380 } },
-    // レベル2 - 保存する
-    { id: loginId, content: textContent(t('defaultMap.login')), position: { x: 650, y: 470 } },
-    { id: saveShortcutId, content: textContent(t('defaultMap.saveShortcut')), position: { x: 650, y: 530 } },
+    { id: addChildId, content: textContent(t('defaultMap.addChild')), position: { x: 650, y: 0 } },
+    { id: addSiblingId, content: textContent(t('defaultMap.addSibling')), position: { x: 650, y: 60 } },
+    // レベル2 - ノードを編集する
+    { id: editStartId, content: textContent(t('defaultMap.editStart')), position: { x: 650, y: 160 } },
+    { id: editEndId, content: textContent(t('defaultMap.editEnd')), position: { x: 650, y: 220 } },
+    // レベル2 - 共有ノード（DAGの要）
+    { id: dragConnectId, content: textContent(t('defaultMap.dragConnect')), position: { x: 650, y: 330 } },
+    { id: saveId, content: textContent(t('defaultMap.save')), position: { x: 650, y: 440 } },
+    // レベル2 - 整理・保存する
+    { id: autoLayoutId, content: textContent(t('defaultMap.autoLayout')), position: { x: 650, y: 530 } },
   ];
 
   // エッジ定義（RIGHT レイアウト: right -> left）
@@ -67,17 +84,20 @@ export function createDefaultMap(t: TFunction): MindMap {
     // ルート -> レベル1
     { id: generateId(), source: rootId, target: addNodesId, sourceHandle: 'right', targetHandle: 'left' },
     { id: generateId(), source: rootId, target: editId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: rootId, target: connectId, sourceHandle: 'right', targetHandle: 'left' },
     { id: generateId(), source: rootId, target: organizeId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: rootId, target: saveId, sourceHandle: 'right', targetHandle: 'left' },
-    // レベル1 -> レベル2
+    // レベル1 -> レベル2（通常のツリーエッジ）
     { id: generateId(), source: addNodesId, target: addChildId, sourceHandle: 'right', targetHandle: 'left' },
     { id: generateId(), source: addNodesId, target: addSiblingId, sourceHandle: 'right', targetHandle: 'left' },
     { id: generateId(), source: editId, target: editStartId, sourceHandle: 'right', targetHandle: 'left' },
     { id: generateId(), source: editId, target: editEndId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: organizeId, target: moveNodeId, sourceHandle: 'right', targetHandle: 'left' },
     { id: generateId(), source: organizeId, target: autoLayoutId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: saveId, target: loginId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: saveId, target: saveShortcutId, sourceHandle: 'right', targetHandle: 'left' },
+    // DAGクロスリンク: "ドラッグで接続" は「追加する」と「つなげる」の両方から
+    { id: generateId(), source: addNodesId, target: dragConnectId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: connectId, target: dragConnectId, sourceHandle: 'right', targetHandle: 'left' },
+    // DAGクロスリンク: "保存" は「編集する」と「整理・保存する」の両方から
+    { id: generateId(), source: editId, target: saveId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: organizeId, target: saveId, sourceHandle: 'right', targetHandle: 'left' },
   ];
 
   return {
