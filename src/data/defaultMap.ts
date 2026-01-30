@@ -25,83 +25,64 @@ export function markAsVisited(): void {
 /**
  * 初回ユーザー向けのデフォルトマップを生成（DAG構造）
  *
- * 「新サービスの企画」という実践的なテーマで、
- * ツリーでは表現できない依存関係を自然に含むDAG構造を示す。
+ * 「アイデアを広げる」という抽象的な価値を、
+ * マップ自体の構造で体感させる。
  *
  * 構造:
- *   "新サービスの企画"
- *   ├──→ "課題を発見する"
- *   │     ├──→ "ユーザーヒアリング" ──────────┐
- *   │     └──→ "市場リサーチ" ─────────────────┤
- *   ├──→ "解決策を考える"                      │
- *   │     ├──→ "コンセプト設計" ←──────────────┘ (3つの親)
- *   │     │           │
- *   │     └──→ "技術検証" ─────────────────────┐
- *   ├──→ "計画を立てる"                         │
- *   │     ├──→ "ロードマップ" ←── コンセプト設計 │ (2つの親)
- *   │     │           │                         │
- *   │     └──→ "チーム編成"                     │
- *   └──→ "実行する"                             │
- *         └──→ "プロトタイプ開発" ←─────────────┘←── ロードマップ (3つの親)
+ *   "ひとつのアイデアから"
+ *   ├──→ "問いを立てる"
+ *   │     └──→ "気づき" ─────────→──┐
+ *   ├──→ "調べる"          ↑         │
+ *   │     └──→ "発見" ←────┘ ──→────┤
+ *   ├──→ "人と話す"          ↑       ↓
+ *   │     └──→ "ひらめき" ←──┘  "次のアイデアへ"
+ *
+ *   DAGノード:
+ *   - "発見"（2つの親: 調べる + 気づき）
+ *   - "ひらめき"（2つの親: 人と話す + 発見）
+ *   - "次のアイデアへ"（3つの親: 気づき + 発見 + ひらめき）
  */
 export function createDefaultMap(t: TFunction): MindMap {
-  // ノードID生成
   const rootId = generateId();
-  const discoverId = generateId();
-  const userInterviewId = generateId();
-  const marketResearchId = generateId();
-  const solveId = generateId();
-  const conceptId = generateId();
-  const techValidationId = generateId();
-  const planId = generateId();
-  const roadmapId = generateId();
-  const teamBuildingId = generateId();
-  const executeId = generateId();
-  const prototypeId = generateId();
+  const askId = generateId();
+  const researchId = generateId();
+  const talkId = generateId();
+  const awarenessId = generateId();
+  const discoveryId = generateId();
+  const inspirationId = generateId();
+  const nextIdeaId = generateId();
 
   const nodes = [
-    // ルート
-    { id: rootId, content: textContent(t('defaultMap.root')), position: { x: 0, y: 250 } },
-    // レベル1
-    { id: discoverId, content: textContent(t('defaultMap.discover')), position: { x: 300, y: 30 } },
-    { id: solveId, content: textContent(t('defaultMap.solve')), position: { x: 300, y: 180 } },
-    { id: planId, content: textContent(t('defaultMap.plan')), position: { x: 300, y: 370 } },
-    { id: executeId, content: textContent(t('defaultMap.execute')), position: { x: 300, y: 520 } },
-    // レベル2 - 課題を発見する
-    { id: userInterviewId, content: textContent(t('defaultMap.userInterview')), position: { x: 650, y: 0 } },
-    { id: marketResearchId, content: textContent(t('defaultMap.marketResearch')), position: { x: 650, y: 60 } },
-    // レベル2 - 解決策を考える（コンセプト設計は DAG ノード: 3つの親を持つ）
-    { id: conceptId, content: textContent(t('defaultMap.concept')), position: { x: 650, y: 150 } },
-    { id: techValidationId, content: textContent(t('defaultMap.techValidation')), position: { x: 650, y: 220 } },
-    // レベル2 - 計画を立てる（ロードマップは DAG ノード: 2つの親を持つ）
-    { id: roadmapId, content: textContent(t('defaultMap.roadmap')), position: { x: 650, y: 340 } },
-    { id: teamBuildingId, content: textContent(t('defaultMap.teamBuilding')), position: { x: 650, y: 400 } },
-    // レベル2 - 実行する（プロトタイプ開発は DAG ノード: 3つの親を持つ）
-    { id: prototypeId, content: textContent(t('defaultMap.prototype')), position: { x: 650, y: 520 } },
+    { id: rootId, content: textContent(t('defaultMap.root')), position: { x: 0, y: 150 } },
+    // 3つの探索パス
+    { id: askId, content: textContent(t('defaultMap.ask')), position: { x: 250, y: 0 } },
+    { id: researchId, content: textContent(t('defaultMap.research')), position: { x: 250, y: 150 } },
+    { id: talkId, content: textContent(t('defaultMap.talk')), position: { x: 250, y: 300 } },
+    // 各パスからの成果
+    { id: awarenessId, content: textContent(t('defaultMap.awareness')), position: { x: 500, y: 0 } },
+    { id: discoveryId, content: textContent(t('defaultMap.discovery')), position: { x: 500, y: 150 } },
+    { id: inspirationId, content: textContent(t('defaultMap.inspiration')), position: { x: 500, y: 300 } },
+    // 収束
+    { id: nextIdeaId, content: textContent(t('defaultMap.nextIdea')), position: { x: 750, y: 150 } },
   ];
 
   const edges = [
-    // ルート -> レベル1
-    { id: generateId(), source: rootId, target: discoverId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: rootId, target: solveId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: rootId, target: planId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: rootId, target: executeId, sourceHandle: 'right', targetHandle: 'left' },
-    // レベル1 -> レベル2（ツリーエッジ）
-    { id: generateId(), source: discoverId, target: userInterviewId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: discoverId, target: marketResearchId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: solveId, target: conceptId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: solveId, target: techValidationId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: planId, target: roadmapId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: planId, target: teamBuildingId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: executeId, target: prototypeId, sourceHandle: 'right', targetHandle: 'left' },
-    // DAGクロスリンク: "コンセプト設計" ← ユーザーヒアリング & 市場リサーチ
-    { id: generateId(), source: userInterviewId, target: conceptId, sourceHandle: 'bottom', targetHandle: 'top' },
-    { id: generateId(), source: marketResearchId, target: conceptId, sourceHandle: 'bottom', targetHandle: 'top' },
-    // DAGクロスリンク: "ロードマップ" ← コンセプト設計
-    { id: generateId(), source: conceptId, target: roadmapId, sourceHandle: 'bottom', targetHandle: 'top' },
-    // DAGクロスリンク: "プロトタイプ開発" ← 技術検証 & ロードマップ
-    { id: generateId(), source: techValidationId, target: prototypeId, sourceHandle: 'bottom', targetHandle: 'top' },
-    { id: generateId(), source: roadmapId, target: prototypeId, sourceHandle: 'bottom', targetHandle: 'top' },
+    // ルート → 3つの探索パス
+    { id: generateId(), source: rootId, target: askId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: rootId, target: researchId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: rootId, target: talkId, sourceHandle: 'right', targetHandle: 'left' },
+    // 各パス → 成果（ツリーエッジ）
+    { id: generateId(), source: askId, target: awarenessId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: researchId, target: discoveryId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: talkId, target: inspirationId, sourceHandle: 'right', targetHandle: 'left' },
+    // DAG: 気づきが発見を導く
+    { id: generateId(), source: awarenessId, target: discoveryId, sourceHandle: 'bottom', targetHandle: 'top' },
+    // DAG: 発見がひらめきを生む
+    { id: generateId(), source: discoveryId, target: inspirationId, sourceHandle: 'bottom', targetHandle: 'top' },
+    // DAG: すべてが次のアイデアへ収束
+    { id: generateId(), source: awarenessId, target: nextIdeaId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: discoveryId, target: nextIdeaId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: inspirationId, target: nextIdeaId, sourceHandle: 'right', targetHandle: 'left' },
   ];
 
   return {

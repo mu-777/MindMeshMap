@@ -66,19 +66,15 @@
     "deleteEdge": "删除连线"
   },
   "defaultMap": {
-    "name": "新服务企划",
-    "root": "新服务企划",
-    "discover": "发现问题",
-    "userInterview": "用户访谈",
-    "marketResearch": "市场调研",
-    "solve": "设计解决方案",
-    "concept": "概念设计",
-    "techValidation": "技术验证",
-    "plan": "制定计划",
-    "roadmap": "路线图",
-    "teamBuilding": "团队组建",
-    "execute": "执行",
-    "prototype": "原型开发"
+    "name": "拓展你的想法",
+    "root": "从一个想法开始",
+    "ask": "提出问题",
+    "research": "调查研究",
+    "talk": "与人交流",
+    "awareness": "察觉",
+    "discovery": "发现",
+    "inspiration": "灵感",
+    "nextIdea": "下一个想法"
   },
   "dialogs": {
     "unsavedChangesNew": "您有未保存的更改。确定要创建新地图吗？",

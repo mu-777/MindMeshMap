@@ -66,19 +66,15 @@
     "deleteEdge": "Delete edge"
   },
   "defaultMap": {
-    "name": "Planning a New Service",
-    "root": "Planning a New Service",
-    "discover": "Discover Problems",
-    "userInterview": "User Interviews",
-    "marketResearch": "Market Research",
-    "solve": "Design Solutions",
-    "concept": "Concept Design",
-    "techValidation": "Technical Validation",
-    "plan": "Make a Plan",
-    "roadmap": "Roadmap",
-    "teamBuilding": "Team Building",
-    "execute": "Execute",
-    "prototype": "Prototype Development"
+    "name": "Expand Your Ideas",
+    "root": "Start with one idea",
+    "ask": "Ask questions",
+    "research": "Research",
+    "talk": "Talk to people",
+    "awareness": "Awareness",
+    "discovery": "Discovery",
+    "inspiration": "Inspiration",
+    "nextIdea": "Your next idea"
   },
   "dialogs": {
     "unsavedChangesNew": "You have unsaved changes. Create a new map anyway?",

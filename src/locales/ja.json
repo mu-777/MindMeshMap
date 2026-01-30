@@ -66,19 +66,15 @@
     "deleteEdge": "エッジを削除"
   },
   "defaultMap": {
-    "name": "新サービスの企画",
-    "root": "新サービスの企画",
-    "discover": "課題を発見する",
-    "userInterview": "ユーザーヒアリング",
-    "marketResearch": "市場リサーチ",
-    "solve": "解決策を考える",
-    "concept": "コンセプト設計",
-    "techValidation": "技術検証",
-    "plan": "計画を立てる",
-    "roadmap": "ロードマップ",
-    "teamBuilding": "チーム編成",
-    "execute": "実行する",
-    "prototype": "プロトタイプ開発"
+    "name": "アイデアを広げよう",
+    "root": "ひとつのアイデアから",
+    "ask": "問いを立てる",
+    "research": "調べる",
+    "talk": "人と話す",
+    "awareness": "気づき",
+    "discovery": "発見",
+    "inspiration": "ひらめき",
+    "nextIdea": "次のアイデアへ"
   },
   "dialogs": {
     "unsavedChangesNew": "保存されていない変更があります。新しいマップを作成しますか？",
