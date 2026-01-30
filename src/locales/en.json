@@ -65,6 +65,22 @@
     "addLabel": "+ Label",
     "deleteEdge": "Delete edge"
   },
+  "defaultMap": {
+    "name": "Getting Started",
+    "root": "How to use MindMeshMap",
+    "addNodes": "Add Nodes",
+    "addChild": "Press Tab to add a child node",
+    "addSibling": "Press Enter to add a sibling node",
+    "edit": "Edit",
+    "editStart": "Double-click to start editing",
+    "editEnd": "Press Escape to finish",
+    "organize": "Organize",
+    "moveNode": "Drag to move nodes",
+    "autoLayout": "Auto layout from toolbar",
+    "save": "Save",
+    "login": "Sign in with Google",
+    "saveShortcut": "Ctrl+S to save"
+  },
   "dialogs": {
     "unsavedChangesNew": "You have unsaved changes. Create a new map anyway?",
     "unsavedChangesContinue": "You have unsaved changes. Continue anyway?",

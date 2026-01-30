@@ -22,6 +22,7 @@ import { CustomEdge, type CustomEdgeType } from './CustomEdge';
 import { ContextMenu } from './ContextMenu';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
+import { isFirstVisit, markAsVisited, createDefaultMap } from '../../data/defaultMap';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -49,6 +50,7 @@ export function MindMapCanvas() {
   const {
     currentMap,
     createNewMap,
+    setCurrentMap,
     updateNode,
     updateNodePositions,
     addNode,
@@ -89,12 +91,17 @@ export function MindMapCanvas() {
     [getViewport]
   );
 
-  // 初回マウント時に新規マップを作成
+  // 初回マウント時にマップを作成（初回訪問時はデフォルトマップを表示）
   useEffect(() => {
     if (!currentMap) {
-      createNewMap();
+      if (isFirstVisit()) {
+        setCurrentMap(createDefaultMap(t));
+        markAsVisited();
+      } else {
+        createNewMap();
+      }
     }
-  }, [currentMap, createNewMap]);
+  }, [currentMap, createNewMap, setCurrentMap, t]);
 
   // ノードをReact Flow形式に変換
   const nodes: CustomNodeType[] = useMemo(() => {

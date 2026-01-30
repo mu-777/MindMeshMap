@@ -65,6 +65,22 @@
     "addLabel": "+ 标签",
     "deleteEdge": "删除连线"
   },
+  "defaultMap": {
+    "name": "使用指南",
+    "root": "MindMeshMap 使用方法",
+    "addNodes": "添加节点",
+    "addChild": "按 Tab 键添加子节点",
+    "addSibling": "按 Enter 键添加兄弟节点",
+    "edit": "编辑",
+    "editStart": "双击开始编辑",
+    "editEnd": "按 Escape 完成编辑",
+    "organize": "整理",
+    "moveNode": "拖拽移动节点",
+    "autoLayout": "工具栏自动布局",
+    "save": "保存",
+    "login": "使用 Google 登录",
+    "saveShortcut": "Ctrl+S 保存"
+  },
   "dialogs": {
     "unsavedChangesNew": "您有未保存的更改。确定要创建新地图吗？",
     "unsavedChangesContinue": "您有未保存的更改。确定要继续吗？",
