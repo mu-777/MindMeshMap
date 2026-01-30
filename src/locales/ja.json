@@ -66,19 +66,19 @@
     "deleteEdge": "エッジを削除"
   },
   "defaultMap": {
-    "name": "使い方ガイド",
-    "root": "MindMeshMap の使い方",
-    "addNodes": "ノードを追加する",
-    "addChild": "Tab で子ノード追加",
-    "addSibling": "Enter で兄弟ノード追加",
-    "edit": "ノードを編集する",
-    "editStart": "ダブルクリックで編集開始",
-    "editEnd": "Escape で編集完了",
-    "connect": "ノードをつなげる",
-    "dragConnect": "ハンドルからドラッグで接続",
-    "organize": "整理・保存する",
-    "autoLayout": "自動レイアウトで整理",
-    "save": "Ctrl+S / Google Drive で保存"
+    "name": "新サービスの企画",
+    "root": "新サービスの企画",
+    "discover": "課題を発見する",
+    "userInterview": "ユーザーヒアリング",
+    "marketResearch": "市場リサーチ",
+    "solve": "解決策を考える",
+    "concept": "コンセプト設計",
+    "techValidation": "技術検証",
+    "plan": "計画を立てる",
+    "roadmap": "ロードマップ",
+    "teamBuilding": "チーム編成",
+    "execute": "実行する",
+    "prototype": "プロトタイプ開発"
   },
   "dialogs": {
     "unsavedChangesNew": "保存されていない変更があります。新しいマップを作成しますか？",

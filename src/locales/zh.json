@@ -66,19 +66,19 @@
     "deleteEdge": "删除连线"
   },
   "defaultMap": {
-    "name": "使用指南",
-    "root": "MindMeshMap 使用方法",
-    "addNodes": "添加节点",
-    "addChild": "Tab 添加子节点",
-    "addSibling": "Enter 添加兄弟节点",
-    "edit": "编辑节点",
-    "editStart": "双击开始编辑",
-    "editEnd": "Escape 完成编辑",
-    "connect": "连接节点",
-    "dragConnect": "从端点拖拽连接",
-    "organize": "整理与保存",
-    "autoLayout": "自动布局整理",
-    "save": "Ctrl+S / Google Drive 保存"
+    "name": "新服务企划",
+    "root": "新服务企划",
+    "discover": "发现问题",
+    "userInterview": "用户访谈",
+    "marketResearch": "市场调研",
+    "solve": "设计解决方案",
+    "concept": "概念设计",
+    "techValidation": "技术验证",
+    "plan": "制定计划",
+    "roadmap": "路线图",
+    "teamBuilding": "团队组建",
+    "execute": "执行",
+    "prototype": "原型开发"
   },
   "dialogs": {
     "unsavedChangesNew": "您有未保存的更改。确定要创建新地图吗？",

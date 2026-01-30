@@ -25,79 +25,83 @@ export function markAsVisited(): void {
 /**
  * 初回ユーザー向けのデフォルトマップを生成（DAG構造）
  *
- * ツリーではなく、複数の親を持つノードを含めることで
- * MindMeshMap の「自由な構造」をデモンストレーションする。
+ * 「新サービスの企画」という実践的なテーマで、
+ * ツリーでは表現できない依存関係を自然に含むDAG構造を示す。
  *
  * 構造:
- *   "MindMeshMap の使い方"
- *   ├──→ "ノードを追加する"
- *   │     ├──→ "Tab で子ノード追加"
- *   │     ├──→ "Enter で兄弟ノード追加"
- *   │     └──→ "ハンドルからドラッグで接続"  ←─┐
- *   ├──→ "ノードを編集する"                     │
- *   │     ├──→ "ダブルクリックで編集開始"        │
- *   │     ├──→ "Escape で編集完了"               │
- *   │     └──→ "Ctrl+S / Google Drive で保存" ←─┼─┐
- *   ├──→ "ノードをつなげる" ─────────────────────┘ │
- *   └──→ "整理・保存する" ────────────────────────┘
- *         └──→ "自動レイアウトで整理"
+ *   "新サービスの企画"
+ *   ├──→ "課題を発見する"
+ *   │     ├──→ "ユーザーヒアリング" ──────────┐
+ *   │     └──→ "市場リサーチ" ─────────────────┤
+ *   ├──→ "解決策を考える"                      │
+ *   │     ├──→ "コンセプト設計" ←──────────────┘ (3つの親)
+ *   │     │           │
+ *   │     └──→ "技術検証" ─────────────────────┐
+ *   ├──→ "計画を立てる"                         │
+ *   │     ├──→ "ロードマップ" ←── コンセプト設計 │ (2つの親)
+ *   │     │           │                         │
+ *   │     └──→ "チーム編成"                     │
+ *   └──→ "実行する"                             │
+ *         └──→ "プロトタイプ開発" ←─────────────┘←── ロードマップ (3つの親)
  */
 export function createDefaultMap(t: TFunction): MindMap {
   // ノードID生成
   const rootId = generateId();
-  const addNodesId = generateId();
-  const addChildId = generateId();
-  const addSiblingId = generateId();
-  const editId = generateId();
-  const editStartId = generateId();
-  const editEndId = generateId();
-  const connectId = generateId();
-  const dragConnectId = generateId();
-  const organizeId = generateId();
-  const autoLayoutId = generateId();
-  const saveId = generateId();
+  const discoverId = generateId();
+  const userInterviewId = generateId();
+  const marketResearchId = generateId();
+  const solveId = generateId();
+  const conceptId = generateId();
+  const techValidationId = generateId();
+  const planId = generateId();
+  const roadmapId = generateId();
+  const teamBuildingId = generateId();
+  const executeId = generateId();
+  const prototypeId = generateId();
 
-  // ノード定義（position は fitView 前の初期配置）
   const nodes = [
     // ルート
     { id: rootId, content: textContent(t('defaultMap.root')), position: { x: 0, y: 250 } },
     // レベル1
-    { id: addNodesId, content: textContent(t('defaultMap.addNodes')), position: { x: 300, y: 30 } },
-    { id: editId, content: textContent(t('defaultMap.edit')), position: { x: 300, y: 200 } },
-    { id: connectId, content: textContent(t('defaultMap.connect')), position: { x: 300, y: 370 } },
-    { id: organizeId, content: textContent(t('defaultMap.organize')), position: { x: 300, y: 500 } },
-    // レベル2 - ノードを追加する
-    { id: addChildId, content: textContent(t('defaultMap.addChild')), position: { x: 650, y: 0 } },
-    { id: addSiblingId, content: textContent(t('defaultMap.addSibling')), position: { x: 650, y: 60 } },
-    // レベル2 - ノードを編集する
-    { id: editStartId, content: textContent(t('defaultMap.editStart')), position: { x: 650, y: 160 } },
-    { id: editEndId, content: textContent(t('defaultMap.editEnd')), position: { x: 650, y: 220 } },
-    // レベル2 - 共有ノード（DAGの要）
-    { id: dragConnectId, content: textContent(t('defaultMap.dragConnect')), position: { x: 650, y: 330 } },
-    { id: saveId, content: textContent(t('defaultMap.save')), position: { x: 650, y: 440 } },
-    // レベル2 - 整理・保存する
-    { id: autoLayoutId, content: textContent(t('defaultMap.autoLayout')), position: { x: 650, y: 530 } },
+    { id: discoverId, content: textContent(t('defaultMap.discover')), position: { x: 300, y: 30 } },
+    { id: solveId, content: textContent(t('defaultMap.solve')), position: { x: 300, y: 180 } },
+    { id: planId, content: textContent(t('defaultMap.plan')), position: { x: 300, y: 370 } },
+    { id: executeId, content: textContent(t('defaultMap.execute')), position: { x: 300, y: 520 } },
+    // レベル2 - 課題を発見する
+    { id: userInterviewId, content: textContent(t('defaultMap.userInterview')), position: { x: 650, y: 0 } },
+    { id: marketResearchId, content: textContent(t('defaultMap.marketResearch')), position: { x: 650, y: 60 } },
+    // レベル2 - 解決策を考える（コンセプト設計は DAG ノード: 3つの親を持つ）
+    { id: conceptId, content: textContent(t('defaultMap.concept')), position: { x: 650, y: 150 } },
+    { id: techValidationId, content: textContent(t('defaultMap.techValidation')), position: { x: 650, y: 220 } },
+    // レベル2 - 計画を立てる（ロードマップは DAG ノード: 2つの親を持つ）
+    { id: roadmapId, content: textContent(t('defaultMap.roadmap')), position: { x: 650, y: 340 } },
+    { id: teamBuildingId, content: textContent(t('defaultMap.teamBuilding')), position: { x: 650, y: 400 } },
+    // レベル2 - 実行する（プロトタイプ開発は DAG ノード: 3つの親を持つ）
+    { id: prototypeId, content: textContent(t('defaultMap.prototype')), position: { x: 650, y: 520 } },
   ];
 
-  // エッジ定義（RIGHT レイアウト: right -> left）
   const edges = [
     // ルート -> レベル1
-    { id: generateId(), source: rootId, target: addNodesId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: rootId, target: editId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: rootId, target: connectId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: rootId, target: organizeId, sourceHandle: 'right', targetHandle: 'left' },
-    // レベル1 -> レベル2（通常のツリーエッジ）
-    { id: generateId(), source: addNodesId, target: addChildId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: addNodesId, target: addSiblingId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: editId, target: editStartId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: editId, target: editEndId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: organizeId, target: autoLayoutId, sourceHandle: 'right', targetHandle: 'left' },
-    // DAGクロスリンク: "ドラッグで接続" は「追加する」と「つなげる」の両方から
-    { id: generateId(), source: addNodesId, target: dragConnectId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: connectId, target: dragConnectId, sourceHandle: 'right', targetHandle: 'left' },
-    // DAGクロスリンク: "保存" は「編集する」と「整理・保存する」の両方から
-    { id: generateId(), source: editId, target: saveId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: organizeId, target: saveId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: rootId, target: discoverId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: rootId, target: solveId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: rootId, target: planId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: rootId, target: executeId, sourceHandle: 'right', targetHandle: 'left' },
+    // レベル1 -> レベル2（ツリーエッジ）
+    { id: generateId(), source: discoverId, target: userInterviewId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: discoverId, target: marketResearchId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: solveId, target: conceptId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: solveId, target: techValidationId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: planId, target: roadmapId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: planId, target: teamBuildingId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: executeId, target: prototypeId, sourceHandle: 'right', targetHandle: 'left' },
+    // DAGクロスリンク: "コンセプト設計" ← ユーザーヒアリング & 市場リサーチ
+    { id: generateId(), source: userInterviewId, target: conceptId, sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: generateId(), source: marketResearchId, target: conceptId, sourceHandle: 'bottom', targetHandle: 'top' },
+    // DAGクロスリンク: "ロードマップ" ← コンセプト設計
+    { id: generateId(), source: conceptId, target: roadmapId, sourceHandle: 'bottom', targetHandle: 'top' },
+    // DAGクロスリンク: "プロトタイプ開発" ← 技術検証 & ロードマップ
+    { id: generateId(), source: techValidationId, target: prototypeId, sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: generateId(), source: roadmapId, target: prototypeId, sourceHandle: 'bottom', targetHandle: 'top' },
   ];
 
   return {
