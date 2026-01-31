@@ -67,14 +67,15 @@
   },
   "defaultMap": {
     "name": "アイデアを広げよう",
-    "root": "ひとつのアイデアから",
-    "ask": "問いを立てる",
-    "research": "調べる",
-    "talk": "人と話す",
-    "awareness": "気づき",
-    "discovery": "発見",
-    "inspiration": "ひらめき",
-    "nextIdea": "次のアイデアへ"
+    "root": "アイデアの種",
+    "diverge": "発散する",
+    "association": "連想",
+    "question": "疑問",
+    "deepen": "掘り下げる",
+    "concretize": "具体化",
+    "connect": "つなげる",
+    "newPerspective": "新しい視点",
+    "bigPicture": "全体像が見える"
   },
   "dialogs": {
     "unsavedChangesNew": "保存されていない変更があります。新しいマップを作成しますか？",

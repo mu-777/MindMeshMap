@@ -25,64 +25,70 @@ export function markAsVisited(): void {
 /**
  * 初回ユーザー向けのデフォルトマップを生成（DAG構造）
  *
- * 「アイデアを広げる」という抽象的な価値を、
- * マップ自体の構造で体感させる。
+ * 「曖昧な思いつきを発散し、構造を整理して全体像を掴む」
+ * というツールの価値を、マップの構造自体で体感させる。
  *
  * 構造:
- *   "ひとつのアイデアから"
- *   ├──→ "問いを立てる"
- *   │     └──→ "気づき" ─────────→──┐
- *   ├──→ "調べる"          ↑         │
- *   │     └──→ "発見" ←────┘ ──→────┤
- *   ├──→ "人と話す"          ↑       ↓
- *   │     └──→ "ひらめき" ←──┘  "次のアイデアへ"
- *
- *   DAGノード:
- *   - "発見"（2つの親: 調べる + 気づき）
- *   - "ひらめき"（2つの親: 人と話す + 発見）
- *   - "次のアイデアへ"（3つの親: 気づき + 発見 + ひらめき）
+ *   "アイデアの種"
+ *   ├──→ "発散する"
+ *   │     ├──→ "連想" ─────────────┐
+ *   │     └──→ "疑問" ─────────────┼──┐
+ *   ├──→ "掘り下げる"              │  │
+ *   │     └──→ "具体化" ←─────────┘  │ (2つの親)
+ *   └──→ "つなげる"                   │
+ *         └──→ "新しい視点" ←─具体化──┘ (3つの親)
+ *                  │            │
+ *                  └──→ "全体像が見える" ←┘ (2つの親)
  */
 export function createDefaultMap(t: TFunction): MindMap {
   const rootId = generateId();
-  const askId = generateId();
-  const researchId = generateId();
-  const talkId = generateId();
-  const awarenessId = generateId();
-  const discoveryId = generateId();
-  const inspirationId = generateId();
-  const nextIdeaId = generateId();
+  const divergeId = generateId();
+  const associationId = generateId();
+  const questionId = generateId();
+  const deepenId = generateId();
+  const concretizeId = generateId();
+  const connectId = generateId();
+  const newPerspectiveId = generateId();
+  const bigPictureId = generateId();
 
   const nodes = [
     { id: rootId, content: textContent(t('defaultMap.root')), position: { x: 0, y: 150 } },
-    // 3つの探索パス
-    { id: askId, content: textContent(t('defaultMap.ask')), position: { x: 250, y: 0 } },
-    { id: researchId, content: textContent(t('defaultMap.research')), position: { x: 250, y: 150 } },
-    { id: talkId, content: textContent(t('defaultMap.talk')), position: { x: 250, y: 300 } },
-    // 各パスからの成果
-    { id: awarenessId, content: textContent(t('defaultMap.awareness')), position: { x: 500, y: 0 } },
-    { id: discoveryId, content: textContent(t('defaultMap.discovery')), position: { x: 500, y: 150 } },
-    { id: inspirationId, content: textContent(t('defaultMap.inspiration')), position: { x: 500, y: 300 } },
-    // 収束
-    { id: nextIdeaId, content: textContent(t('defaultMap.nextIdea')), position: { x: 750, y: 150 } },
+    // レベル1: 3つのアプローチ
+    { id: divergeId, content: textContent(t('defaultMap.diverge')), position: { x: 250, y: 0 } },
+    { id: deepenId, content: textContent(t('defaultMap.deepen')), position: { x: 250, y: 150 } },
+    { id: connectId, content: textContent(t('defaultMap.connect')), position: { x: 250, y: 300 } },
+    // レベル2: 発散の成果
+    { id: associationId, content: textContent(t('defaultMap.association')), position: { x: 500, y: -30 } },
+    { id: questionId, content: textContent(t('defaultMap.question')), position: { x: 500, y: 40 } },
+    // レベル2: DAGノード（具体化 ← 掘り下げる + 連想）
+    { id: concretizeId, content: textContent(t('defaultMap.concretize')), position: { x: 500, y: 150 } },
+    // レベル2: DAGノード（新しい視点 ← つなげる + 疑問 + 具体化）
+    { id: newPerspectiveId, content: textContent(t('defaultMap.newPerspective')), position: { x: 500, y: 300 } },
+    // レベル3: 収束（全体像 ← 具体化 + 新しい視点）
+    { id: bigPictureId, content: textContent(t('defaultMap.bigPicture')), position: { x: 750, y: 220 } },
   ];
 
   const edges = [
-    // ルート → 3つの探索パス
-    { id: generateId(), source: rootId, target: askId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: rootId, target: researchId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: rootId, target: talkId, sourceHandle: 'right', targetHandle: 'left' },
-    // 各パス → 成果（ツリーエッジ）
-    { id: generateId(), source: askId, target: awarenessId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: researchId, target: discoveryId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: talkId, target: inspirationId, sourceHandle: 'right', targetHandle: 'left' },
-    // DAG: 気づきが発見を導く
-    { id: generateId(), source: awarenessId, target: discoveryId, sourceHandle: 'bottom', targetHandle: 'top' },
-    // DAG: 発見がひらめきを生む
-    { id: generateId(), source: discoveryId, target: inspirationId, sourceHandle: 'bottom', targetHandle: 'top' },
-    // DAG: すべてが次のアイデアへ収束
-    { id: generateId(), source: awarenessId, target: nextIdeaId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: discoveryId, target: nextIdeaId, sourceHandle: 'right', targetHandle: 'left' },
-    { id: generateId(), source: inspirationId, target: nextIdeaId, sourceHandle: 'right', targetHandle: 'left' },
+    // ルート → 3つのアプローチ
+    { id: generateId(), source: rootId, target: divergeId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: rootId, target: deepenId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: rootId, target: connectId, sourceHandle: 'right', targetHandle: 'left' },
+    // 発散 → 連想・疑問
+    { id: generateId(), source: divergeId, target: associationId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: divergeId, target: questionId, sourceHandle: 'right', targetHandle: 'left' },
+    // 掘り下げる → 具体化
+    { id: generateId(), source: deepenId, target: concretizeId, sourceHandle: 'right', targetHandle: 'left' },
+    // つなげる → 新しい視点
+    { id: generateId(), source: connectId, target: newPerspectiveId, sourceHandle: 'right', targetHandle: 'left' },
+    // DAG: 連想 → 具体化（発散した連想が具体化を導く）
+    { id: generateId(), source: associationId, target: concretizeId, sourceHandle: 'bottom', targetHandle: 'top' },
+    // DAG: 疑問 → 新しい視点（問いが新たな視点を開く）
+    { id: generateId(), source: questionId, target: newPerspectiveId, sourceHandle: 'bottom', targetHandle: 'top' },
+    // DAG: 具体化 → 新しい視点（具体化が視点をつなげる）
+    { id: generateId(), source: concretizeId, target: newPerspectiveId, sourceHandle: 'bottom', targetHandle: 'top' },
+    // DAG: 具体化 + 新しい視点 → 全体像（収束）
+    { id: generateId(), source: concretizeId, target: bigPictureId, sourceHandle: 'right', targetHandle: 'left' },
+    { id: generateId(), source: newPerspectiveId, target: bigPictureId, sourceHandle: 'right', targetHandle: 'left' },
   ];
 
   return {

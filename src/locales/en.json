@@ -67,14 +67,15 @@
   },
   "defaultMap": {
     "name": "Expand Your Ideas",
-    "root": "Start with one idea",
-    "ask": "Ask questions",
-    "research": "Research",
-    "talk": "Talk to people",
-    "awareness": "Awareness",
-    "discovery": "Discovery",
-    "inspiration": "Inspiration",
-    "nextIdea": "Your next idea"
+    "root": "Seed of an Idea",
+    "diverge": "Diverge",
+    "association": "Association",
+    "question": "Questions",
+    "deepen": "Go Deeper",
+    "concretize": "Make it Concrete",
+    "connect": "Connect",
+    "newPerspective": "New Perspective",
+    "bigPicture": "The Big Picture Emerges"
   },
   "dialogs": {
     "unsavedChangesNew": "You have unsaved changes. Create a new map anyway?",
