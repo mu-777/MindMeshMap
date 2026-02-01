@@ -65,18 +65,6 @@
     "addLabel": "+ ラベル",
     "deleteEdge": "エッジを削除"
   },
-  "defaultMap": {
-    "name": "アイデアを広げよう",
-    "root": "アイデアの種",
-    "diverge": "発散する",
-    "association": "連想",
-    "question": "疑問",
-    "deepen": "掘り下げる",
-    "concretize": "具体化",
-    "connect": "つなげる",
-    "newPerspective": "新しい視点",
-    "bigPicture": "全体像が見える"
-  },
   "dialogs": {
     "unsavedChangesNew": "保存されていない変更があります。新しいマップを作成しますか？",
     "unsavedChangesContinue": "保存されていない変更があります。続行しますか？",

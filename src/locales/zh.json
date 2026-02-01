@@ -65,18 +65,6 @@
     "addLabel": "+ 标签",
     "deleteEdge": "删除连线"
   },
-  "defaultMap": {
-    "name": "拓展你的想法",
-    "root": "想法的种子",
-    "diverge": "发散",
-    "association": "联想",
-    "question": "疑问",
-    "deepen": "深入探究",
-    "concretize": "具体化",
-    "connect": "连接",
-    "newPerspective": "新视角",
-    "bigPicture": "全貌浮现"
-  },
   "dialogs": {
     "unsavedChangesNew": "您有未保存的更改。确定要创建新地图吗？",
     "unsavedChangesContinue": "您有未保存的更改。确定要继续吗？",
