@@ -65,6 +65,18 @@
     "addLabel": "+ Label",
     "deleteEdge": "Delete edge"
   },
+  "defaultMap": {
+    "name": "Expand Your Ideas",
+    "root": "Seed of an Idea",
+    "diverge": "Diverge",
+    "association": "Association",
+    "question": "Questions",
+    "deepen": "Go Deeper",
+    "concretize": "Make it Concrete",
+    "connect": "Connect",
+    "newPerspective": "New Perspective",
+    "bigPicture": "The Big Picture Emerges"
+  },
   "dialogs": {
     "unsavedChangesNew": "You have unsaved changes. Create a new map anyway?",
     "unsavedChangesContinue": "You have unsaved changes. Continue anyway?",
