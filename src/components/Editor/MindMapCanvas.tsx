@@ -13,6 +13,7 @@ import {
   type NodeChange,
   type EdgeChange,
   type Node,
+  type Edge,
   type OnConnectEnd,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -58,7 +59,7 @@ export function MindMapCanvas() {
     addEdge: storeAddEdge,
     saveToHistory,
   } = useMapStore();
-  const { selectedNodeId, selectedNodeIds, setSelectedNodeId, toggleNodeSelection, clearMultiSelection, setEditingNodeId, closeContextMenu } = useUIStore();
+  const { selectedNodeId, selectedNodeIds, selectedEdgeId, setSelectedNodeId, setSelectedEdgeId, toggleNodeSelection, clearMultiSelection, setEditingNodeId, closeContextMenu } = useUIStore();
   const { screenToFlowPosition, fitView, getViewport } = useReactFlow();
   const connectingInfo = useRef<{ nodeId: string | null; handleId: string | null }>({
     nodeId: null,
@@ -167,6 +168,7 @@ export function MindMapCanvas() {
     const nextCache = new Map<string, CustomEdgeType>();
 
     const result = currentMap.edges.map((edge) => {
+      const selected = edge.id === selectedEdgeId;
       const prev = prevCache.get(edge.id);
       const unchanged =
         prev !== undefined &&
@@ -174,7 +176,8 @@ export function MindMapCanvas() {
         prev.target === edge.target &&
         prev.sourceHandle === edge.sourceHandle &&
         prev.targetHandle === edge.targetHandle &&
-        prev.data?.label === edge.label;
+        prev.data?.label === edge.label &&
+        prev.selected === selected;
 
       const edgeObj: CustomEdgeType = unchanged
         ? prev
@@ -186,6 +189,7 @@ export function MindMapCanvas() {
             targetHandle: edge.targetHandle,
             type: 'custom' as const,
             data: { label: edge.label },
+            selected,
           };
       nextCache.set(edge.id, edgeObj);
       return edgeObj;
@@ -193,7 +197,7 @@ export function MindMapCanvas() {
 
     edgesCacheRef.current = nextCache;
     return result;
-  }, [currentMap]);
+  }, [currentMap, selectedEdgeId]);
 
   // ノード変更ハンドラ
   const onNodesChange = useCallback(
@@ -351,10 +355,19 @@ export function MindMapCanvas() {
   // キャンバスクリックで選択解除
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
+    setSelectedEdgeId(null);
     clearMultiSelection();
     setEditingNodeId(null);
     closeContextMenu();
-  }, [setSelectedNodeId, clearMultiSelection, setEditingNodeId, closeContextMenu]);
+  }, [setSelectedNodeId, setSelectedEdgeId, clearMultiSelection, setEditingNodeId, closeContextMenu]);
+
+  // エッジクリックで選択（Delete キーでの削除を可能にするため、選択状態をアプリ側で明示管理する）
+  const onEdgeClick = useCallback(
+    (_event: React.MouseEvent, edge: Edge) => {
+      setSelectedEdgeId(edge.id);
+    },
+    [setSelectedEdgeId]
+  );
 
   // ダブルクリック/ダブルタップで新しいノードを作成
   const createNodeAtPosition = useCallback(
@@ -583,6 +596,7 @@ export function MindMapCanvas() {
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
       onNodeClick={onNodeClick}
+      onEdgeClick={onEdgeClick}
       onPaneClick={onPaneClick}
       onNodeDragStart={onNodeDragStart}
       onNodeDrag={onNodeDrag}
@@ -598,6 +612,11 @@ export function MindMapCanvas() {
       // ダブルクリックはノード作成に割り当てているため、React Flow標準のズーム動作は無効化する
       // （有効のままだとd3-zoomのdblclickハンドラがイベント伝播を止め、ラッパーdivのonDoubleClickまで届かない）
       zoomOnDoubleClick={false}
+      // React Flow標準のキーボードアクセシビリティ（ノードDOMがフォーカスを持っている状態で
+      // 矢印キーを押すと選択中ノードがその方向へ移動する等）を無効化する。アプリ独自のキーボード
+      // ナビゲーション（useKeyboardShortcuts）と二重に働き、矢印キーでノードが動いてしまう
+      // 不具合の原因になっていたため
+      disableKeyboardA11y={true}
       className="bg-gray-900"
       proOptions={{ hideAttribution: true }}
     >

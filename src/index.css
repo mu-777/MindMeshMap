@@ -27,3 +27,11 @@ body {
   width: 100%;
   height: 100vh;
 }
+
+/* 100vhをフォールバックとしつつ、対応ブラウザでは動的ビューポート高（dvh）を優先する。
+   モバイルではURLバーの出入りでvisual viewportが変動するため、100vh固定だと
+   下端（React Flow Controls等）が画面外に押し出されてしまう問題への対策 */
+.app-height {
+  height: 100vh;
+  height: 100dvh;
+}

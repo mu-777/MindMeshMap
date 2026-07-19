@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -8,6 +9,8 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useEditorStore } from '../../stores/editorStore';
+import { useNodeCreation } from '../../hooks/useNodeCreation';
+import { wasLastInteractionTouch } from '../../utils/pointerTracker';
 
 // BubbleMenu用ProseMirrorプラグインのpluginKey（ノードごとのエディタに閉じているので固定文字列でよい）
 const BUBBLE_MENU_PLUGIN_KEY = 'bubbleMenu';
@@ -25,7 +28,15 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
   const { updateNodeContent } = useMapStore();
   const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu, pendingEditClear, setPendingEditClear } = useUIStore();
   const setActiveEditor = useEditorStore((state) => state.setActiveEditor);
+  const { createChildNode, createSiblingNode } = useNodeCreation();
   const isEditing = editingNodeId === id;
+  // armed状態（選択中かつ編集中でない）。この状態ではTiptapエディタをeditable+フォーカス済みに
+  // しておく（armed-focus方式）。IMEは打鍵時点でフォーカスされている要素を見てcomposition開始を
+  // 判断するため、打鍵の「前」からフォーカスがcontenteditableに無いと1文字目の変換が正しく
+  // 働かない（keydownハンドラ内でフォーカスを移す方式では、その打鍵自体には間に合わない）。
+  // タッチ操作直後はarmedにしない（1タップ目からソフトキーボードが開いてしまうのを防ぐ。
+  // モバイルの2タップ編集フローはこのarmed機構と独立して従来通り動作する）
+  const armed = selected && !isEditing && !wasLastInteractionTouch();
   const containerRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -60,6 +71,101 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
       }
     })(),
     editable: isEditing,
+    // armed-focus方式の要。ノードのTiptapエディタに常時フォーカスを当てておくことで
+    // IMEが1文字目から正しくcomposition開始できるようにする一方、印字可能文字以外
+    // （Tab/Enter/Delete/矢印/Ctrl系等）はProseMirrorに処理させず、windowのuseKeyboardShortcuts
+    // にノード操作として処理させる（returnをtrueにするとProseMirrorはpreventDefaultした上で
+    // 自身のキー処理を行わない。ただしDOMイベントの伝播は止まらないためwindowまでバブルする）。
+    // このオブジェクトは毎レンダーで新しく作られるが、@tiptap/reactのuseEditorは
+    // レンダーごとにeditorProps差分を検知してeditor.setOptions()経由でライブのEditorViewへ
+    // 反映するため、id・armed・createChildNode等の最新のクロージャが常に使われる
+    // （stale closureの心配はない）。ただし「今この瞬間の」selectedNodeId/editingNodeIdは
+    // レンダー時点の値では不十分な場合があるため、useUIStore.getState()で都度取得する
+    editorProps: {
+      handleKeyDown: (_view, event) => {
+        const uiState = useUIStore.getState();
+        const isEditingNow = uiState.editingNodeId === id;
+        const isArmedNow =
+          !isEditingNow &&
+          (uiState.selectedNodeId === id || uiState.selectedNodeIds.includes(id));
+
+        // IME変換中、または変換確定のキー入力（keyCode 229はSafari等でisComposingが
+        // 正しく立たない場合のフォールバック）。armedであれば編集モードへ遷移させた上で
+        // このキー入力自体はTiptap/ブラウザのIME処理にそのまま委ねる（return false）。
+        // 編集中は何もしない（IME変換確定のEnter等を編集終了として扱わないため）
+        if (event.isComposing || event.keyCode === 229) {
+          if (isArmedNow) {
+            flushSync(() => {
+              // 実際のクリア処理はeditingNodeId反映後のuseLayoutEffectで行う
+              // （isFirstEditInSessionRefのリセットより先にクリアしてしまうと、
+              // 「1編集セッション=1 Undo」の記録が1つずれてしまうため）
+              setPendingEditClear(true);
+              setEditingNodeId(id);
+            });
+          }
+          return false;
+        }
+
+        if (isEditingNow) {
+          // Escapeで編集終了（armedへ復帰。selectedNodeIdは変えないので選択状態は保たれる）
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            flushSync(() => {
+              setEditingNodeId(null);
+            });
+            return true;
+          }
+          // Tabで編集確定＋子ノード作成（新ノードを選択=armedにする。マインドマップ標準の挙動）
+          if (event.key === 'Tab') {
+            event.preventDefault();
+            event.stopPropagation();
+            flushSync(() => {
+              setEditingNodeId(null);
+              createChildNode(id);
+            });
+            return true;
+          }
+          // Enterで編集確定＋兄弟ノード作成。ただしタッチ環境では改行のまま
+          // （スマホのソフトキーボードで改行できることを維持する。兄弟ノード作成は
+          // ハンドルドラッグ等の別手段で可能）。Shift+Enterは常にTiptapに任せて改行にする
+          if (event.key === 'Enter' && !event.shiftKey) {
+            if (wasLastInteractionTouch()) {
+              return false;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            flushSync(() => {
+              setEditingNodeId(null);
+              createSiblingNode(id);
+            });
+            return true;
+          }
+          // 他のキーはTiptapに任せる（通常のテキスト入力、Ctrl+Zでのテキスト内Undo等）
+          return false;
+        }
+
+        if (isArmedNow) {
+          // 印字可能文字（Ctrl/Meta/Altなしの単一文字）は編集モードへ遷移し、この打鍵自体は
+          // ブラウザ/ProseMirrorのデフォルト処理に委ねる（フォーカスは既にあるのでIMEも正しく動く）
+          const isPrintableChar =
+            event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
+          if (isPrintableChar) {
+            flushSync(() => {
+              setPendingEditClear(true);
+              setEditingNodeId(id);
+            });
+            return false;
+          }
+          // それ以外のキー（Tab/Enter/Backspace/Delete/矢印/Ctrl・Meta修飾付き全般/F2等）は
+          // ProseMirrorに処理させない。preventDefaultはProseMirror側で行われ、イベント自体は
+          // windowまでバブルするので、既存のuseKeyboardShortcutsがノード操作として処理する
+          return true;
+        }
+
+        return false;
+      },
+    },
     onUpdate: ({ editor }) => {
       const json = JSON.stringify(editor.getJSON());
       // マウント直後、実際のユーザー入力なしにTiptap/ProseMirror側の初期化（スキーマ正規化等）で
@@ -84,30 +190,73 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     }
   }, [isEditing]);
 
-  // 編集モードの切り替え。
+  // 編集モード・armed状態の切り替えに応じて、editable/フォーカスを同期する。
   // useLayoutEffect にしているのは、印字可能文字によるキーボード横取り編集開始
-  // （useKeyboardShortcutsのflushSync）内で同期的に実行される必要があるため。
-  // useEffectだと次のマクロタスクまで実行が遅延し、ブラウザのデフォルトの文字入力/IME変換開始処理が
-  // 走る時点でまだフォーカスが移っておらず、1文字目の入力を取りこぼしてしまう
+  // （useKeyboardShortcutsのflushSync、またはCustomNode自身のeditorProps.handleKeyDownの
+  // flushSync）内で同期的に実行される必要があるため。useEffectだと次のマクロタスクまで
+  // 実行が遅延し、ブラウザのデフォルトの文字入力/IME変換開始処理が走る時点でまだフォーカスが
+  // 移っておらず、1文字目の入力を取りこぼしてしまう
   useLayoutEffect(() => {
-    if (editor) {
-      editor.setEditable(isEditing);
-      if (isEditing) {
-        // pendingEditClearが立っている場合、既存内容をクリアしてから編集開始する
-        // （文字の挿入自体はブラウザ/IMEのデフォルト処理に任せるため、ここではクリアのみ行う）
-        if (pendingEditClear) {
-          editor.commands.clearContent();
-          setPendingEditClear(false);
-        }
-        // Tiptapのfocusコマンドは実際のDOMフォーカスをrequestAnimationFrame内で行うため
-        // （「For React we have to focus asynchronously」）、キーボード横取り編集開始の
-        // flushSync内では間に合わず、直後にブラウザが処理する1文字目の入力を取りこぼす。
-        // そのためDOMフォーカス自体はここで同期的に行い、focus('end')ではカーソル位置のみ委ねる
-        editor.view.dom.focus();
-        editor.commands.focus('end');
+    if (!editor || editor.isDestroyed) return;
+
+    if (isEditing) {
+      editor.setEditable(true);
+      // pendingEditClearが立っている場合、既存内容をクリアしてから編集開始する
+      // （文字の挿入自体はブラウザ/IMEのデフォルト処理に任せるため、ここではクリアのみ行う）。
+      // isFirstEditInSessionRefのリセット（上のeffect）は宣言順によりこれより先に実行済みなので、
+      // ここでのクリア操作は正しく「1編集セッション目の変更」として履歴に積まれる
+      if (pendingEditClear) {
+        editor.commands.clearContent();
+        setPendingEditClear(false);
+      }
+      // Tiptapのfocusコマンドは実際のDOMフォーカスをrequestAnimationFrame内で行うため
+      // （「For React we have to focus asynchronously」）、キーボード横取り編集開始の
+      // flushSync内では間に合わず、直後にブラウザが処理する1文字目の入力を取りこぼす。
+      // そのためDOMフォーカス自体はここで同期的に行い、focus('end')ではカーソル位置のみ委ねる
+      editor.view.dom.focus();
+      editor.commands.focus('end');
+    } else if (armed) {
+      // armed-focus方式: 選択中・非編集のノードのエディタに常時フォーカスを当てておく。
+      // これにより次の打鍵が発生する「前」からフォーカスがcontenteditableにある状態になり、
+      // IMEが1文字目から正しくcomposition開始できる
+      editor.setEditable(true);
+      editor.view.dom.focus();
+
+      // React Flowは新規追加ノードを、ハンドル位置計算に必要な寸法計測が完了するまで
+      // visibility:hiddenで描画する（計測完了後にvisibleへ切り替える）。非表示要素は
+      // フォーカスできないため、Tab/Enterでのノード新規作成直後にarmedにする場合など、
+      // 上の同期focus()が効かないことがある。既存ノードをクリックしてarmedにする場合は
+      // 既に可視化済みなので即座に成功する（このリトライは無害・no-op）
+      if (document.activeElement !== editor.view.dom) {
+        let attempts = 0;
+        let rafId: number | null = null;
+        const retryFocus = () => {
+          rafId = null;
+          if (editor.isDestroyed || document.activeElement === editor.view.dom) return;
+          editor.view.dom.focus();
+          attempts += 1;
+          if (document.activeElement !== editor.view.dom && attempts < 20) {
+            rafId = requestAnimationFrame(retryFocus);
+          }
+        };
+        rafId = requestAnimationFrame(retryFocus);
+        return () => {
+          if (rafId !== null) cancelAnimationFrame(rafId);
+        };
+      }
+    } else {
+      // armedでも編集中でもない（未選択・他ノード選択・タッチ選択直後 等）。
+      // editor.commands.blur()はTiptap内部でrequestAnimationFrame経由の非同期実行になる
+      // （focusコマンドと同様の理由）ため、ここではview.dom.blur()を直接同期的に呼ぶ。
+      // 非同期のままだと、このコミット内で別ノード（子ノード作成等）が同期的にfocus()を
+      // 呼んだ後になって、遅延実行されたblur()が発火してしまい、意図せずフォーカスが
+      // documentへ抜けてしまう
+      editor.setEditable(false);
+      if (document.activeElement === editor.view.dom) {
+        editor.view.dom.blur();
       }
     }
-  }, [editor, isEditing, pendingEditClear, setPendingEditClear]);
+  }, [editor, isEditing, armed, pendingEditClear, setPendingEditClear]);
 
   // 外部（Undo/Redo等）からのcontent変更をエディタに反映する。
   // アプリ側のUndo/RedoはmapStoreのhistoryでdata.contentを戻すが、Tiptapエディタは
@@ -196,35 +345,21 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     [id, isEditing, setSelectedNodeId, toggleNodeSelection]
   );
 
-  // 編集中のキーイベント処理
+  // 編集中のキーイベント処理。
+  // Escape/Tab/Enterの特別処理はeditorProps.handleKeyDown（Tiptap側）に一本化したため、
+  // ここでは編集中の他のキー（通常のテキスト入力等）がwindowのuseKeyboardShortcutsまで
+  // バブリングしないようにするだけ
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (isEditing) {
-        // IME変換中のEnter/Escapeは変換確定のためのキー入力なので、
-        // 編集モードの終了として扱わない（何もせずTiptap/IMEにそのまま処理させる）
+        // IME変換中のキー入力は変換確定のためのものなので、そのままTiptap/IMEに処理させる
         if (e.nativeEvent.isComposing) {
           return;
         }
-        // Escapeで編集終了
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-          setEditingNodeId(null);
-          return;
-        }
-        // Enterで編集終了してノード選択状態に
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          e.stopPropagation();
-          setEditingNodeId(null);
-          setSelectedNodeId(id);
-          return;
-        }
-        // 他のキーはTiptapに任せる（Shift+Enterは改行として動作）
         e.stopPropagation();
       }
     },
-    [isEditing, setEditingNodeId, setSelectedNodeId, id]
+    [isEditing]
   );
 
   // 右クリックでコンテキストメニュー表示
@@ -369,6 +504,7 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
         className={`
           prose prose-sm prose-invert max-w-none
           ${isEditing ? 'cursor-text' : 'cursor-pointer'}
+          ${!isEditing ? 'caret-transparent [&_*]:caret-transparent' : ''}
         `}
       >
         {/* テキスト選択時に表示される書式バー。

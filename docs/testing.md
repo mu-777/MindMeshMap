@@ -1,0 +1,118 @@
+# E2Eテスト手順書
+
+MindMeshMapのE2Eテストは、素の[playwright](https://playwright.dev/)（`@playwright/test`ではない）と
+自前の軽量ランナー（`e2e/run-all.mjs`）で構成されている。採用理由は[decisions.md](./decisions.md)を参照。
+
+このドキュメントはAIエージェント（Sonnet 5等）や将来の自分が、コードを読み直さずにテストを
+実行・拡張できるようにするための手順書。
+
+## 前提
+
+1. 依存関係のインストール（初回のみ、または`package.json`変更後）
+   ```bash
+   npm install
+   ```
+2. Playwrightのブラウザバイナリのインストール（初回のみ）
+   ```bash
+   npx playwright install chromium
+   ```
+3. devサーバの起動（テスト実行中はずっと起動したままにしておく）
+   ```bash
+   npm run dev
+   ```
+   `http://localhost:5173/MindMeshMap/` で応答することを確認する。
+
+## 実行方法
+
+- 全テスト一括実行:
+  ```bash
+  npm run test:e2e
+  ```
+  PASS/FAILのサマリが最後に表示され、1件でも失敗すると非0の終了コードで終わる。
+  devサーバが起動していない場合は、その旨のエラーメッセージで終了する（サーバ起動を促す）。
+
+- 個別テストの実行（デバッグ時など）:
+  ```bash
+  node e2e/<file>.mjs
+  ```
+  例: `node e2e/node-creation.mjs`
+
+- 失敗時、原因調査用のスクリーンショットが `e2e/screenshots/` に保存される
+  （`e2e/helpers.mjs`の`assertTrue`/`assertEqual`が失敗時点で自動保存する）。
+  このディレクトリは実行時成果物のため`.gitignore`済み。
+
+## テストケース一覧
+
+| ファイル | 対象機能・過去に壊れた課題 | 検証内容 | 自動/手動 |
+|---|---|---|---|
+| `node-creation.mjs` | ノード作成の3経路（ダブルクリック/Tab/Enter） | キャンバス空白ダブルクリックで独立ノード作成＋即編集モード、armedノードでTab→子ノード作成、Enter→兄弟ノード作成。新ノードがarmed状態になること | 自動 |
+| `armed-focus-typing.mjs` | armed-focus方式の中核（1文字目IME問題の対策） | クリックのみ（ダブルクリックなし）でTiptapエディタに事前フォーカスが移ること、armedにするだけでノード位置が動かないこと、armedから直接タイプすると内容が「置換」されること、1回のCtrl+Zで元に戻ること | 自動（実IMEでの変換確認は手動、下記参照） |
+| `editing-keys.mjs` | 編集中のTab/Enter/Shift+Enter・タッチ環境のEnter | Tab=確定+子ノード作成(armed)、Enter(非タッチ)=確定+兄弟ノード作成、Shift+Enter=常に改行、Enter(タッチ)=改行のまま（ノードが増えない） | 自動 |
+| `arrow-navigation.mjs` | 矢印キーでのノード間移動、disableKeyboardA11y | armedノードから矢印キーで隣接ノードへフォーカス移動、移動前後で全ノード位置(transform)が不変（React Flow標準の矢印キー移動と二重に効かないこと） | 自動 |
+| `text-undo-redo.mjs` | アプリレベルUndo/Redo、1編集セッション=1ステップ | armed中のDelete/Ctrl+Zがノード削除のアプリレベルUndoとして働く（ProseMirrorのテキスト内Undoに奪われない）、テキスト編集のUndo/Redo往復。複数アクション後のUndo/Redoは「繰り返せば収束する」ことのみ確認（既知の制限あり、下記tuning.md参照） | 自動 |
+| `format-toolbar-bubblemenu.mjs` | 書式パネル(FormatToolbar)とBubbleMenuの表示切替 | 編集中のみFormatToolbarが表示・終了で消える、テキスト選択中はBubbleMenuが表示され太字ボタンで装飾できる、複数ノードで編集セッションを繰り返してもクラッシュしない（過去のremoveChild例外の回帰確認） | 自動 |
+| `edge-selection-delete.mjs` | エッジ選択・Delete削除・ノードとの排他選択 | エッジクリックで選択状態、Deleteキーで削除、ノード選択⇄エッジ選択が相互に排他であること | 自動 |
+| `context-menu-delete.mjs` | 右クリックメニューでの削除、選択クリア漏れ回帰 | 右クリック→メニューからノード/エッジ削除、削除対象が選択中だった場合にuiStoreの選択がクリアされること（Undoボタンが無効になるまでの押下回数で検証） | 自動 |
+| `menu-outside-click.mjs` | コンテキストメニュー/ファイルメニューの外側クリッククローズ | 右クリックメニュー・ファイルメニューがキャンバス空白クリックで閉じること、メニュー自身のボタンクリックは引き続き機能すること（キャプチャフェーズ化の回帰確認） | 自動 |
+| `png-export.mjs` | PNGエクスポートの実寸・見切れ | 出力画像の実寸がuseExportPng.tsの計算式と一致すること、四辺（外周1px）が背景色のみでノードが見切れていないこと | 自動 |
+| `mobile-viewport.mjs` | モバイル表示・2タップ編集フロー | ツールバーが画面上端から可視、React Flow Controlsがビューポート内に収まる、1タップ目はエディタにフォーカスが入らない（選択のみ）、2タップ目で編集モードに入る | 自動 |
+
+## 手動確認チェックリスト
+
+以下はCDP（Chrome DevTools Protocol）経由のPlaywrightでは自動化できない、または
+自動化する価値が低い項目。理由とともに記載する。実施したら日付とブラウザ/OSを控えておくとよい。
+
+- **実IME（日本語IME等）での1文字目変換**: CDPの`Input.insertText`/`Input.imeSetComposition`では、
+  実際のOS/ブラウザが発火するcompositionstart/compositionupdate/compositionendのイベント列を
+  完全には再現できない。`armed-focus-typing.mjs`で「打鍵前にフォーカスがcontenteditableに
+  移っていること」自体は自動検証済みだが、変換候補が実際に正しく出るかは人間の確認が必要。
+  手順: ノードを1回クリックして選択（armed）→ そのままローマ字入力を始め、1文字目から
+  変換候補が正しく出ることを確認する。
+- **Android実機でのURLバー出入り時の100dvh挙動とソフトキーボード表示時のレイアウト**:
+  Playwrightのモバイルエミュレーションは固定ビューポートで、実機のURLバーの出入りに伴う
+  ビューポート変化やソフトキーボード表示時の`interactive-widget=resizes-content`の挙動を
+  再現できない。手順: Android Chrome実機でページを開き、スクロールでURLバーを隠す/出す、
+  ノードをタップしてソフトキーボードを表示する、の両方でツールバー・キャンバスのレイアウトが
+  崩れないことを確認する。
+- **Googleログインが必要な一連の機能**: Drive保存・オートセーブ・リネームのDrive反映・
+  マップ一覧のソート・トークン失効時の再ログイン導線。実際のGoogleアカウントでのOAuth同意を
+  伴うため自動化していない。手順: `docs/decisions.md`の該当決定（§2, 3, 9, 15）を参照しつつ、
+  実際にログインしてDrive上のファイルが期待通り作成・更新・一覧表示されることを確認する。
+- **PNGエクスポートの目視品質**: `png-export.mjs`は実寸・四辺の背景余白（見切れの有無）を
+  ピクセル単位で自動検証しているが、フォントのアンチエイリアシングや配色など「見た目の質」の
+  最終確認は人間の目視に委ねる。手順: エクスポートしたPNGを画像ビューアで開き、文字が
+  読みやすいか、意図しない要素（ツールバー等）が写り込んでいないかを確認する。
+
+## テストを書き足すときの流儀
+
+- **1ファイル=1テーマ**。既存の一覧表にあるテーマの粒度を目安にする。1つのテーマに複数の
+  観点がある場合は、ファイル内で`async function testXxx()`に分けて`run()`から順に呼び出す
+  （`editing-keys.mjs`や`text-undo-redo.mjs`を参考にする）。
+- **テストの独立性を保つ**。`helpers.mjs`の`launchPage()`は呼ぶたびに新しいブラウザ
+  コンテキストを作るため、localStorage/sessionStorageは常に空（初回訪問状態）から始まる。
+  他のテストの状態に依存するテストを書かない。1テスト関数の中では`launchPage()`で作った
+  ブラウザを`finally`ブロックで必ず`closeBrowser()`すること。
+- **helpersを使う**。ノードのDOM構造（`.react-flow__node`、`.ProseMirror`、選択/編集中を
+  示すクラス名等）に依存する処理は`e2e/helpers.mjs`の既存関数（`getNodeIds`、`isNodeEditing`、
+  `isNodeSelected`、`getActiveElementInfo`等）を再利用する。同じDOM構造を複数ファイルで
+  ベタ書きしない（CustomNode.tsx側の実装が変わったときの修正箇所を1箇所に保つため）。
+- **アサーションは`assertTrue`/`assertEqual`を使う**。`console.log`で目視確認するだけの
+  スクリプトは「恒久テスト」にならない（scratchpadで使っていたスクリプトが正にこれで、
+  誤った期待値がコメントに書かれていても誰も検知できなかった実例が本タスク中に見つかっている。
+  `docs/tuning.md`の既知の未対応事項を参照）。必ず例外を投げて失敗を検知できる形にする。
+- **失敗しても壊れていないことを確認する（陽性確認）**。新しい退行テストを書いたら、
+  対象のバグ修正を一時的に取り消した状態（`git stash`等）で実際にテストが失敗することを
+  確認してから元に戻す。「常にPASSしてしまうテスト」は無意味なので、これを省略しない
+  （`context-menu-delete.mjs`の作成時に、素朴な実装だと修正の有無に関わらずPASSしてしまう
+  ケースが実際にあった。詳細はファイル内のコメント参照）。
+- **スクリーンショットの置き場所**: `SCREENSHOT_DIR`（`e2e/screenshots/`）に保存する。
+  `saveScreenshot(page, name)`ヘルパを使うと連番が自動で付く。このディレクトリはgit管理外
+  （`.gitignore`）なので、恒久的に参照したい画像ではなく、あくまでデバッグ用途として扱うこと。
+- **待機はタイムアウト付きの`waitForSelector`等を優先**し、固定`waitForTimeout`は
+  アニメーション・デバウンス処理の完了待ちなど本当に必要な箇所のみに絞る（他のテストファイルの
+  待機時間を参考にする。短すぎるとflakyになり、長すぎるとテスト全体が遅くなる）。
+- **flakyなテストを見つけたら**、原因（要素の重なり・タイミング）を特定して安定化するか
+  （本タスク中、エッジクリックがラベルオーバーレイや隣接エッジと座標的に重なって意図しない
+  要素をクリックしてしまう問題が複数箇所で見つかり、`dispatchEvent`での直接発火や
+  `getEdgePointNotTouchingNode`ヘルパで対処した）、安定化が難しい場合は理由をコメントに
+  明記した上でテストから除外する。

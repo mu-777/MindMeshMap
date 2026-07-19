@@ -11,6 +11,7 @@ export interface ContextMenuState {
 interface UIStoreState extends UIState {
   lastSelectedNodeId: string | null;
   selectedNodeIds: string[];
+  selectedEdgeId: string | null;
   contextMenu: ContextMenuState | null;
   // 編集開始時に既存内容をクリアするフラグ（印字可能文字入力によるキーボード横取り編集開始用）
   pendingEditClear: boolean;
@@ -18,6 +19,7 @@ interface UIStoreState extends UIState {
   // MapListの一覧取得useEffectの依存に加えることで、保存後に一覧（名前・更新日時）を再取得させる
   mapListVersion: number;
   setSelectedNodeId: (nodeId: string | null) => void;
+  setSelectedEdgeId: (edgeId: string | null) => void;
   toggleNodeSelection: (nodeId: string) => void;
   clearMultiSelection: () => void;
   setEditingNodeId: (nodeId: string | null) => void;
@@ -35,6 +37,7 @@ export const useUIStore = create<UIStoreState>((set) => ({
   selectedNodeId: null,
   lastSelectedNodeId: null,
   selectedNodeIds: [],
+  selectedEdgeId: null,
   editingNodeId: null,
   isSidebarOpen: true,
   isHelpModalOpen: false,
@@ -49,6 +52,16 @@ export const useUIStore = create<UIStoreState>((set) => ({
       lastSelectedNodeId: nodeId !== null ? nodeId : state.lastSelectedNodeId,
       // 単一選択時は複数選択をクリア
       selectedNodeIds: [],
+      // ノードとエッジの選択は排他（ノード選択時はエッジ選択をクリア）
+      selectedEdgeId: nodeId !== null ? null : state.selectedEdgeId,
+    })),
+
+  setSelectedEdgeId: (edgeId) =>
+    set((state) => ({
+      selectedEdgeId: edgeId,
+      // ノードとエッジの選択は排他（エッジ選択時はノード選択をクリア）
+      selectedNodeId: edgeId !== null ? null : state.selectedNodeId,
+      selectedNodeIds: edgeId !== null ? [] : state.selectedNodeIds,
     })),
 
   toggleNodeSelection: (nodeId) =>

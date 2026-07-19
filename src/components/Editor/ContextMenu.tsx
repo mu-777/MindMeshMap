@@ -5,7 +5,7 @@ import { useMapStore } from '../../stores/mapStore';
 
 export function ContextMenu() {
   const { t } = useTranslation();
-  const { contextMenu, closeContextMenu } = useUIStore();
+  const { contextMenu, closeContextMenu, selectedNodeId, selectedEdgeId, setSelectedNodeId, setSelectedEdgeId } = useUIStore();
   const { deleteNode, deleteEdge } = useMapStore();
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -17,28 +17,42 @@ export function ContextMenu() {
       }
     };
 
+    // キャプチャフェーズで登録する。React Flowのパン/ズーム（d3-drag/d3-zoom）は
+    // キャンバス上のmousedownでstopImmediatePropagationを呼ぶため、バブルフェーズの
+    // リスナーだとキャンバスクリックがdocumentまで届かずメニューが閉じない問題への対策。
+    // キャプチャはdocument→要素の順で走るためd3側のstopPropagationの影響を受けない
     if (contextMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
+      document.addEventListener('mousedown', handleClickOutside, { capture: true });
+      document.addEventListener('touchstart', handleClickOutside, { capture: true });
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside, { capture: true });
+      document.removeEventListener('touchstart', handleClickOutside, { capture: true });
     };
   }, [contextMenu, closeContextMenu]);
 
   // 削除処理
+  // 削除対象がuiStore側の選択状態（selectedNodeId/selectedEdgeId）と一致する場合は
+  // 選択も一緒にクリアする。クリアしないと、次にDeleteキーを押したときに
+  // 既に存在しないノード/エッジのIDが選択されたままになり、何も起きない
+  // （無音のno-op）不具合になる
   const handleDelete = useCallback(() => {
     if (contextMenu) {
       if (contextMenu.type === 'node') {
         deleteNode(contextMenu.id);
+        if (selectedNodeId === contextMenu.id) {
+          setSelectedNodeId(null);
+        }
       } else {
         deleteEdge(contextMenu.id);
+        if (selectedEdgeId === contextMenu.id) {
+          setSelectedEdgeId(null);
+        }
       }
       closeContextMenu();
     }
-  }, [contextMenu, deleteNode, deleteEdge, closeContextMenu]);
+  }, [contextMenu, deleteNode, deleteEdge, closeContextMenu, selectedNodeId, selectedEdgeId, setSelectedNodeId, setSelectedEdgeId]);
 
   if (!contextMenu) return null;
 

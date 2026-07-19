@@ -17,7 +17,7 @@ function AppContent() {
   const { isSidebarOpen, isHelpModalOpen, setHelpModalOpen } = useUIStore();
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-900">
+    <div className="app-height flex w-screen flex-col overflow-hidden bg-gray-900">
       {/* ツールバー（最上部に固定） */}
       <Toolbar />
 

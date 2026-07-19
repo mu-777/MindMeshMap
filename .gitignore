@@ -27,3 +27,7 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# E2Eテストの実行時成果物（失敗時のスクリーンショット・ダウンロード検証ファイル）
+e2e/screenshots/*
+!e2e/screenshots/.gitkeep

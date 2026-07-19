@@ -25,6 +25,7 @@ const basicOperationKeys = [
   'moveNode',
   'createEdge',
   'createConnectedNode',
+  'selectEdge',
   'edgeLabel',
   'deleteMenu',
 ] as const;
@@ -37,6 +38,14 @@ const formatShortcuts: { labelKey: string; key: string }[] = [
   { labelKey: 'help.formatBulletList', key: 'Ctrl+Shift+8' },
   { labelKey: 'help.formatOrderedList', key: 'Ctrl+Shift+7' },
   { labelKey: 'help.formatNewLine', key: 'Shift+Enter' },
+];
+
+// タブ3「キーボード」冒頭に表示する、ノード編集中だけ意味が変わる固定ショートカット
+// （キーバインド編集の対象外。CustomNode.tsxのeditorProps.handleKeyDownを参照）
+const editingShortcuts: { labelKey: string; key: string }[] = [
+  { labelKey: 'help.editingConfirmCreateChild', key: 'Tab' },
+  { labelKey: 'help.editingConfirmCreateSibling', key: 'Enter' },
+  { labelKey: 'help.editingNewLineTouch', key: 'Enter' },
 ];
 
 // タブ3「キーボード」: 既存のショートカット一覧（クリックでキーバインド編集可能）
@@ -227,6 +236,23 @@ export function KeyboardShortcutHelp({ onClose }: KeyboardShortcutHelpProps) {
         {/* タブ3: キーボード（キーバインド編集可能） */}
         {activeTab === 'keyboard' && (
           <div className="space-y-6">
+            {/* ノード編集中だけTab/Enterの意味が変わる固定ショートカット（キーバインド編集の対象外） */}
+            <div>
+              <h3 className="mb-3 text-sm font-medium text-gray-400">{t('help.editingIntroTitle')}</h3>
+              <p className="mb-2 text-xs text-gray-500">{t('help.editingIntro')}</p>
+              <div className="space-y-2">
+                {editingShortcuts.map(({ labelKey, key }) => (
+                  <div
+                    key={labelKey}
+                    className="flex items-center justify-between rounded bg-gray-700/50 px-3 py-2"
+                  >
+                    <span className="text-sm text-gray-300">{t(labelKey)}</span>
+                    <kbd className="rounded bg-gray-600 px-2 py-1 font-mono text-xs text-gray-200">{key}</kbd>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {shortcutGroups.map((group) => (
               <div key={group.titleKey}>
                 <h3 className="mb-3 text-sm font-medium text-gray-400">

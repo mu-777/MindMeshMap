@@ -25,11 +25,15 @@ function useClickOutside(
       }
       handler();
     };
-    document.addEventListener('mousedown', listener);
-    document.addEventListener('touchstart', listener);
+    // キャプチャフェーズで登録する。React Flowのパン/ズーム（d3-drag/d3-zoom）は
+    // キャンバス上のmousedownでstopImmediatePropagationを呼ぶため、バブルフェーズの
+    // リスナーだとキャンバスクリックがdocumentまで届かずメニューが閉じない問題への対策。
+    // キャプチャはdocument→要素の順で走るためd3側のstopPropagationの影響を受けない
+    document.addEventListener('mousedown', listener, { capture: true });
+    document.addEventListener('touchstart', listener, { capture: true });
     return () => {
-      document.removeEventListener('mousedown', listener);
-      document.removeEventListener('touchstart', listener);
+      document.removeEventListener('mousedown', listener, { capture: true });
+      document.removeEventListener('touchstart', listener, { capture: true });
     };
   }, [ref, handler]);
 }
