@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/authStore';
 import { useMapStore } from '../../stores/mapStore';
@@ -12,6 +12,27 @@ import { MapMeta } from '../../types';
 import { MapListItem } from './MapListItem';
 import { GoogleAuthButton } from '../Auth/GoogleAuthButton';
 
+// マップ一覧の並び順。選択値はlocalStorageに保存し、次回表示時も復元する
+type SortOrder = 'updatedDesc' | 'updatedAsc' | 'createdDesc' | 'createdAsc';
+const SORT_ORDERS: SortOrder[] = ['updatedDesc', 'updatedAsc', 'createdDesc', 'createdAsc'];
+const DEFAULT_SORT_ORDER: SortOrder = 'updatedDesc';
+const SORT_ORDER_STORAGE_KEY = 'mindmeshmap-maplist-sort';
+
+// 保存されている並び順を復元。不正な値（未知の文字列・未保存など）はデフォルトにフォールバックする
+function loadSortOrder(): SortOrder {
+  const stored = localStorage.getItem(SORT_ORDER_STORAGE_KEY);
+  return SORT_ORDERS.includes(stored as SortOrder) ? (stored as SortOrder) : DEFAULT_SORT_ORDER;
+}
+
+// 並び順に応じてマップ一覧をソート（一覧は小規模なので毎回ソートし直す）
+function sortMaps(maps: MapMeta[], order: SortOrder): MapMeta[] {
+  const key = order.startsWith('updated') ? 'updatedAt' : 'createdAt';
+  const direction = order.endsWith('Desc') ? -1 : 1;
+  return [...maps].sort(
+    (a, b) => direction * (new Date(a[key]).getTime() - new Date(b[key]).getTime())
+  );
+}
+
 export function MapList() {
   const { t } = useTranslation();
   const { isSignedIn } = useAuthStore();
@@ -24,6 +45,15 @@ export function MapList() {
   const mapListVersion = useUIStore((state) => state.mapListVersion);
 
   const [maps, setMaps] = useState<MapMeta[]>([]);
+  const [sortOrder, setSortOrder] = useState<SortOrder>(loadSortOrder);
+  const sortedMaps = useMemo(() => sortMaps(maps, sortOrder), [maps, sortOrder]);
+
+  // 並び順の選択を保存し、次回表示時にも復元する
+  const handleSortOrderChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const order = e.target.value as SortOrder;
+    setSortOrder(order);
+    localStorage.setItem(SORT_ORDER_STORAGE_KEY, order);
+  }, []);
 
   // セッション失効時の共通トースト（再ログインボタン付き）
   const showSessionExpiredToast = useCallback(() => {
@@ -152,6 +182,20 @@ export function MapList() {
         </button>
       </div>
 
+      {/* 並び順選択 */}
+      <div className="border-b border-gray-700 px-4 py-2">
+        <select
+          value={sortOrder}
+          onChange={handleSortOrderChange}
+          className="w-full rounded border border-gray-600 bg-gray-700 px-2 py-1 text-xs text-gray-300 focus:border-blue-500 focus:outline-none"
+        >
+          <option value="updatedDesc">{t('mapList.sortUpdatedDesc')}</option>
+          <option value="updatedAsc">{t('mapList.sortUpdatedAsc')}</option>
+          <option value="createdDesc">{t('mapList.sortCreatedDesc')}</option>
+          <option value="createdAsc">{t('mapList.sortCreatedAsc')}</option>
+        </select>
+      </div>
+
       {/* エラー表示 */}
       {error && (
         <div className="m-2 rounded bg-red-900/50 p-2 text-xs text-red-300">
@@ -171,7 +215,7 @@ export function MapList() {
           </div>
         ) : (
           <ul className="divide-y divide-gray-700">
-            {maps.map((map) => (
+            {sortedMaps.map((map) => (
               <MapListItem
                 key={map.fileId}
                 map={map}

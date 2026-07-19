@@ -25,9 +25,10 @@
     "layoutDown": "向下",
     "layoutRight": "向右",
     "fileMenu": "文件",
-    "exportJson": "导出JSON",
-    "exportPng": "导出PNG",
-    "importJson": "导入JSON"
+    "sectionExport": "导出",
+    "sectionImport": "导入",
+    "itemJson": "JSON",
+    "itemPng": "PNG图片"
   },
   "auth": {
     "signInWithGoogle": "使用Google登录",
@@ -36,7 +37,11 @@
   "mapList": {
     "title": "地图列表",
     "noMaps": "暂无地图",
-    "signInPrompt": "使用Google登录以保存和同步您的地图"
+    "signInPrompt": "使用Google登录以保存和同步您的地图",
+    "sortUpdatedDesc": "更新时间（从新到旧）",
+    "sortUpdatedAsc": "更新时间（从旧到新）",
+    "sortCreatedDesc": "创建时间（从新到旧）",
+    "sortCreatedAsc": "创建时间（从旧到新）"
   },
   "shortcuts": {
     "nodeOperations": "节点操作",
@@ -68,7 +73,7 @@
     "opEdgeLabelDesc": "点击连线中间",
     "opDeleteMenu": "删除菜单",
     "opDeleteMenuDesc": "右键点击 / 长按",
-    "formatIntro": "编辑节点时选中文本会显示格式工具栏。",
+    "formatIntro": "编辑节点时，画布右上角会常驻显示格式面板。选中文本时，选区旁还会显示提供相同操作的浮动格式工具栏。",
     "formatBold": "粗体",
     "formatItalic": "斜体",
     "formatStrike": "删除线",

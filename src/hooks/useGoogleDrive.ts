@@ -107,7 +107,7 @@ export function useGoogleDrive() {
       const folderId = await getOrCreateAppFolder();
 
       const response = await authFetch(
-        `${DRIVE_API_BASE}/files?q='${folderId}' in parents and mimeType='application/json' and trashed=false&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`,
+        `${DRIVE_API_BASE}/files?q='${folderId}' in parents and mimeType='application/json' and trashed=false&fields=files(id,name,modifiedTime,createdTime)&orderBy=modifiedTime desc`,
         { headers: getJsonHeaders() }
       );
 
@@ -117,11 +117,14 @@ export function useGoogleDrive() {
 
       const data = await response.json();
 
-      return (data.files || []).map((file: { id: string; name: string; modifiedTime: string }) => ({
-        fileId: file.id,
-        name: file.name.replace('.json', ''),
-        updatedAt: file.modifiedTime,
-      }));
+      return (data.files || []).map(
+        (file: { id: string; name: string; modifiedTime: string; createdTime: string }) => ({
+          fileId: file.id,
+          name: file.name.replace('.json', ''),
+          updatedAt: file.modifiedTime,
+          createdAt: file.createdTime,
+        })
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);

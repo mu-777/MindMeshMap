@@ -288,6 +288,10 @@ export function Toolbar() {
 
           {isFileMenuOpen && (
             <div className="absolute left-0 top-full z-50 mt-1 w-44 rounded-md border border-gray-600 bg-gray-800 py-1 shadow-lg">
+              {/* エクスポート */}
+              <div className="px-3 py-1 text-xs text-gray-500">
+                {t('toolbar.sectionExport')}
+              </div>
               <button
                 onClick={() => {
                   handleExportJson();
@@ -296,7 +300,7 @@ export function Toolbar() {
                 disabled={!currentMap}
                 className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {t('toolbar.exportJson')}
+                {t('toolbar.itemJson')}
               </button>
               <button
                 onClick={() => {
@@ -306,8 +310,15 @@ export function Toolbar() {
                 disabled={!currentMap}
                 className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {t('toolbar.exportPng')}
+                {t('toolbar.itemPng')}
               </button>
+
+              <div className="my-1 h-px bg-gray-700" />
+
+              {/* インポート */}
+              <div className="px-3 py-1 text-xs text-gray-500">
+                {t('toolbar.sectionImport')}
+              </div>
               <button
                 onClick={() => {
                   handleImportClick();
@@ -315,7 +326,7 @@ export function Toolbar() {
                 }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
               >
-                {t('toolbar.importJson')}
+                {t('toolbar.itemJson')}
               </button>
             </div>
           )}
@@ -505,7 +516,10 @@ export function Toolbar() {
 
             <div className="my-1 h-px bg-gray-700" />
 
-            {/* JSONエクスポート */}
+            {/* エクスポート */}
+            <div className="px-3 py-1 text-xs text-gray-500">
+              {t('toolbar.sectionExport')}
+            </div>
             <button
               onClick={() => {
                 handleExportJson();
@@ -514,10 +528,8 @@ export function Toolbar() {
               disabled={!currentMap}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {t('toolbar.exportJson')}
+              {t('toolbar.itemJson')}
             </button>
-
-            {/* PNGエクスポート */}
             <button
               onClick={() => {
                 handleExportPng();
@@ -526,10 +538,15 @@ export function Toolbar() {
               disabled={!currentMap}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {t('toolbar.exportPng')}
+              {t('toolbar.itemPng')}
             </button>
 
-            {/* JSONインポート */}
+            <div className="my-1 h-px bg-gray-700" />
+
+            {/* インポート */}
+            <div className="px-3 py-1 text-xs text-gray-500">
+              {t('toolbar.sectionImport')}
+            </div>
             <button
               onClick={() => {
                 handleImportClick();
@@ -537,7 +554,7 @@ export function Toolbar() {
               }}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
             >
-              {t('toolbar.importJson')}
+              {t('toolbar.itemJson')}
             </button>
 
             <div className="my-1 h-px bg-gray-700" />

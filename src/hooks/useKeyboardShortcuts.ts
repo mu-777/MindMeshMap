@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { useMapStore } from '../stores/mapStore';
 import { useUIStore } from '../stores/uiStore';
@@ -72,7 +73,7 @@ export function useKeyboardShortcuts() {
     isHelpModalOpen,
     setSelectedNodeId,
     setEditingNodeId,
-    setPendingEditChar,
+    setPendingEditClear,
     setHelpModalOpen,
     clearMultiSelection,
   } = useUIStore();
@@ -141,16 +142,23 @@ export function useKeyboardShortcuts() {
 
         // ノードが選択されている状態で、印刷可能文字が入力された場合、編集モードに入る
         // 条件: 単一文字、Ctrl/Alt/Metaキーなし、ノードが選択されている
+        //
+        // ここでは event.preventDefault() を呼ばない。代わりに flushSync で状態更新を
+        // 同期的にフラッシュし、この同じ keydown イベントに対するブラウザのデフォルト処理
+        // （Tiptapのcontenteditableへのテキスト入力/IME変換開始）が、フォーカス移動後の
+        // エディタ要素に対して行われるようにする。こうすることで1文字目からIME変換が正しく効く
+        // （文字を横取りしてinsertContentする方式だと、変換を経ない生のASCIIが入ってしまうため）
         if (
           activeNodeId &&
           event.key.length === 1 &&
           !modifiers.ctrl &&
           !modifiers.alt
         ) {
-          event.preventDefault();
-          setSelectedNodeId(activeNodeId);
-          setPendingEditChar(event.key);
-          setEditingNodeId(activeNodeId);
+          flushSync(() => {
+            setSelectedNodeId(activeNodeId);
+            setPendingEditClear(true);
+            setEditingNodeId(activeNodeId);
+          });
         }
         return;
       }
@@ -432,7 +440,7 @@ export function useKeyboardShortcuts() {
       setLayoutDirection,
       setSelectedNodeId,
       setEditingNodeId,
-      setPendingEditChar,
+      setPendingEditClear,
       setHelpModalOpen,
       clearMultiSelection,
       fitView,

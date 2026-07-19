@@ -1,11 +1,16 @@
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenuPlugin } from '@tiptap/extension-bubble-menu';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
+import { useEditorStore } from '../../stores/editorStore';
+
+// BubbleMenu用ProseMirrorプラグインのpluginKey（ノードごとのエディタに閉じているので固定文字列でよい）
+const BUBBLE_MENU_PLUGIN_KEY = 'bubbleMenu';
 
 const LONG_PRESS_DURATION = 500; // 長押し判定時間（ミリ秒）
 
@@ -18,7 +23,8 @@ export type CustomNodeType = Node<CustomNodeData, 'custom'>;
 function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) {
   const { t } = useTranslation();
   const { updateNodeContent } = useMapStore();
-  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu, pendingEditChar, setPendingEditChar } = useUIStore();
+  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu, pendingEditClear, setPendingEditClear } = useUIStore();
+  const setActiveEditor = useEditorStore((state) => state.setActiveEditor);
   const isEditing = editingNodeId === id;
   const containerRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -30,6 +36,13 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
   const tapHandledRef = useRef<boolean>(false);
   // 編集セッション中の最初の変更かどうか（最初の変更のみ履歴を積み、1編集セッション=1 Undoにする）
   const isFirstEditInSessionRef = useRef<boolean>(true);
+  // BubbleMenu（テキスト選択時の書式バー）の中身を入れる要素。@tiptap/reactの<BubbleMenu>を
+  // isEditingで直接マウント/アンマウントすると、内部でtippyがこの要素を実DOM上で
+  // ポップアップ側へ再親子付けするため、Reactが後からremoveChildしようとして
+  // 「The node to be removed is not a child of this node」でクラッシュする。
+  // そのため要素自体は常時マウントしたままにし、下のuseEffectでプラグインの登録/解除だけを
+  // isEditingで切り替える（要素を動かすtippy側の処理と、Reactのマウント管理を分離する）
+  const [bubbleMenuElement, setBubbleMenuElement] = useState<HTMLDivElement | null>(null);
 
   // Tiptapエディタの初期化
   const editor = useEditor({
@@ -49,6 +62,13 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     editable: isEditing,
     onUpdate: ({ editor }) => {
       const json = JSON.stringify(editor.getJSON());
+      // マウント直後、実際のユーザー入力なしにTiptap/ProseMirror側の初期化（スキーマ正規化等）で
+      // onUpdateが発火することがある。このとき再シリアライズしたjsonは既存のdata.contentと
+      // 完全一致する（内容としては無変更）ため、履歴を汚さないようここで無視する。
+      // これにより「ダブルクリックでのノード作成1回でsaveToHistoryが複数回積まれる」問題
+      // （addNode自身のsaveToHistoryに加え、この無変更onUpdateがrecordHistory=trueで
+      // もう1回積んでいた）も解消される
+      if (json === data.content) return;
       const recordHistory = isFirstEditInSessionRef.current;
       isFirstEditInSessionRef.current = false;
       updateNodeContent(id, json, recordHistory);
@@ -56,29 +76,95 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
   });
 
   // 編集セッション開始時（isEditingがtrueになった瞬間）に「最初の変更」フラグをリセットする。
-  // 下の「編集モードの切り替え」effectより先に実行される必要がある
-  // （pendingEditChar挿入時のonUpdateがこのフラグを見るため）
-  useEffect(() => {
+  // 下の「編集モードの切り替え」effectより先に実行される必要があるためuseLayoutEffectにしている
+  // （両方useLayoutEffectであれば宣言順に同期実行されるため、この順序関係が保たれる）
+  useLayoutEffect(() => {
     if (isEditing) {
       isFirstEditInSessionRef.current = true;
     }
   }, [isEditing]);
 
-  // 編集モードの切り替え
-  useEffect(() => {
+  // 編集モードの切り替え。
+  // useLayoutEffect にしているのは、印字可能文字によるキーボード横取り編集開始
+  // （useKeyboardShortcutsのflushSync）内で同期的に実行される必要があるため。
+  // useEffectだと次のマクロタスクまで実行が遅延し、ブラウザのデフォルトの文字入力/IME変換開始処理が
+  // 走る時点でまだフォーカスが移っておらず、1文字目の入力を取りこぼしてしまう
+  useLayoutEffect(() => {
     if (editor) {
       editor.setEditable(isEditing);
       if (isEditing) {
-        // pendingEditCharがある場合、内容をクリアしてその文字から編集開始
-        if (pendingEditChar) {
+        // pendingEditClearが立っている場合、既存内容をクリアしてから編集開始する
+        // （文字の挿入自体はブラウザ/IMEのデフォルト処理に任せるため、ここではクリアのみ行う）
+        if (pendingEditClear) {
           editor.commands.clearContent();
-          editor.commands.insertContent(pendingEditChar);
-          setPendingEditChar(null);
+          setPendingEditClear(false);
         }
+        // Tiptapのfocusコマンドは実際のDOMフォーカスをrequestAnimationFrame内で行うため
+        // （「For React we have to focus asynchronously」）、キーボード横取り編集開始の
+        // flushSync内では間に合わず、直後にブラウザが処理する1文字目の入力を取りこぼす。
+        // そのためDOMフォーカス自体はここで同期的に行い、focus('end')ではカーソル位置のみ委ねる
+        editor.view.dom.focus();
         editor.commands.focus('end');
       }
     }
-  }, [editor, isEditing, pendingEditChar, setPendingEditChar]);
+  }, [editor, isEditing, pendingEditClear, setPendingEditClear]);
+
+  // 外部（Undo/Redo等）からのcontent変更をエディタに反映する。
+  // アプリ側のUndo/RedoはmapStoreのhistoryでdata.contentを戻すが、Tiptapエディタは
+  // 初期化時にcontentを読むだけで以後のprops変更を自動反映しないため、ここで同期する。
+  // 編集中は自分自身の入力でdata.contentが更新されるため何もしない
+  useEffect(() => {
+    if (!editor || isEditing) return;
+    const currentJson = JSON.stringify(editor.getJSON());
+    if (currentJson === data.content) return;
+
+    try {
+      const parsed = JSON.parse(data.content);
+      editor.commands.setContent(parsed, false);
+    } catch {
+      editor.commands.setContent(
+        { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: data.content || '' }] }] },
+        false
+      );
+    }
+  }, [data.content, editor, isEditing]);
+
+  // 編集中のエディタをeditorStoreに公開し、FormatToolbar（キャンバス右上の常設書式パネル）が
+  // 操作対象として参照できるようにする。編集終了・アンマウント時は自分がactiveEditorの場合のみクリアする
+  useEffect(() => {
+    if (isEditing && editor) {
+      setActiveEditor(editor);
+      return () => {
+        if (useEditorStore.getState().activeEditor === editor) {
+          setActiveEditor(null);
+        }
+      };
+    }
+  }, [isEditing, editor, setActiveEditor]);
+
+  // BubbleMenu（テキスト選択時の書式バー）のProseMirrorプラグインをisEditingに応じて
+  // 登録/解除する。編集中でないノードはプラグイン自体が存在しない状態になるため、
+  // tippyインスタンスやeditor.on('focus'/'blur')等のリスナーはノード数分ではなく
+  // 編集中の1ノード分（最大1インスタンス）しか生きない。
+  // useLayoutEffectにしているのは、下のclassName切り替え（isEditing===falseで.hidden付与）と
+  // 同じコミットで同期的に実行するため（ズレるとプラグインのdestroy前後で1フレーム分
+  // 表示が不安定になりうる）
+  useLayoutEffect(() => {
+    if (!isEditing || !editor || !bubbleMenuElement || editor.isDestroyed) return;
+
+    const plugin = BubbleMenuPlugin({
+      pluginKey: BUBBLE_MENU_PLUGIN_KEY,
+      editor,
+      element: bubbleMenuElement,
+      tippyOptions: { zIndex: 9999, placement: 'top' },
+    });
+    editor.registerPlugin(plugin);
+    return () => {
+      if (!editor.isDestroyed) {
+        editor.unregisterPlugin(BUBBLE_MENU_PLUGIN_KEY);
+      }
+    };
+  }, [isEditing, editor, bubbleMenuElement]);
 
   // ダブルクリックで編集モードに
   const handleDoubleClick = useCallback(() => {
@@ -114,6 +200,11 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (isEditing) {
+        // IME変換中のEnter/Escapeは変換確定のためのキー入力なので、
+        // 編集モードの終了として扱わない（何もせずTiptap/IMEにそのまま処理させる）
+        if (e.nativeEvent.isComposing) {
+          return;
+        }
         // Escapeで編集終了
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -280,13 +371,21 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
           ${isEditing ? 'cursor-text' : 'cursor-pointer'}
         `}
       >
-        {/* テキスト選択時に表示される書式バー。編集中でない（isEditable=false）間は
-            BubbleMenuのデフォルトshouldShowにより自動的に非表示になる */}
+        {/* テキスト選択時に表示される書式バー。
+            要素自体は常時マウントしておき（理由は上のuseEffectのコメント参照）、
+            表示に使われるBubbleMenuPluginの登録/解除をisEditingで切り替えることで、
+            実質的に編集中の1ノードだけがtippyインスタンスを持つようにしている */}
         {editor && (
-          <BubbleMenu
-            editor={editor}
-            tippyOptions={{ zIndex: 9999, placement: 'top' }}
-            className="nodrag flex items-center gap-0.5 rounded border border-gray-600 bg-gray-800 p-1 shadow-lg"
+          <div
+            ref={setBubbleMenuElement}
+            // isEditingがfalseの間はプラグイン未登録でtippyに引き取られないため、
+            // 素のインライン要素としてレイアウトに残ってしまう。hiddenクラスで場所を取らせない
+            // （visibility:hiddenだとボタン分の高さが常にノード内に残ってしまうため）
+            className={
+              isEditing
+                ? 'nodrag flex items-center gap-0.5 rounded border border-gray-600 bg-gray-800 p-1 shadow-lg'
+                : 'hidden'
+            }
           >
             <button
               type="button"
@@ -338,7 +437,7 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
             >
               1.
             </button>
-          </BubbleMenu>
+          </div>
         )}
         <EditorContent editor={editor} />
       </div>

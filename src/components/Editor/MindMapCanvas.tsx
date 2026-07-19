@@ -20,6 +20,7 @@ import '@xyflow/react/dist/style.css';
 import { CustomNode, type CustomNodeType } from './CustomNode';
 import { CustomEdge, type CustomEdgeType } from './CustomEdge';
 import { ContextMenu } from './ContextMenu';
+import { FormatToolbar } from './FormatToolbar';
 import { useMapStore, loadDraft } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { isFirstVisit, markAsVisited, createDefaultMap } from '../../data/defaultMap';
@@ -72,6 +73,13 @@ export function MindMapCanvas() {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressPositionRef = useRef<{ x: number; y: number } | null>(null);
 
+  // 初回マップ初期化が完了済みかどうか。dev の StrictMode は初回マウント時にeffectを
+  // 「実行→クリーンアップ→再実行」と2回連続で呼び出すため、このrefが無いとisFirstVisit()を
+  // 元に分岐する初期化ロジックが2回走ってしまい、1回目のsetCurrentMap（デフォルトマップ）が
+  // 2回目のcreateNewMap（Root Node 1個のマップ）で上書きされてしまう
+  // （1回目のmarkAsVisited()がstateの反映前に同期実行されるため、2回目はisFirstVisit()がfalseになる）
+  const hasInitializedMapRef = useRef(false);
+
   // ノードがビューポート内に表示されているかチェック
   const isNodeInViewport = useCallback(
     (nodePosition: { x: number; y: number }) => {
@@ -95,44 +103,96 @@ export function MindMapCanvas() {
   // 初回マウント時にマップを復元・作成する。
   // 優先順位: (1) localStorageに保存されたドラフトがあれば復元 → (2) 初回訪問時はデフォルトマップ → (3) 新規マップ
   useEffect(() => {
-    if (!currentMap) {
-      const draft = loadDraft();
-      if (draft) {
-        setCurrentMap(draft.map, draft.fileId);
-        setDirty(draft.isDirty);
-      } else if (isFirstVisit()) {
-        setCurrentMap(createDefaultMap(t));
-        markAsVisited();
-      } else {
-        createNewMap();
-      }
+    if (hasInitializedMapRef.current || currentMap) return;
+    hasInitializedMapRef.current = true;
+
+    const draft = loadDraft();
+    if (draft) {
+      setCurrentMap(draft.map, draft.fileId);
+      setDirty(draft.isDirty);
+    } else if (isFirstVisit()) {
+      setCurrentMap(createDefaultMap(t));
+      markAsVisited();
+    } else {
+      createNewMap();
     }
   }, [currentMap, createNewMap, setCurrentMap, setDirty, t]);
 
-  // ノードをReact Flow形式に変換
+  // 前回生成したReact Flowノード/エッジオブジェクトをidキーで保持するキャッシュ。
+  // React Flowはオブジェクト参照の同一性でmemo化されたノード/エッジコンポーネントの再レンダーを
+  // 抑制するため、内容（content/position/selected、エッジはlabel/source/target/handles）が
+  // 変わっていない要素は同一参照を返すことで、キー入力やドラッグの毎フレームで全ノードが
+  // 再レンダーされるのを防ぐ
+  const nodesCacheRef = useRef<Map<string, CustomNodeType>>(new Map());
+  const edgesCacheRef = useRef<Map<string, CustomEdgeType>>(new Map());
+
+  // ノードをReact Flow形式に変換（内容が変わっていないノードは前回と同じオブジェクト参照を返す）
   const nodes: CustomNodeType[] = useMemo(() => {
     if (!currentMap) return [];
-    return currentMap.nodes.map((node) => ({
-      id: node.id,
-      type: 'custom' as const,
-      position: node.position,
-      data: { content: node.content },
-      selected: node.id === selectedNodeId || selectedNodeIds.includes(node.id),
-    }));
+    const prevCache = nodesCacheRef.current;
+    const nextCache = new Map<string, CustomNodeType>();
+
+    const result = currentMap.nodes.map((node) => {
+      const selected = node.id === selectedNodeId || selectedNodeIds.includes(node.id);
+      const prev = prevCache.get(node.id);
+      const unchanged =
+        prev !== undefined &&
+        prev.data.content === node.content &&
+        prev.position.x === node.position.x &&
+        prev.position.y === node.position.y &&
+        prev.selected === selected;
+
+      const nodeObj: CustomNodeType = unchanged
+        ? prev
+        : {
+            id: node.id,
+            type: 'custom' as const,
+            position: node.position,
+            data: { content: node.content },
+            selected,
+          };
+      nextCache.set(node.id, nodeObj);
+      return nodeObj;
+    });
+
+    // 削除されたノードのエントリを引き継がないよう、キャッシュはMapごと差し替える
+    nodesCacheRef.current = nextCache;
+    return result;
   }, [currentMap, selectedNodeId, selectedNodeIds]);
 
-  // エッジをReact Flow形式に変換
+  // エッジをReact Flow形式に変換（内容が変わっていないエッジは前回と同じオブジェクト参照を返す）
   const edges: CustomEdgeType[] = useMemo(() => {
     if (!currentMap) return [];
-    return currentMap.edges.map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      type: 'custom' as const,
-      data: { label: edge.label },
-    }));
+    const prevCache = edgesCacheRef.current;
+    const nextCache = new Map<string, CustomEdgeType>();
+
+    const result = currentMap.edges.map((edge) => {
+      const prev = prevCache.get(edge.id);
+      const unchanged =
+        prev !== undefined &&
+        prev.source === edge.source &&
+        prev.target === edge.target &&
+        prev.sourceHandle === edge.sourceHandle &&
+        prev.targetHandle === edge.targetHandle &&
+        prev.data?.label === edge.label;
+
+      const edgeObj: CustomEdgeType = unchanged
+        ? prev
+        : {
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle,
+            type: 'custom' as const,
+            data: { label: edge.label },
+          };
+      nextCache.set(edge.id, edgeObj);
+      return edgeObj;
+    });
+
+    edgesCacheRef.current = nextCache;
+    return result;
   }, [currentMap]);
 
   // ノード変更ハンドラ
@@ -535,11 +595,15 @@ export function MindMapCanvas() {
       fitViewOptions={{ padding: 0.2 }}
       minZoom={0.1}
       maxZoom={2}
+      // ダブルクリックはノード作成に割り当てているため、React Flow標準のズーム動作は無効化する
+      // （有効のままだとd3-zoomのdblclickハンドラがイベント伝播を止め、ラッパーdivのonDoubleClickまで届かない）
+      zoomOnDoubleClick={false}
       className="bg-gray-900"
       proOptions={{ hideAttribution: true }}
     >
       <Background color="#374151" gap={20} />
       <Controls className="!bg-gray-800 !border-gray-700 [&>button]:!bg-gray-700 [&>button]:!border-gray-600 [&>button]:!text-gray-300 [&>button:hover]:!bg-gray-600" />
+      <FormatToolbar />
 
       {/* 矢印マーカー定義 */}
       <svg>

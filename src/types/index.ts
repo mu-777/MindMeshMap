@@ -36,6 +36,7 @@ export interface MapMeta {
   fileId: string;
   name: string;
   updatedAt: string;
+  createdAt: string;
 }
 
 // キーバインド設定

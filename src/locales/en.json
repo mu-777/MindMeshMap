@@ -25,9 +25,10 @@
     "layoutDown": "Down",
     "layoutRight": "Right",
     "fileMenu": "File",
-    "exportJson": "Export JSON",
-    "exportPng": "Export PNG",
-    "importJson": "Import JSON"
+    "sectionExport": "Export",
+    "sectionImport": "Import",
+    "itemJson": "JSON",
+    "itemPng": "PNG image"
   },
   "auth": {
     "signInWithGoogle": "Sign in with Google",
@@ -36,7 +37,11 @@
   "mapList": {
     "title": "Maps",
     "noMaps": "No maps",
-    "signInPrompt": "Sign in with Google to save and sync your maps"
+    "signInPrompt": "Sign in with Google to save and sync your maps",
+    "sortUpdatedDesc": "Updated (newest)",
+    "sortUpdatedAsc": "Updated (oldest)",
+    "sortCreatedDesc": "Created (newest)",
+    "sortCreatedAsc": "Created (oldest)"
   },
   "shortcuts": {
     "nodeOperations": "Node Operations",
@@ -68,7 +73,7 @@
     "opEdgeLabelDesc": "Click the middle of an edge",
     "opDeleteMenu": "Delete Menu",
     "opDeleteMenuDesc": "Right-click / Long-press",
-    "formatIntro": "Select text while editing a node to show the formatting toolbar.",
+    "formatIntro": "While editing a node, a formatting panel stays visible in the top-right corner of the canvas. Selecting text also shows a floating formatting toolbar next to the selection with the same options.",
     "formatBold": "Bold",
     "formatItalic": "Italic",
     "formatStrike": "Strikethrough",

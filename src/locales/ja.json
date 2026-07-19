@@ -25,9 +25,10 @@
     "layoutDown": "下向き",
     "layoutRight": "右向き",
     "fileMenu": "ファイル",
-    "exportJson": "JSONエクスポート",
-    "exportPng": "PNGエクスポート",
-    "importJson": "JSONインポート"
+    "sectionExport": "エクスポート",
+    "sectionImport": "インポート",
+    "itemJson": "JSON",
+    "itemPng": "PNG画像"
   },
   "auth": {
     "signInWithGoogle": "Googleでログイン",
@@ -36,7 +37,11 @@
   "mapList": {
     "title": "マップ一覧",
     "noMaps": "マップがありません",
-    "signInPrompt": "Googleでログインするとマップを保存・同期できます"
+    "signInPrompt": "Googleでログインするとマップを保存・同期できます",
+    "sortUpdatedDesc": "更新日時（新しい順）",
+    "sortUpdatedAsc": "更新日時（古い順）",
+    "sortCreatedDesc": "作成日時（新しい順）",
+    "sortCreatedAsc": "作成日時（古い順）"
   },
   "shortcuts": {
     "nodeOperations": "ノード操作",
@@ -68,7 +73,7 @@
     "opEdgeLabelDesc": "エッジの中央をクリック",
     "opDeleteMenu": "削除メニュー",
     "opDeleteMenuDesc": "右クリック / 長押し",
-    "formatIntro": "編集中にテキストを選択すると書式バーが表示されます。",
+    "formatIntro": "ノードを編集中は、キャンバス右上に書式パネルが常時表示されます。また、テキストを選択すると選択範囲のそばにも同じ操作ができる書式バーが表示されます。",
     "formatBold": "太字",
     "formatItalic": "斜体",
     "formatStrike": "取り消し線",

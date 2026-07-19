@@ -368,12 +368,23 @@ export const useMapStore = create<MapState>((set, get) => ({
   },
 
   undo: () => {
-    const { history, historyIndex } = get();
+    const { currentMap, history, historyIndex } = get();
     if (historyIndex <= 0) return;
+
+    // saveToHistory()は「これから行うアクションの実行前」の状態を積む設計のため、
+    // 直近のアクション後の最新状態（currentMap）自体はまだhistory配列に反映されていない
+    // （次のアクションのsaveToHistory()が呼ばれて初めて配列に載る）。
+    // そのままhistoryIndexを1つ戻すと、この未反映の最新状態がRedoで復元できなくなってしまうため、
+    // 移動前に現在の状態をhistory[historyIndex]に書き戻しておく
+    const newHistory = [...history];
+    if (currentMap) {
+      newHistory[historyIndex] = currentMap;
+    }
 
     const newIndex = historyIndex - 1;
     set({
-      currentMap: history[newIndex],
+      currentMap: newHistory[newIndex],
+      history: newHistory,
       historyIndex: newIndex,
       isDirty: true,
     });

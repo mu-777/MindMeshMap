@@ -12,7 +12,8 @@ interface UIStoreState extends UIState {
   lastSelectedNodeId: string | null;
   selectedNodeIds: string[];
   contextMenu: ContextMenuState | null;
-  pendingEditChar: string | null;
+  // 編集開始時に既存内容をクリアするフラグ（印字可能文字入力によるキーボード横取り編集開始用）
+  pendingEditClear: boolean;
   // Drive保存が成功するたびにインクリメントするカウンタ。
   // MapListの一覧取得useEffectの依存に加えることで、保存後に一覧（名前・更新日時）を再取得させる
   mapListVersion: number;
@@ -20,7 +21,7 @@ interface UIStoreState extends UIState {
   toggleNodeSelection: (nodeId: string) => void;
   clearMultiSelection: () => void;
   setEditingNodeId: (nodeId: string | null) => void;
-  setPendingEditChar: (char: string | null) => void;
+  setPendingEditClear: (clear: boolean) => void;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
   setHelpModalOpen: (open: boolean) => void;
@@ -38,7 +39,7 @@ export const useUIStore = create<UIStoreState>((set) => ({
   isSidebarOpen: true,
   isHelpModalOpen: false,
   contextMenu: null,
-  pendingEditChar: null,
+  pendingEditClear: false,
   mapListVersion: 0,
 
   setSelectedNodeId: (nodeId) =>
@@ -80,7 +81,7 @@ export const useUIStore = create<UIStoreState>((set) => ({
 
   setEditingNodeId: (nodeId) => set({ editingNodeId: nodeId }),
 
-  setPendingEditChar: (char) => set({ pendingEditChar: char }),
+  setPendingEditClear: (clear) => set({ pendingEditClear: clear }),
 
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
 
