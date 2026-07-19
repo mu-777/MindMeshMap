@@ -3,11 +3,17 @@ import { MindMapCanvas } from './components/Editor/MindMapCanvas';
 import { Toolbar } from './components/Editor/Toolbar';
 import { MapList } from './components/Sidebar/MapList';
 import { KeyboardShortcutHelp } from './components/Common/KeyboardShortcutHelp';
+import { ToastContainer } from './components/Common/ToastContainer';
+import { ConfirmDialog } from './components/Common/ConfirmDialog';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useUnloadGuard } from './hooks/useUnloadGuard';
+import { useAutoSave } from './hooks/useAutoSave';
 import { useUIStore } from './stores/uiStore';
 
 function AppContent() {
   useKeyboardShortcuts();
+  useUnloadGuard();
+  useAutoSave();
   const { isSidebarOpen, isHelpModalOpen, setHelpModalOpen } = useUIStore();
 
   return (
@@ -34,6 +40,12 @@ function AppContent() {
       {isHelpModalOpen && (
         <KeyboardShortcutHelp onClose={() => setHelpModalOpen(false)} />
       )}
+
+      {/* トースト通知 */}
+      <ToastContainer />
+
+      {/* 確認ダイアログ */}
+      <ConfirmDialog />
     </div>
   );
 }

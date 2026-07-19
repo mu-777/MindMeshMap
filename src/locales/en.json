@@ -4,6 +4,7 @@
     "saving": "Saving...",
     "delete": "Delete",
     "cancel": "Cancel",
+    "ok": "OK",
     "loading": "Loading...",
     "refresh": "Refresh",
     "menu": "Menu",
@@ -22,7 +23,11 @@
     "helpShortcut": "Help (?)",
     "layoutDirection": "Layout Direction",
     "layoutDown": "Down",
-    "layoutRight": "Right"
+    "layoutRight": "Right",
+    "fileMenu": "File",
+    "exportJson": "Export JSON",
+    "exportPng": "Export PNG",
+    "importJson": "Import JSON"
   },
   "auth": {
     "signInWithGoogle": "Sign in with Google",
@@ -34,12 +39,46 @@
     "signInPrompt": "Sign in with Google to save and sync your maps"
   },
   "shortcuts": {
-    "title": "Keyboard Shortcuts",
     "nodeOperations": "Node Operations",
     "navigation": "Navigation",
     "editing": "Editing",
     "view": "View",
     "helpHint": "Press ? to show this help"
+  },
+  "help": {
+    "title": "Help",
+    "tabBasic": "Basic Operations",
+    "tabFormat": "Formatting",
+    "tabKeyboard": "Keyboard",
+    "opCreateNode": "Create Node",
+    "opCreateNodeDesc": "Double-click empty canvas / Long-press",
+    "opEditNode": "Edit Node",
+    "opEditNodeDesc": "Double-click / Tap again on a selected node",
+    "opSelectNode": "Select Node",
+    "opSelectNodeDesc": "Click / Tap",
+    "opMultiSelect": "Multi-select",
+    "opMultiSelectDesc": "Shift+Click",
+    "opMoveNode": "Move Node",
+    "opMoveNodeDesc": "Drag",
+    "opCreateEdge": "Create Edge",
+    "opCreateEdgeDesc": "Drag a handle (blue circle) to another node",
+    "opCreateConnectedNode": "Create Connected Node",
+    "opCreateConnectedNodeDesc": "Drag a handle and drop on empty canvas",
+    "opEdgeLabel": "Edge Label",
+    "opEdgeLabelDesc": "Click the middle of an edge",
+    "opDeleteMenu": "Delete Menu",
+    "opDeleteMenuDesc": "Right-click / Long-press",
+    "formatIntro": "Select text while editing a node to show the formatting toolbar.",
+    "formatBold": "Bold",
+    "formatItalic": "Italic",
+    "formatStrike": "Strikethrough",
+    "formatBulletList": "Bullet List",
+    "formatOrderedList": "Numbered List",
+    "formatNewLine": "New Line",
+    "pressKey": "Press a key...",
+    "keyConflict": "Already assigned to \"{{action}}\"",
+    "resetKeybinds": "Reset to Defaults",
+    "openSampleMap": "Open Sample Map"
   },
   "keybinds": {
     "createChildNode": "Create Child Node",
@@ -63,7 +102,12 @@
     "newNode": "New node",
     "placeholder": "Enter text...",
     "addLabel": "+ Label",
-    "deleteEdge": "Delete edge"
+    "deleteEdge": "Delete edge",
+    "bold": "Bold (Ctrl+B)",
+    "italic": "Italic (Ctrl+I)",
+    "strike": "Strikethrough (Ctrl+Shift+S)",
+    "bulletList": "Bullet List (Ctrl+Shift+8)",
+    "orderedList": "Numbered List (Ctrl+Shift+7)"
   },
   "defaultMap": {
     "name": "Expand Your Ideas",
@@ -83,5 +127,13 @@
     "saveFailed": "Failed to save",
     "loadFailed": "Failed to load map",
     "deleteFailed": "Failed to delete"
+  },
+  "toast": {
+    "localAutoSaved": "Changes are auto-saved on this device. Sign in with Google to save to Google Drive.",
+    "alreadySaved": "Already saved",
+    "sessionExpired": "Your login session has expired. Please sign in again.",
+    "importSuccess": "Map imported successfully",
+    "importFailed": "Failed to import map. The file format is invalid.",
+    "exportPngFailed": "Failed to export PNG"
   }
 }

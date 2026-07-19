@@ -4,6 +4,8 @@ import { useAuthStore } from '../stores/authStore';
 // Google API クライアントID（実際の値は環境変数または設定ファイルから取得）
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+// GISのトークンレスポンスにexpires_inが含まれない場合のフォールバック（秒）
+const DEFAULT_EXPIRES_IN_SEC = 3600;
 
 declare global {
   interface Window {
@@ -13,7 +15,11 @@ declare global {
           initTokenClient: (config: {
             client_id: string;
             scope: string;
-            callback: (response: { access_token?: string; error?: string }) => void;
+            callback: (response: {
+              access_token?: string;
+              expires_in?: number;
+              error?: string;
+            }) => void;
           }) => {
             requestAccessToken: () => void;
           };
@@ -87,9 +93,11 @@ export function useGoogleAuth() {
         }
 
         if (response.access_token) {
+          const expiresInSec = response.expires_in ?? DEFAULT_EXPIRES_IN_SEC;
           setAuth({
             isSignedIn: true,
             accessToken: response.access_token,
+            expiresAt: Date.now() + expiresInSec * 1000,
           });
 
           // ユーザー情報を取得

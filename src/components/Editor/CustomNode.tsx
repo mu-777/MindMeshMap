@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useMapStore } from '../../stores/mapStore';
@@ -17,7 +17,7 @@ export type CustomNodeType = Node<CustomNodeData, 'custom'>;
 
 function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) {
   const { t } = useTranslation();
-  const { updateNode } = useMapStore();
+  const { updateNodeContent } = useMapStore();
   const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu, pendingEditChar, setPendingEditChar } = useUIStore();
   const isEditing = editingNodeId === id;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -25,7 +25,11 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredRef = useRef<boolean>(false);
   const dragDetectedRef = useRef<boolean>(false);
-  const touchStartTimeRef = useRef<number | null>(null);
+  // タップをhandleTouchEndで処理済みかどうか。直後に発火する合成clickイベント
+  // （handleClick）で同じタップを二重処理しないようにするためのフラグ
+  const tapHandledRef = useRef<boolean>(false);
+  // 編集セッション中の最初の変更かどうか（最初の変更のみ履歴を積み、1編集セッション=1 Undoにする）
+  const isFirstEditInSessionRef = useRef<boolean>(true);
 
   // Tiptapエディタの初期化
   const editor = useEditor({
@@ -45,9 +49,20 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     editable: isEditing,
     onUpdate: ({ editor }) => {
       const json = JSON.stringify(editor.getJSON());
-      updateNode(id, { content: json });
+      const recordHistory = isFirstEditInSessionRef.current;
+      isFirstEditInSessionRef.current = false;
+      updateNodeContent(id, json, recordHistory);
     },
   });
+
+  // 編集セッション開始時（isEditingがtrueになった瞬間）に「最初の変更」フラグをリセットする。
+  // 下の「編集モードの切り替え」effectより先に実行される必要がある
+  // （pendingEditChar挿入時のonUpdateがこのフラグを見るため）
+  useEffect(() => {
+    if (isEditing) {
+      isFirstEditInSessionRef.current = true;
+    }
+  }, [isEditing]);
 
   // 編集モードの切り替え
   useEffect(() => {
@@ -70,24 +85,19 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     setEditingNodeId(id);
   }, [id, setEditingNodeId]);
 
-  // クリックで選択（Shift+クリックで複数選択、モバイルタップで編集モード）
+  // クリックで選択（Shift+クリックで複数選択）
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+
+      // タッチ由来のタップはhandleTouchEndで処理済みのため、
+      // 直後に発火する合成clickイベントはここで消費して無視する（二重処理防止）
+      if (tapHandledRef.current) {
+        tapHandledRef.current = false;
+        return;
+      }
+
       if (!isEditing) {
-        // モバイルタップの場合（最近のタッチがあり、長押しでもドラッグでもない場合）
-        const touchStartTime = touchStartTimeRef.current;
-        const wasRecentTouch = touchStartTime !== null && Date.now() - touchStartTime < 500;
-        const wasLongPress = longPressTriggeredRef.current;
-        const wasDrag = dragDetectedRef.current;
-
-        if (wasRecentTouch && !wasLongPress && !wasDrag) {
-          // モバイルタップで編集モードに入る
-          touchStartTimeRef.current = null;
-          setEditingNodeId(id);
-          return;
-        }
-
         if (e.shiftKey) {
           // Shift+クリックで複数選択をトグル
           toggleNodeSelection(id);
@@ -97,7 +107,7 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
         }
       }
     },
-    [id, isEditing, setSelectedNodeId, toggleNodeSelection, setEditingNodeId]
+    [id, isEditing, setSelectedNodeId, toggleNodeSelection]
   );
 
   // 編集中のキーイベント処理
@@ -154,7 +164,6 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
       touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
       longPressTriggeredRef.current = false;
       dragDetectedRef.current = false;
-      touchStartTimeRef.current = Date.now();
 
       longPressTimerRef.current = setTimeout(() => {
         longPressTriggeredRef.current = true;
@@ -184,21 +193,27 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     [clearLongPressTimer]
   );
 
-  // タッチ終了（モバイルではタップで編集モードに入る）
+  // タッチ終了（モバイルは1タップ目=選択、2タップ目=編集の2段階で処理する）
   const handleTouchEnd = useCallback(() => {
     const wasLongPress = longPressTriggeredRef.current;
     const wasDrag = dragDetectedRef.current;
     clearLongPressTimer();
 
-    // 長押しでもドラッグでもない通常のタップの場合、編集モードに入る
+    // 長押しでもドラッグでもない通常のタップの場合のみ選択/編集を処理する
     if (!wasLongPress && !wasDrag && !isEditing) {
-      // touchStartTimeRefをクリアして、handleClickで二重処理されないようにする
-      touchStartTimeRef.current = null;
-      setEditingNodeId(id);
+      // 直後に発火する合成clickイベント（handleClick）で二重処理されないようにフラグを立てる
+      tapHandledRef.current = true;
+
+      if (selected) {
+        // 既に選択済みのノードへの2回目のタップで編集モードに入る
+        setEditingNodeId(id);
+      } else {
+        // 未選択ノードへの1回目のタップは選択のみ
+        // （即座に編集モードにするとキーボードが誤って開いてしまうため）
+        setSelectedNodeId(id);
+      }
     }
-    // 注: handleClickでもタップを検出できるようにtouchStartTimeRefは
-    // 長押し・ドラッグの場合のみここでクリアしない（handleClickでフォールバック処理）
-  }, [clearLongPressTimer, id, isEditing, setEditingNodeId]);
+  }, [clearLongPressTimer, id, isEditing, selected, setEditingNodeId, setSelectedNodeId]);
 
   // コンポーネントアンマウント時にタイマーをクリア
   useEffect(() => {
@@ -265,6 +280,66 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
           ${isEditing ? 'cursor-text' : 'cursor-pointer'}
         `}
       >
+        {/* テキスト選択時に表示される書式バー。編集中でない（isEditable=false）間は
+            BubbleMenuのデフォルトshouldShowにより自動的に非表示になる */}
+        {editor && (
+          <BubbleMenu
+            editor={editor}
+            tippyOptions={{ zIndex: 9999, placement: 'top' }}
+            className="nodrag flex items-center gap-0.5 rounded border border-gray-600 bg-gray-800 p-1 shadow-lg"
+          >
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              title={t('editor.bold')}
+              className={`rounded px-2 py-1 text-xs font-bold ${
+                editor.isActive('bold') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              B
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              title={t('editor.italic')}
+              className={`rounded px-2 py-1 text-xs italic ${
+                editor.isActive('italic') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              I
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleStrike().run()}
+              title={t('editor.strike')}
+              className={`rounded px-2 py-1 text-xs line-through ${
+                editor.isActive('strike') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              S
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+              title={t('editor.bulletList')}
+              className={`rounded px-2 py-1 text-xs ${
+                editor.isActive('bulletList') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              •
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+              title={t('editor.orderedList')}
+              className={`rounded px-2 py-1 text-xs ${
+                editor.isActive('orderedList') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              1.
+            </button>
+          </BubbleMenu>
+        )}
         <EditorContent editor={editor} />
       </div>
     </div>

@@ -13,6 +13,9 @@ interface UIStoreState extends UIState {
   selectedNodeIds: string[];
   contextMenu: ContextMenuState | null;
   pendingEditChar: string | null;
+  // Drive保存が成功するたびにインクリメントするカウンタ。
+  // MapListの一覧取得useEffectの依存に加えることで、保存後に一覧（名前・更新日時）を再取得させる
+  mapListVersion: number;
   setSelectedNodeId: (nodeId: string | null) => void;
   toggleNodeSelection: (nodeId: string) => void;
   clearMultiSelection: () => void;
@@ -24,6 +27,7 @@ interface UIStoreState extends UIState {
   toggleHelpModal: () => void;
   openContextMenu: (type: 'node' | 'edge', id: string, x: number, y: number) => void;
   closeContextMenu: () => void;
+  bumpMapListVersion: () => void;
 }
 
 export const useUIStore = create<UIStoreState>((set) => ({
@@ -35,6 +39,7 @@ export const useUIStore = create<UIStoreState>((set) => ({
   isHelpModalOpen: false,
   contextMenu: null,
   pendingEditChar: null,
+  mapListVersion: 0,
 
   setSelectedNodeId: (nodeId) =>
     set((state) => ({
@@ -48,7 +53,7 @@ export const useUIStore = create<UIStoreState>((set) => ({
   toggleNodeSelection: (nodeId) =>
     set((state) => {
       // 現在のselectedNodeIdも含めた選択リストを作成
-      let currentSelectedIds = [...state.selectedNodeIds];
+      const currentSelectedIds = [...state.selectedNodeIds];
       if (state.selectedNodeId && !currentSelectedIds.includes(state.selectedNodeId)) {
         currentSelectedIds.push(state.selectedNodeId);
       }
@@ -88,4 +93,6 @@ export const useUIStore = create<UIStoreState>((set) => ({
   openContextMenu: (type, id, x, y) => set({ contextMenu: { type, id, x, y } }),
 
   closeContextMenu: () => set({ contextMenu: null }),
+
+  bumpMapListVersion: () => set((state) => ({ mapListVersion: state.mapListVersion + 1 })),
 }));

@@ -1,10 +1,15 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useReactFlow } from '@xyflow/react';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
+import { useConfirmStore } from '../../stores/confirmStore';
+import { useToastStore } from '../../stores/toastStore';
 import { useAutoLayout } from '../../hooks/useAutoLayout';
-import { useGoogleDrive } from '../../hooks/useGoogleDrive';
+import { useSaveMap } from '../../hooks/useSaveMap';
+import { useExportPng } from '../../hooks/useExportPng';
+import { exportMapAsJson, parseImportedMap } from '../../utils/exportImport';
 import { LayoutDirection } from '../../types';
 import { LanguageSwitcher } from '../Common/LanguageSwitcher';
 
@@ -33,21 +38,25 @@ export function Toolbar() {
   const { t } = useTranslation();
   const {
     currentMap,
-    currentFileId,
     isDirty,
     createNewMap,
     updateMap,
     setLayoutDirection,
+    setCurrentMap,
+    setDirty,
     undo,
     redo,
     history,
     historyIndex,
-    setDirty,
   } = useMapStore();
   const { toggleSidebar, setHelpModalOpen } = useUIStore();
   const { isSignedIn } = useAuthStore();
-  const { saveMap, isLoading } = useGoogleDrive();
+  const { requestConfirm } = useConfirmStore();
+  const { addToast } = useToastStore();
+  const { save, isLoading } = useSaveMap();
   const { applyLayout } = useAutoLayout();
+  const { exportPng } = useExportPng();
+  const { fitView } = useReactFlow();
 
   // タイトル編集用のstate
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -60,6 +69,16 @@ export function Toolbar() {
   useClickOutside(toolMenuRef as React.RefObject<HTMLElement>, () =>
     setIsToolMenuOpen(false)
   );
+
+  // デスクトップ用「ファイル」メニューのstate
+  const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
+  const fileMenuRef = useRef<HTMLDivElement>(null);
+  useClickOutside(fileMenuRef as React.RefObject<HTMLElement>, () =>
+    setIsFileMenuOpen(false)
+  );
+
+  // JSONインポート用の非表示file input
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // タイトル編集開始時にフォーカス
   useEffect(() => {
@@ -103,26 +122,13 @@ export function Toolbar() {
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
-  const handleNewMap = useCallback(() => {
+  const handleNewMap = useCallback(async () => {
     if (isDirty) {
-      const confirm = window.confirm(t('dialogs.unsavedChangesNew'));
-      if (!confirm) return;
+      const confirmed = await requestConfirm(t('dialogs.unsavedChangesNew'));
+      if (!confirmed) return;
     }
     createNewMap();
-  }, [isDirty, createNewMap, t]);
-
-  const handleSave = useCallback(async () => {
-    if (!currentMap || !isSignedIn) return;
-
-    try {
-      await saveMap(currentMap, currentFileId);
-      setDirty(false);
-      alert(t('dialogs.savedSuccess'));
-    } catch (error) {
-      console.error('Save failed:', error);
-      alert(t('dialogs.saveFailed'));
-    }
-  }, [currentMap, currentFileId, isSignedIn, saveMap, setDirty, t]);
+  }, [isDirty, createNewMap, requestConfirm, t]);
 
   const handleLayoutDirectionChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -135,6 +141,52 @@ export function Toolbar() {
   const handleAutoLayout = useCallback(() => {
     applyLayout();
   }, [applyLayout]);
+
+  // JSONエクスポート
+  const handleExportJson = useCallback(() => {
+    if (!currentMap) return;
+    exportMapAsJson(currentMap);
+  }, [currentMap]);
+
+  // PNGエクスポート
+  const handleExportPng = useCallback(() => {
+    if (!currentMap) return;
+    exportPng();
+  }, [currentMap, exportPng]);
+
+  // JSONインポートのファイル選択ダイアログを開く
+  const handleImportClick = useCallback(() => {
+    importInputRef.current?.click();
+  }, []);
+
+  // JSONインポート：ファイル選択後の処理
+  const handleImportFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // 同じファイルを連続で選択してもchangeイベントが発火するように毎回リセットする
+      e.target.value = '';
+      if (!file) return;
+
+      const text = await file.text();
+      const importedMap = parseImportedMap(text);
+      if (!importedMap) {
+        addToast({ type: 'error', message: t('toast.importFailed') });
+        return;
+      }
+
+      if (isDirty) {
+        const confirmed = await requestConfirm(t('dialogs.unsavedChangesContinue'));
+        if (!confirmed) return;
+      }
+
+      // インポートしたマップはDrive未保存の状態として扱う（fileIdなし・isDirty=true）
+      setCurrentMap(importedMap, null);
+      setDirty(true);
+      addToast({ type: 'success', message: t('toast.importSuccess') });
+      setTimeout(() => fitView(), 50);
+    },
+    [isDirty, requestConfirm, setCurrentMap, setDirty, addToast, t, fitView]
+  );
 
   return (
     <div className="relative flex h-12 items-center justify-between border-b border-gray-700 bg-gray-800 px-2 md:px-4">
@@ -191,7 +243,7 @@ export function Toolbar() {
 
         {isSignedIn && (
           <button
-            onClick={handleSave}
+            onClick={save}
             disabled={isLoading || !isDirty}
             className={`
               rounded p-1.5 md:px-3 md:py-1.5
@@ -223,6 +275,51 @@ export function Toolbar() {
             </span>
           </button>
         )}
+
+        {/* ファイルメニュー（デスクトップのみ。モバイルは⋮メニューに同項目がある） */}
+        <div className="relative hidden md:block" ref={fileMenuRef}>
+          <button
+            onClick={() => setIsFileMenuOpen((open) => !open)}
+            className="rounded px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+            title={t('toolbar.fileMenu')}
+          >
+            {t('toolbar.fileMenu')}
+          </button>
+
+          {isFileMenuOpen && (
+            <div className="absolute left-0 top-full z-50 mt-1 w-44 rounded-md border border-gray-600 bg-gray-800 py-1 shadow-lg">
+              <button
+                onClick={() => {
+                  handleExportJson();
+                  setIsFileMenuOpen(false);
+                }}
+                disabled={!currentMap}
+                className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t('toolbar.exportJson')}
+              </button>
+              <button
+                onClick={() => {
+                  handleExportPng();
+                  setIsFileMenuOpen(false);
+                }}
+                disabled={!currentMap}
+                className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t('toolbar.exportPng')}
+              </button>
+              <button
+                onClick={() => {
+                  handleImportClick();
+                  setIsFileMenuOpen(false);
+                }}
+                className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
+              >
+                {t('toolbar.importJson')}
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="hidden h-6 w-px bg-gray-700 md:block" />
 
@@ -406,6 +503,45 @@ export function Toolbar() {
               {t('toolbar.align')}
             </button>
 
+            <div className="my-1 h-px bg-gray-700" />
+
+            {/* JSONエクスポート */}
+            <button
+              onClick={() => {
+                handleExportJson();
+                setIsToolMenuOpen(false);
+              }}
+              disabled={!currentMap}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t('toolbar.exportJson')}
+            </button>
+
+            {/* PNGエクスポート */}
+            <button
+              onClick={() => {
+                handleExportPng();
+                setIsToolMenuOpen(false);
+              }}
+              disabled={!currentMap}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t('toolbar.exportPng')}
+            </button>
+
+            {/* JSONインポート */}
+            <button
+              onClick={() => {
+                handleImportClick();
+                setIsToolMenuOpen(false);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
+            >
+              {t('toolbar.importJson')}
+            </button>
+
+            <div className="my-1 h-px bg-gray-700" />
+
             {/* ヘルプ */}
             <button
               onClick={() => {
@@ -439,6 +575,15 @@ export function Toolbar() {
           </div>
         )}
       </div>
+
+      {/* JSONインポート用の非表示file input（デスクトップ・モバイル共通） */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={handleImportFileChange}
+        className="hidden"
+      />
     </div>
   );
 }

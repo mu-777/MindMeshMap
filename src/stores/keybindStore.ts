@@ -11,7 +11,8 @@ interface KeybindState {
 }
 
 // キーの正規化（Ctrl+Shift+Zなど）
-const normalizeKey = (
+// ヘルプモーダルのキーバインド編集UI（KeyboardShortcutHelp）からも同じ正規化ロジックを使うためexportする
+export const normalizeKey = (
   key: string,
   modifiers: { ctrl: boolean; shift: boolean; alt: boolean }
 ): string => {

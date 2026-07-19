@@ -17,10 +17,12 @@ interface MapState {
   createNewMap: (name?: string) => void;
   updateMap: (updates: Partial<MindMap>) => void;
   setDirty: (dirty: boolean) => void;
+  setCurrentFileId: (fileId: string | null) => void;
 
   // ノード操作
   addNode: (node: Omit<MapNode, 'id'>, parentId?: string, sourceHandle?: string, targetHandle?: string) => string;
   updateNode: (nodeId: string, updates: Partial<MapNode>) => void;
+  updateNodeContent: (nodeId: string, content: string, recordHistory: boolean) => void;
   deleteNode: (nodeId: string) => void;
   deleteNodes: (nodeIds: string[]) => void;
   updateNodePositions: (positions: { id: string; position: { x: number; y: number } }[]) => void;
@@ -104,6 +106,8 @@ export const useMapStore = create<MapState>((set, get) => ({
 
   setDirty: (dirty) => set({ isDirty: dirty }),
 
+  setCurrentFileId: (fileId) => set({ currentFileId: fileId }),
+
   addNode: (nodeData, parentId, sourceHandle, targetHandle) => {
     const { currentMap, saveToHistory } = get();
     if (!currentMap) return '';
@@ -152,6 +156,28 @@ export const useMapStore = create<MapState>((set, get) => ({
         ...currentMap,
         nodes: currentMap.nodes.map((node) =>
           node.id === nodeId ? { ...node, ...updates } : node
+        ),
+        updatedAt: new Date().toISOString(),
+      },
+      isDirty: true,
+    });
+  },
+
+  // テキスト編集用。recordHistory が true のときのみ履歴を積む
+  // （編集セッション中の最初の1回だけ true にすることで「1編集セッション=1 Undo」を実現する）
+  updateNodeContent: (nodeId, content, recordHistory) => {
+    const { currentMap, saveToHistory } = get();
+    if (!currentMap) return;
+
+    if (recordHistory) {
+      saveToHistory();
+    }
+
+    set({
+      currentMap: {
+        ...currentMap,
+        nodes: currentMap.nodes.map((node) =>
+          node.id === nodeId ? { ...node, content } : node
         ),
         updatedAt: new Date().toISOString(),
       },
@@ -365,3 +391,57 @@ export const useMapStore = create<MapState>((set, get) => ({
     });
   },
 }));
+
+// --- localStorageへの常時自動保存（ドラフト）とその復元 ---
+
+const DRAFT_STORAGE_KEY = 'mindmeshmap-draft';
+const DRAFT_SAVE_DEBOUNCE_MS = 500;
+
+interface DraftData {
+  map: MindMap;
+  fileId: string | null;
+  isDirty: boolean;
+}
+
+let draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+// currentMap / currentFileId / isDirty の変化を監視し、デバウンスしてlocalStorageに保存する
+useMapStore.subscribe((state, prevState) => {
+  if (
+    state.currentMap === prevState.currentMap &&
+    state.currentFileId === prevState.currentFileId &&
+    state.isDirty === prevState.isDirty
+  ) {
+    return;
+  }
+
+  if (draftSaveTimer) {
+    clearTimeout(draftSaveTimer);
+  }
+
+  draftSaveTimer = setTimeout(() => {
+    const { currentMap, currentFileId, isDirty } = useMapStore.getState();
+    // マップが存在しない場合は書かない
+    if (!currentMap) return;
+
+    const draft: DraftData = { map: currentMap, fileId: currentFileId, isDirty };
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  }, DRAFT_SAVE_DEBOUNCE_MS);
+});
+
+// 保存されたドラフトを復元する。パース失敗・不正な形式の場合はnullを返し、壊れたデータは削除する
+export function loadDraft(): DraftData | null {
+  const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.map) {
+      throw new Error('Invalid draft data');
+    }
+    return parsed as DraftData;
+  } catch {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    return null;
+  }
+}

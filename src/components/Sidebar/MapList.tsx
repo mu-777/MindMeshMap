@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/authStore';
 import { useMapStore } from '../../stores/mapStore';
+import { useConfirmStore } from '../../stores/confirmStore';
+import { useToastStore } from '../../stores/toastStore';
+import { useUIStore } from '../../stores/uiStore';
 import { useGoogleDrive } from '../../hooks/useGoogleDrive';
+import { useGoogleAuth } from '../../hooks/useGoogleAuth';
+import { AuthExpiredError } from '../../utils/errors';
 import { MapMeta } from '../../types';
 import { MapListItem } from './MapListItem';
 import { GoogleAuthButton } from '../Auth/GoogleAuthButton';
@@ -12,9 +17,23 @@ export function MapList() {
   const { isSignedIn } = useAuthStore();
   const { currentFileId, isDirty, setDirty } = useMapStore();
   const { listMaps, loadMap, deleteMap, isLoading, error } = useGoogleDrive();
+  const { signIn } = useGoogleAuth();
   const { setCurrentMap } = useMapStore();
+  const { requestConfirm } = useConfirmStore();
+  const { addToast } = useToastStore();
+  const mapListVersion = useUIStore((state) => state.mapListVersion);
 
   const [maps, setMaps] = useState<MapMeta[]>([]);
+
+  // セッション失効時の共通トースト（再ログインボタン付き）
+  const showSessionExpiredToast = useCallback(() => {
+    addToast({
+      type: 'error',
+      message: t('toast.sessionExpired'),
+      actionLabel: t('auth.signInWithGoogle'),
+      onAction: signIn,
+    });
+  }, [addToast, signIn, t]);
 
   // マップ一覧を取得
   const fetchMaps = useCallback(async () => {
@@ -25,19 +44,24 @@ export function MapList() {
       setMaps(mapList);
     } catch (err) {
       console.error('Failed to fetch maps:', err);
+      if (err instanceof AuthExpiredError) {
+        showSessionExpiredToast();
+      }
     }
-  }, [isSignedIn, listMaps]);
+  }, [isSignedIn, listMaps, showSessionExpiredToast]);
 
+  // mapListVersionは保存成功のたびにインクリメントされる。
+  // 依存に加えることで、保存のたびに一覧（名前・更新日時）が最新化される
   useEffect(() => {
     fetchMaps();
-  }, [fetchMaps]);
+  }, [fetchMaps, mapListVersion]);
 
   // マップを開く
   const handleOpenMap = useCallback(
     async (fileId: string) => {
       if (isDirty) {
-        const confirm = window.confirm(t('dialogs.unsavedChangesContinue'));
-        if (!confirm) return;
+        const confirmed = await requestConfirm(t('dialogs.unsavedChangesContinue'));
+        if (!confirmed) return;
       }
 
       try {
@@ -46,27 +70,35 @@ export function MapList() {
         setDirty(false);
       } catch (err) {
         console.error('Failed to load map:', err);
-        alert(t('dialogs.loadFailed'));
+        if (err instanceof AuthExpiredError) {
+          showSessionExpiredToast();
+        } else {
+          addToast({ type: 'error', message: t('dialogs.loadFailed') });
+        }
       }
     },
-    [isDirty, loadMap, setCurrentMap, setDirty, t]
+    [isDirty, loadMap, setCurrentMap, setDirty, requestConfirm, addToast, showSessionExpiredToast, t]
   );
 
   // マップを削除
   const handleDeleteMap = useCallback(
     async (fileId: string, name: string) => {
-      const confirm = window.confirm(t('dialogs.deleteConfirm', { name }));
-      if (!confirm) return;
+      const confirmed = await requestConfirm(t('dialogs.deleteConfirm', { name }));
+      if (!confirmed) return;
 
       try {
         await deleteMap(fileId);
         await fetchMaps();
       } catch (err) {
         console.error('Failed to delete map:', err);
-        alert(t('dialogs.deleteFailed'));
+        if (err instanceof AuthExpiredError) {
+          showSessionExpiredToast();
+        } else {
+          addToast({ type: 'error', message: t('dialogs.deleteFailed') });
+        }
       }
     },
-    [deleteMap, fetchMaps, t]
+    [deleteMap, fetchMaps, requestConfirm, addToast, showSessionExpiredToast, t]
   );
 
   if (!isSignedIn) {

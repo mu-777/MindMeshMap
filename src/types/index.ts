@@ -73,4 +73,6 @@ export interface AuthState {
   accessToken: string | null;
   userEmail: string | null;
   userName: string | null;
+  // アクセストークンの有効期限（epoch ms）。GISのimplicitトークンは約1時間で失効する
+  expiresAt: number | null;
 }

@@ -1,34 +1,73 @@
 import { useCallback, useState } from 'react';
-import { useAuthStore } from '../stores/authStore';
+import { isExpired, useAuthStore } from '../stores/authStore';
 import { MindMap, MapMeta } from '../types';
+import { AuthExpiredError } from '../utils/errors';
 
 const FOLDER_NAME = 'MindMeshMap';
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 const UPLOAD_API_BASE = 'https://www.googleapis.com/upload/drive/v3';
 
+// multipart/relatedアップロード用のFormDataを構築（新規作成・既存ファイル更新のPATCHで共通利用）
+const buildMultipartForm = (metadata: Record<string, unknown>, map: MindMap): FormData => {
+  const form = new FormData();
+  form.append(
+    'metadata',
+    new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+  );
+  form.append(
+    'file',
+    new Blob([JSON.stringify(map)], { type: 'application/json' })
+  );
+  return form;
+};
+
 export function useGoogleDrive() {
-  const { accessToken } = useAuthStore();
+  const { accessToken, expiresAt, signOut } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getHeaders = useCallback(() => {
-    if (!accessToken) {
-      throw new Error('Not authenticated');
-    }
-    return {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    };
-  }, [accessToken]);
+  // 認証ヘッダーのみ。FormDataを送る場合はboundary付きContent-Typeをブラウザに
+  // 任せる必要があるため、Content-Typeはここでは付与しない
+  const getAuthHeader = useCallback(
+    (): HeadersInit => ({ Authorization: `Bearer ${accessToken}` }),
+    [accessToken]
+  );
+
+  // JSONボディを送る通常のAPI呼び出し用ヘッダー
+  const getJsonHeaders = useCallback(
+    (): HeadersInit => ({ ...getAuthHeader(), 'Content-Type': 'application/json' }),
+    [getAuthHeader]
+  );
+
+  // 全Drive API呼び出しをこの関数経由にする。
+  // 呼び出し前にトークンの有無・有効期限（60秒バッファ）をチェックし、
+  // fetch実行後は401レスポンスも検知する。いずれの場合もsignOutしてAuthExpiredErrorをthrowし、
+  // 呼び出し側（useSaveMap/useAutoSave/MapList）で再ログイン導線を出せるようにする
+  const authFetch = useCallback(
+    async (url: string, init?: RequestInit): Promise<Response> => {
+      if (!accessToken || isExpired(expiresAt)) {
+        signOut();
+        throw new AuthExpiredError();
+      }
+
+      const response = await fetch(url, init);
+
+      if (response.status === 401) {
+        signOut();
+        throw new AuthExpiredError();
+      }
+
+      return response;
+    },
+    [accessToken, expiresAt, signOut]
+  );
 
   // アプリ専用フォルダを取得または作成
   const getOrCreateAppFolder = useCallback(async (): Promise<string> => {
-    const headers = getHeaders();
-
     // フォルダを検索
-    const searchResponse = await fetch(
+    const searchResponse = await authFetch(
       `${DRIVE_API_BASE}/files?q=name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id,name)`,
-      { headers }
+      { headers: getJsonHeaders() }
     );
 
     if (!searchResponse.ok) {
@@ -42,9 +81,9 @@ export function useGoogleDrive() {
     }
 
     // フォルダを作成
-    const createResponse = await fetch(`${DRIVE_API_BASE}/files`, {
+    const createResponse = await authFetch(`${DRIVE_API_BASE}/files`, {
       method: 'POST',
-      headers,
+      headers: getJsonHeaders(),
       body: JSON.stringify({
         name: FOLDER_NAME,
         mimeType: 'application/vnd.google-apps.folder',
@@ -57,7 +96,7 @@ export function useGoogleDrive() {
 
     const createData = await createResponse.json();
     return createData.id;
-  }, [getHeaders]);
+  }, [authFetch, getJsonHeaders]);
 
   // マップ一覧を取得
   const listMaps = useCallback(async (): Promise<MapMeta[]> => {
@@ -66,11 +105,10 @@ export function useGoogleDrive() {
 
     try {
       const folderId = await getOrCreateAppFolder();
-      const headers = getHeaders();
 
-      const response = await fetch(
+      const response = await authFetch(
         `${DRIVE_API_BASE}/files?q='${folderId}' in parents and mimeType='application/json' and trashed=false&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`,
-        { headers }
+        { headers: getJsonHeaders() }
       );
 
       if (!response.ok) {
@@ -91,7 +129,7 @@ export function useGoogleDrive() {
     } finally {
       setIsLoading(false);
     }
-  }, [getHeaders, getOrCreateAppFolder]);
+  }, [authFetch, getJsonHeaders, getOrCreateAppFolder]);
 
   // マップを読み込み
   const loadMap = useCallback(
@@ -100,11 +138,9 @@ export function useGoogleDrive() {
       setError(null);
 
       try {
-        const headers = getHeaders();
-
-        const response = await fetch(
+        const response = await authFetch(
           `${DRIVE_API_BASE}/files/${fileId}?alt=media`,
-          { headers }
+          { headers: getJsonHeaders() }
         );
 
         if (!response.ok) {
@@ -121,7 +157,7 @@ export function useGoogleDrive() {
         setIsLoading(false);
       }
     },
-    [getHeaders]
+    [authFetch, getJsonHeaders]
   );
 
   // マップを保存
@@ -131,19 +167,18 @@ export function useGoogleDrive() {
       setError(null);
 
       try {
-        const headers = getHeaders();
-
         if (fileId) {
-          // 既存ファイルを更新
-          const response = await fetch(
-            `${UPLOAD_API_BASE}/files/${fileId}?uploadType=media`,
+          // 既存ファイルを更新。uploadType=multipartでメタデータ（ファイル名）とコンテンツを
+          // 1リクエストで同時更新する。uploadType=mediaだと中身しか更新されず、
+          // タイトルをリネームしてもDrive上のファイル名が古いままになってしまうため
+          const form = buildMultipartForm({ name: `${map.name}.json` }, map);
+
+          const response = await authFetch(
+            `${UPLOAD_API_BASE}/files/${fileId}?uploadType=multipart`,
             {
               method: 'PATCH',
-              headers: {
-                ...headers,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(map),
+              headers: getAuthHeader(),
+              body: form,
             }
           );
 
@@ -155,34 +190,20 @@ export function useGoogleDrive() {
         } else {
           // 新規ファイルを作成
           const folderId = await getOrCreateAppFolder();
-
-          // メタデータを作成
-          const metadata = {
-            name: `${map.name}.json`,
-            mimeType: 'application/json',
-            parents: [folderId],
-          };
-
-          const form = new FormData();
-          form.append(
-            'metadata',
-            new Blob([JSON.stringify(metadata)], { type: 'application/json' })
-          );
-          form.append(
-            'file',
-            new Blob([JSON.stringify(map)], { type: 'application/json' })
-          );
-
-          const response = await fetch(
-            `${UPLOAD_API_BASE}/files?uploadType=multipart`,
+          const form = buildMultipartForm(
             {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-              },
-              body: form,
-            }
+              name: `${map.name}.json`,
+              mimeType: 'application/json',
+              parents: [folderId],
+            },
+            map
           );
+
+          const response = await authFetch(`${UPLOAD_API_BASE}/files?uploadType=multipart`, {
+            method: 'POST',
+            headers: getAuthHeader(),
+            body: form,
+          });
 
           if (!response.ok) {
             throw new Error('Failed to create map');
@@ -199,7 +220,7 @@ export function useGoogleDrive() {
         setIsLoading(false);
       }
     },
-    [accessToken, getHeaders, getOrCreateAppFolder]
+    [authFetch, getAuthHeader, getOrCreateAppFolder]
   );
 
   // マップを削除
@@ -209,11 +230,9 @@ export function useGoogleDrive() {
       setError(null);
 
       try {
-        const headers = getHeaders();
-
-        const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}`, {
+        const response = await authFetch(`${DRIVE_API_BASE}/files/${fileId}`, {
           method: 'DELETE',
-          headers,
+          headers: getJsonHeaders(),
         });
 
         if (!response.ok) {
@@ -227,38 +246,7 @@ export function useGoogleDrive() {
         setIsLoading(false);
       }
     },
-    [getHeaders]
-  );
-
-  // マップをリネーム
-  const renameMap = useCallback(
-    async (fileId: string, newName: string): Promise<void> => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const headers = getHeaders();
-
-        const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}`, {
-          method: 'PATCH',
-          headers,
-          body: JSON.stringify({
-            name: `${newName}.json`,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to rename map');
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        setError(message);
-        throw err;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [getHeaders]
+    [authFetch, getJsonHeaders]
   );
 
   return {
@@ -268,6 +256,5 @@ export function useGoogleDrive() {
     loadMap,
     saveMap,
     deleteMap,
-    renameMap,
   };
 }

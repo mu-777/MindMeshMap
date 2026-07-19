@@ -3,7 +3,9 @@ import { useReactFlow } from '@xyflow/react';
 import { useMapStore } from '../stores/mapStore';
 import { useUIStore } from '../stores/uiStore';
 import { useKeybindStore } from '../stores/keybindStore';
+import { useConfirmStore } from '../stores/confirmStore';
 import { useAutoLayout } from './useAutoLayout';
+import { useSaveMap } from './useSaveMap';
 import {
   buildGraphRelations,
   getParentNodes,
@@ -67,6 +69,7 @@ export function useKeyboardShortcuts() {
     selectedNodeIds,
     lastSelectedNodeId,
     editingNodeId,
+    isHelpModalOpen,
     setSelectedNodeId,
     setEditingNodeId,
     setPendingEditChar,
@@ -74,7 +77,9 @@ export function useKeyboardShortcuts() {
     clearMultiSelection,
   } = useUIStore();
   const { getActionForKey } = useKeybindStore();
+  const { isOpen: isConfirmDialogOpen } = useConfirmStore();
   const { applyLayout } = useAutoLayout();
+  const { save } = useSaveMap();
 
   // ノードがビューポート内に表示されているかチェック
   const isNodeInViewport = useCallback(
@@ -99,6 +104,12 @@ export function useKeyboardShortcuts() {
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      // ヘルプモーダル表示中（キーバインドキャプチャ含む）・確認ダイアログ表示中は
+      // グローバルショートカットを無効化する（Delete等の誤発火を防ぐ）
+      if (isHelpModalOpen || isConfirmDialogOpen) {
+        return;
+      }
+
       // 編集中は特定のキーのみ処理
       if (editingNodeId) {
         if (event.key === 'Escape') {
@@ -372,8 +383,7 @@ export function useKeyboardShortcuts() {
         }
 
         case 'save': {
-          // Google Drive保存（Toolbar側で実装済み）
-          console.log('Save triggered');
+          save();
           break;
         }
 
@@ -410,12 +420,15 @@ export function useKeyboardShortcuts() {
       selectedNodeIds,
       lastSelectedNodeId,
       editingNodeId,
+      isHelpModalOpen,
+      isConfirmDialogOpen,
       getActionForKey,
       addNode,
       deleteNode,
       deleteNodes,
       undo,
       redo,
+      save,
       setLayoutDirection,
       setSelectedNodeId,
       setEditingNodeId,

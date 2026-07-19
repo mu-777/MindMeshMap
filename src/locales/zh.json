@@ -4,6 +4,7 @@
     "saving": "保存中...",
     "delete": "删除",
     "cancel": "取消",
+    "ok": "确定",
     "loading": "加载中...",
     "refresh": "刷新",
     "menu": "菜单",
@@ -22,7 +23,11 @@
     "helpShortcut": "帮助 (?)",
     "layoutDirection": "布局方向",
     "layoutDown": "向下",
-    "layoutRight": "向右"
+    "layoutRight": "向右",
+    "fileMenu": "文件",
+    "exportJson": "导出JSON",
+    "exportPng": "导出PNG",
+    "importJson": "导入JSON"
   },
   "auth": {
     "signInWithGoogle": "使用Google登录",
@@ -34,12 +39,46 @@
     "signInPrompt": "使用Google登录以保存和同步您的地图"
   },
   "shortcuts": {
-    "title": "键盘快捷键",
     "nodeOperations": "节点操作",
     "navigation": "导航",
     "editing": "编辑",
     "view": "视图",
     "helpHint": "按 ? 键显示此帮助"
+  },
+  "help": {
+    "title": "帮助",
+    "tabBasic": "基本操作",
+    "tabFormat": "格式",
+    "tabKeyboard": "键盘",
+    "opCreateNode": "创建节点",
+    "opCreateNodeDesc": "双击空白处 / 长按",
+    "opEditNode": "编辑节点",
+    "opEditNodeDesc": "双击 / 再次点击已选中的节点",
+    "opSelectNode": "选择节点",
+    "opSelectNodeDesc": "点击 / 轻触",
+    "opMultiSelect": "多选",
+    "opMultiSelectDesc": "Shift+点击",
+    "opMoveNode": "移动节点",
+    "opMoveNodeDesc": "拖动",
+    "opCreateEdge": "创建连线",
+    "opCreateEdgeDesc": "将连接点（蓝色圆点）拖动到另一个节点",
+    "opCreateConnectedNode": "创建已连接的新节点",
+    "opCreateConnectedNodeDesc": "拖动连接点并放开在空白处",
+    "opEdgeLabel": "连线标签",
+    "opEdgeLabelDesc": "点击连线中间",
+    "opDeleteMenu": "删除菜单",
+    "opDeleteMenuDesc": "右键点击 / 长按",
+    "formatIntro": "编辑节点时选中文本会显示格式工具栏。",
+    "formatBold": "粗体",
+    "formatItalic": "斜体",
+    "formatStrike": "删除线",
+    "formatBulletList": "项目符号列表",
+    "formatOrderedList": "编号列表",
+    "formatNewLine": "换行",
+    "pressKey": "请按键…",
+    "keyConflict": "已分配给“{{action}}”",
+    "resetKeybinds": "恢复默认",
+    "openSampleMap": "打开示例地图"
   },
   "keybinds": {
     "createChildNode": "创建子节点",
@@ -63,7 +102,12 @@
     "newNode": "新节点",
     "placeholder": "输入文本...",
     "addLabel": "+ 标签",
-    "deleteEdge": "删除连线"
+    "deleteEdge": "删除连线",
+    "bold": "粗体 (Ctrl+B)",
+    "italic": "斜体 (Ctrl+I)",
+    "strike": "删除线 (Ctrl+Shift+S)",
+    "bulletList": "项目符号列表 (Ctrl+Shift+8)",
+    "orderedList": "编号列表 (Ctrl+Shift+7)"
   },
   "dialogs": {
     "unsavedChangesNew": "您有未保存的更改。确定要创建新地图吗？",
@@ -73,5 +117,13 @@
     "saveFailed": "保存失败",
     "loadFailed": "加载地图失败",
     "deleteFailed": "删除失败"
+  },
+  "toast": {
+    "localAutoSaved": "更改已自动保存在此设备上。要保存到 Google Drive，请使用 Google 登录。",
+    "alreadySaved": "已保存",
+    "sessionExpired": "登录会话已过期，请重新登录。",
+    "importSuccess": "地图导入成功",
+    "importFailed": "导入地图失败。文件格式无效。",
+    "exportPngFailed": "导出PNG失败"
   }
 }

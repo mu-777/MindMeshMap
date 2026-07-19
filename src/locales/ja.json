@@ -4,6 +4,7 @@
     "saving": "保存中...",
     "delete": "削除",
     "cancel": "キャンセル",
+    "ok": "OK",
     "loading": "読み込み中...",
     "refresh": "更新",
     "menu": "メニュー",
@@ -22,7 +23,11 @@
     "helpShortcut": "ヘルプ (?)",
     "layoutDirection": "レイアウト方向",
     "layoutDown": "下向き",
-    "layoutRight": "右向き"
+    "layoutRight": "右向き",
+    "fileMenu": "ファイル",
+    "exportJson": "JSONエクスポート",
+    "exportPng": "PNGエクスポート",
+    "importJson": "JSONインポート"
   },
   "auth": {
     "signInWithGoogle": "Googleでログイン",
@@ -34,12 +39,46 @@
     "signInPrompt": "Googleでログインするとマップを保存・同期できます"
   },
   "shortcuts": {
-    "title": "キーボードショートカット",
     "nodeOperations": "ノード操作",
     "navigation": "ナビゲーション",
     "editing": "編集",
     "view": "表示",
     "helpHint": "? キーでこのヘルプを表示"
+  },
+  "help": {
+    "title": "ヘルプ",
+    "tabBasic": "基本操作",
+    "tabFormat": "書式",
+    "tabKeyboard": "キーボード",
+    "opCreateNode": "ノード作成",
+    "opCreateNodeDesc": "空白をダブルクリック / 長押し",
+    "opEditNode": "ノード編集",
+    "opEditNodeDesc": "ダブルクリック / 選択済みノードを再タップ",
+    "opSelectNode": "ノード選択",
+    "opSelectNodeDesc": "クリック / タップ",
+    "opMultiSelect": "複数選択",
+    "opMultiSelectDesc": "Shift+クリック",
+    "opMoveNode": "ノード移動",
+    "opMoveNodeDesc": "ドラッグ",
+    "opCreateEdge": "エッジ作成",
+    "opCreateEdgeDesc": "ハンドル（青い丸）を別のノードへドラッグ",
+    "opCreateConnectedNode": "接続済み新ノード作成",
+    "opCreateConnectedNodeDesc": "ハンドルをドラッグして空白にドロップ",
+    "opEdgeLabel": "エッジラベル",
+    "opEdgeLabelDesc": "エッジの中央をクリック",
+    "opDeleteMenu": "削除メニュー",
+    "opDeleteMenuDesc": "右クリック / 長押し",
+    "formatIntro": "編集中にテキストを選択すると書式バーが表示されます。",
+    "formatBold": "太字",
+    "formatItalic": "斜体",
+    "formatStrike": "取り消し線",
+    "formatBulletList": "箇条書き",
+    "formatOrderedList": "番号付きリスト",
+    "formatNewLine": "改行",
+    "pressKey": "キーを入力…",
+    "keyConflict": "「{{action}}」に割り当て済みです",
+    "resetKeybinds": "デフォルトに戻す",
+    "openSampleMap": "サンプルマップを開く"
   },
   "keybinds": {
     "createChildNode": "子ノード作成",
@@ -63,7 +102,12 @@
     "newNode": "新しいノード",
     "placeholder": "テキストを入力...",
     "addLabel": "+ ラベル",
-    "deleteEdge": "エッジを削除"
+    "deleteEdge": "エッジを削除",
+    "bold": "太字 (Ctrl+B)",
+    "italic": "斜体 (Ctrl+I)",
+    "strike": "取り消し線 (Ctrl+Shift+S)",
+    "bulletList": "箇条書き (Ctrl+Shift+8)",
+    "orderedList": "番号付きリスト (Ctrl+Shift+7)"
   },
   "dialogs": {
     "unsavedChangesNew": "保存されていない変更があります。新しいマップを作成しますか？",
@@ -73,5 +117,13 @@
     "saveFailed": "保存に失敗しました",
     "loadFailed": "マップの読み込みに失敗しました",
     "deleteFailed": "削除に失敗しました"
+  },
+  "toast": {
+    "localAutoSaved": "変更はこの端末に自動保存されています。Google Drive に保存するにはログインしてください。",
+    "alreadySaved": "保存済みです",
+    "sessionExpired": "ログインの有効期限が切れました。再ログインしてください。",
+    "importSuccess": "マップをインポートしました",
+    "importFailed": "マップのインポートに失敗しました。ファイル形式が正しくありません。",
+    "exportPngFailed": "PNGのエクスポートに失敗しました"
   }
 }

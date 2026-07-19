@@ -20,7 +20,7 @@ import '@xyflow/react/dist/style.css';
 import { CustomNode, type CustomNodeType } from './CustomNode';
 import { CustomEdge, type CustomEdgeType } from './CustomEdge';
 import { ContextMenu } from './ContextMenu';
-import { useMapStore } from '../../stores/mapStore';
+import { useMapStore, loadDraft } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { isFirstVisit, markAsVisited, createDefaultMap } from '../../data/defaultMap';
 
@@ -51,10 +51,11 @@ export function MindMapCanvas() {
     currentMap,
     createNewMap,
     setCurrentMap,
-    updateNode,
+    setDirty,
     updateNodePositions,
     addNode,
     addEdge: storeAddEdge,
+    saveToHistory,
   } = useMapStore();
   const { selectedNodeId, selectedNodeIds, setSelectedNodeId, toggleNodeSelection, clearMultiSelection, setEditingNodeId, closeContextMenu } = useUIStore();
   const { screenToFlowPosition, fitView, getViewport } = useReactFlow();
@@ -91,17 +92,22 @@ export function MindMapCanvas() {
     [getViewport]
   );
 
-  // 初回マウント時にマップを作成（初回訪問時はデフォルトマップを表示）
+  // 初回マウント時にマップを復元・作成する。
+  // 優先順位: (1) localStorageに保存されたドラフトがあれば復元 → (2) 初回訪問時はデフォルトマップ → (3) 新規マップ
   useEffect(() => {
     if (!currentMap) {
-      if (isFirstVisit()) {
+      const draft = loadDraft();
+      if (draft) {
+        setCurrentMap(draft.map, draft.fileId);
+        setDirty(draft.isDirty);
+      } else if (isFirstVisit()) {
         setCurrentMap(createDefaultMap(t));
         markAsVisited();
       } else {
         createNewMap();
       }
     }
-  }, [currentMap, createNewMap, setCurrentMap, t]);
+  }, [currentMap, createNewMap, setCurrentMap, setDirty, t]);
 
   // ノードをReact Flow形式に変換
   const nodes: CustomNodeType[] = useMemo(() => {
@@ -403,9 +409,12 @@ export function MindMapCanvas() {
     longPressPositionRef.current = null;
   }, []);
 
-  // 複数ノードドラッグ開始
+  // ノードドラッグ開始
   const onNodeDragStart = useCallback(
     (_event: React.MouseEvent, node: Node) => {
+      // ドラッグ前のスナップショットを履歴に積む（ドラッグ全体で1 Undoステップにするため）
+      saveToHistory();
+
       // 選択されたノードを取得（単一選択 + 複数選択）
       const allSelectedIds = new Set<string>();
       if (selectedNodeId) allSelectedIds.add(selectedNodeId);
@@ -435,7 +444,7 @@ export function MindMapCanvas() {
         dragStartPositions.current.clear();
       }
     },
-    [selectedNodeId, selectedNodeIds, currentMap]
+    [selectedNodeId, selectedNodeIds, currentMap, saveToHistory]
   );
 
   // 複数ノードドラッグ中
@@ -480,9 +489,11 @@ export function MindMapCanvas() {
         isDraggingMultiple.current = false;
         dragStartPositions.current.clear();
       }
-      updateNode(node.id, { position: node.position });
+      // updateNodeは履歴を積んでしまうため、位置のみ更新するupdateNodePositionsを使う
+      // （履歴はonNodeDragStartで既に積んでいる）
+      updateNodePositions([{ id: node.id, position: node.position }]);
     },
-    [updateNode]
+    [updateNodePositions]
   );
 
   if (!currentMap) {
