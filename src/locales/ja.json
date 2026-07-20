@@ -70,9 +70,9 @@
     "opCreateConnectedNode": "接続済み新ノード作成",
     "opCreateConnectedNodeDesc": "ハンドルをドラッグして空白にドロップ",
     "opSelectEdge": "エッジ選択",
-    "opSelectEdgeDesc": "エッジをクリック（Deleteキーで削除。ノード選択とは排他）",
+    "opSelectEdgeDesc": "Shift+クリックで選択をトグル（ノード選択と混在可）。選択したものはDeleteキーでまとめて削除",
     "opEdgeLabel": "エッジラベル",
-    "opEdgeLabelDesc": "エッジの中央をクリック",
+    "opEdgeLabelDesc": "エッジ上のどこをクリックしてもラベル入力欄と削除用の×ボタンが開く",
     "opDeleteMenu": "削除メニュー",
     "opDeleteMenuDesc": "右クリック / 長押し",
     "formatIntro": "ノードを編集中は、キャンバス右上に書式パネルが常時表示されます。また、テキストを選択すると選択範囲のそばにも同じ操作ができる書式バーが表示されます。",
@@ -108,7 +108,8 @@
     "zoomIn": "拡大",
     "zoomOut": "縮小",
     "fitView": "全体表示",
-    "toggleLayoutDirection": "レイアウト方向切替"
+    "toggleLayoutDirection": "レイアウト方向切替",
+    "autoLayout": "整列"
   },
   "editor": {
     "newNode": "新しいノード",

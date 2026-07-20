@@ -1,79 +1,65 @@
 import { useCallback } from 'react';
 import { useMapStore } from '../stores/mapStore';
-import { useUIStore } from '../stores/uiStore';
 import { calculateLayout } from '../utils/layout';
 
 export function useAutoLayout() {
-  const { currentMap, updateNodePositions } = useMapStore();
-  const { selectedNodeId, selectedNodeIds } = useUIStore();
+  const { currentMap, updateNodePositions, saveToHistory } = useMapStore();
 
-  const applyLayout = useCallback(async () => {
-    if (!currentMap) return;
+  // nodeIdsを2件以上指定すると、そのノード群（および両端が指定ノードに含まれるエッジ）だけを
+  // ELKで整列し、非対象ノードは動かさない。整列結果は「元の選択ノード群の外接矩形の左上」に
+  // 合わせて平行移動するため、画面外へ飛んだり無関係な位置に移動したりしない（fitViewもしない）。
+  // nodeIdsを省略、または1件以下の場合は従来どおりマップ全体を整列する
+  const applyLayout = useCallback(
+    async (nodeIds?: string[]) => {
+      if (!currentMap) return;
 
-    // 選択されたノードIDを収集
-    const selectedIds = new Set<string>();
-    if (selectedNodeId) {
-      selectedIds.add(selectedNodeId);
-    }
-    selectedNodeIds.forEach((id) => selectedIds.add(id));
+      if (nodeIds && nodeIds.length >= 2) {
+        const targetIdSet = new Set(nodeIds);
+        const targetNodes = currentMap.nodes.filter((node) => targetIdSet.has(node.id));
+        if (targetNodes.length < 2) return;
 
-    // 選択されたノードが複数ある場合のみ、選択されたノードとその関連ノードだけをレイアウト
-    // 1つだけ選択されている場合や何も選択されていない場合は全ノードをレイアウト
-    if (selectedIds.size > 1) {
-      // 選択されたノードに関連するエッジを取得
-      const relatedEdges = currentMap.edges.filter(
-        (edge) => selectedIds.has(edge.source) || selectedIds.has(edge.target)
-      );
+        // 両端が対象ノードに含まれるエッジのみを使う（対象外ノードへつながるエッジを含めると
+        // ELKがそのノードの方向まで考慮してレイアウトを歪めてしまうため）
+        const targetEdges = currentMap.edges.filter(
+          (edge) => targetIdSet.has(edge.source) && targetIdSet.has(edge.target)
+        );
 
-      // 関連するノードIDを収集（選択されたノードと接続先のノード）
-      const relatedNodeIds = new Set<string>(selectedIds);
-      relatedEdges.forEach((edge) => {
-        relatedNodeIds.add(edge.source);
-        relatedNodeIds.add(edge.target);
-      });
+        // 元の対象ノード群の外接矩形の左上（ノードのposition＝左上座標のmin）
+        const originalMinX = Math.min(...targetNodes.map((n) => n.position.x));
+        const originalMinY = Math.min(...targetNodes.map((n) => n.position.y));
 
-      // 関連ノードだけを抽出
-      const relatedNodes = currentMap.nodes.filter((node) => relatedNodeIds.has(node.id));
+        const result = await calculateLayout(targetNodes, targetEdges, currentMap.layoutDirection);
+        if (result.nodes.length === 0) return;
 
-      // 選択されたノードの位置を基準にしてオフセットを計算
-      const firstSelectedNode = currentMap.nodes.find((n) => selectedIds.has(n.id));
-      const offsetX = firstSelectedNode?.position.x || 0;
-      const offsetY = firstSelectedNode?.position.y || 0;
+        // ELKレイアウト結果の外接矩形の左上
+        const layoutMinX = Math.min(...result.nodes.map((n) => n.position.x));
+        const layoutMinY = Math.min(...result.nodes.map((n) => n.position.y));
 
-      const result = await calculateLayout(
-        relatedNodes,
-        relatedEdges,
-        currentMap.layoutDirection
-      );
+        // レイアウト結果の外接矩形の左上が、元の外接矩形の左上と一致するように平行移動する
+        // （その場で整列させ、画面が飛ばないようにするため）
+        const offsetX = originalMinX - layoutMinX;
+        const offsetY = originalMinY - layoutMinY;
 
-      // レイアウト結果のオフセットを調整（選択されたノードの元の位置を基準に）
-      const layoutFirstNode = result.nodes.find((n) => selectedIds.has(n.id));
-      const layoutOffsetX = layoutFirstNode?.position.x || 0;
-      const layoutOffsetY = layoutFirstNode?.position.y || 0;
-
-      // 選択されたノードのみ位置を更新（接続先のノードは動かさない）
-      const updatedPositions = result.nodes
-        .filter((node) => selectedIds.has(node.id))
-        .map((node) => ({
+        const updatedPositions = result.nodes.map((node) => ({
           id: node.id,
           position: {
-            x: node.position.x - layoutOffsetX + offsetX,
-            y: node.position.y - layoutOffsetY + offsetY,
+            x: node.position.x + offsetX,
+            y: node.position.y + offsetY,
           },
         }));
 
-      updateNodePositions(updatedPositions);
-    } else {
-      // 全ノードをレイアウト
-      const result = await calculateLayout(
-        currentMap.nodes,
-        currentMap.edges,
-        currentMap.layoutDirection
-      );
+        saveToHistory();
+        updateNodePositions(updatedPositions);
+      } else {
+        // 全ノードをレイアウト
+        const result = await calculateLayout(currentMap.nodes, currentMap.edges, currentMap.layoutDirection);
 
-      updateNodePositions(result.nodes);
-    }
-  }, [currentMap, updateNodePositions, selectedNodeId, selectedNodeIds]);
+        saveToHistory();
+        updateNodePositions(result.nodes);
+      }
+    },
+    [currentMap, updateNodePositions, saveToHistory]
+  );
 
   return { applyLayout };
 }

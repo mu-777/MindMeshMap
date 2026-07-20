@@ -13,8 +13,8 @@ import { LayoutDirection } from '../types';
 
 export function useKeyboardShortcuts() {
   const { fitView, zoomIn, zoomOut } = useReactFlow();
-  const { currentMap, deleteNode, deleteNodes, deleteEdge, undo, redo, setLayoutDirection } = useMapStore();
-  const { setSelectedNodeId, setSelectedEdgeId, setEditingNodeId, setPendingEditClear, setHelpModalOpen, clearMultiSelection } = useUIStore();
+  const { currentMap, deleteNodesAndEdges, undo, redo, setLayoutDirection } = useMapStore();
+  const { setSelectedNodeId, setEditingNodeId, setPendingEditClear, setHelpModalOpen, clearMultiSelection, clearEdgeSelection } = useUIStore();
   const { getActionForKey } = useKeybindStore();
   const { isOpen: isConfirmDialogOpen } = useConfirmStore();
   const { applyLayout } = useAutoLayout();
@@ -30,7 +30,7 @@ export function useKeyboardShortcuts() {
       const {
         selectedNodeId,
         selectedNodeIds,
-        selectedEdgeId,
+        selectedEdgeIds,
         lastSelectedNodeId,
         editingNodeId,
         isHelpModalOpen,
@@ -123,23 +123,20 @@ export function useKeyboardShortcuts() {
         }
 
         case 'deleteNode': {
-          // 複数ノード選択時は複数削除
-          if (selectedNodeIds.length > 0) {
-            deleteNodes(selectedNodeIds);
-            clearMultiSelection();
-            setSelectedNodeId(null);
-          } else if (selectedEdgeId) {
-            // ノードが未選択でエッジが選択されている場合はエッジを削除する。
-            // selectedNodeIdとselectedEdgeIdはuiStoreで排他管理されているため、
-            // ここに到達する時点でselectedNodeIdは必ずnull（＝ノード未選択）。
-            // activeNodeId（未選択時にlastSelectedNodeIdへフォールバックする値）による
-            // ノード削除より、明示的に選択されたエッジの削除を優先する
-            deleteEdge(selectedEdgeId);
-            setSelectedEdgeId(null);
-          } else if (activeNodeId) {
-            deleteNode(activeNodeId);
-            setSelectedNodeId(null);
+          // 選択中のノード（selectedNodeIds、なければselectedNodeId単体）と
+          // 選択中のエッジ（selectedEdgeIds）をまとめて削除する。
+          // lastSelectedNodeIdへのフォールバック（activeNodeId）はここでは使わない
+          // （キャンバス空白クリック等で明示的に選択解除された後の「直近選択ノード」を
+          // Deleteキーで誤って削除してしまわないようにするため）
+          const nodeIdsToDelete = selectedNodeIds.length > 0 ? selectedNodeIds : selectedNodeId ? [selectedNodeId] : [];
+          const edgeIdsToDelete = selectedEdgeIds;
+          if (nodeIdsToDelete.length === 0 && edgeIdsToDelete.length === 0) {
+            break;
           }
+          deleteNodesAndEdges(nodeIdsToDelete, edgeIdsToDelete);
+          setSelectedNodeId(null);
+          clearMultiSelection();
+          clearEdgeSelection();
           break;
         }
 
@@ -272,6 +269,14 @@ export function useKeyboardShortcuts() {
           }
           break;
         }
+
+        case 'autoLayout': {
+          // 2ノード以上選択中なら選択ノードだけを整列し、それ以外はマップ全体を整列する。
+          // selectedNodeIdsはこのコールバックの先頭でuseUIStore.getState()から取得した最新値
+          // （このファイル冒頭のコメント参照。stale closure対策）
+          applyLayout(selectedNodeIds.length >= 2 ? selectedNodeIds : undefined);
+          break;
+        }
       }
     },
     [
@@ -280,19 +285,17 @@ export function useKeyboardShortcuts() {
       getActionForKey,
       createChildNode,
       createSiblingNode,
-      deleteNode,
-      deleteNodes,
-      deleteEdge,
+      deleteNodesAndEdges,
       undo,
       redo,
       save,
       setLayoutDirection,
       setSelectedNodeId,
-      setSelectedEdgeId,
       setEditingNodeId,
       setPendingEditClear,
       setHelpModalOpen,
       clearMultiSelection,
+      clearEdgeSelection,
       fitView,
       zoomIn,
       zoomOut,

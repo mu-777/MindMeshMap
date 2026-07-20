@@ -1,9 +1,10 @@
 // 右クリックのコンテキストメニューからのノード/エッジ削除を検証する。
-// エッジ側は、削除時にuiStoreのselectedEdgeIdをクリアする修正の退行テストを兼ねる:
-// 修正前はContextMenuの削除ハンドラがselectedEdgeId/selectedNodeIdをクリアしないままだったため、
+// エッジ側は、削除時にuiStoreのselectedEdgeIds（複数選択。旧selectedEdgeIdから移行済み。
+// docs/decisions.md参照）をクリアする修正の退行テストを兼ねる:
+// 修正前はContextMenuの削除ハンドラがselectedEdgeIds/selectedNodeIdをクリアしないままだったため、
 // 削除直後に何もない場所でDeleteキーを押すと「既に存在しないエッジID」に対して
-// deleteEdge()が呼ばれ、視覚的には何も起きないのにUndo履歴だけが1件余分に積まれていた
-// （selectedEdgeIdにはlastSelectedNodeId相当のフォールバックが無く、選択解除しない限り
+// deleteNodesAndEdges()が呼ばれ、視覚的には何も起きないのにUndo履歴だけが1件余分に積まれていた
+// （selectedEdgeIdsにはlastSelectedNodeId相当のフォールバックが無く、選択解除しない限り
 // 直接そのIDを握り続けるため、この経路だけ確実に症状が再現する）。
 //
 // 検証方法についての注記: 「1回のCtrl+Zで元に戻るか」で判定しようとすると、
@@ -72,16 +73,22 @@ async function testEdgeDeleteViaContextMenuClearsSelection() {
     const edgeCountBefore = await page.locator('.react-flow__edge').count();
     const point = await getEdgePoint(page, 0, 0.25);
 
-    // バグ再現の前提条件として、先に左クリックでエッジをselectedEdgeIdに選択させておく
-    // （未選択のまま右クリック削除しても、selectedEdgeIdはそもそもnullのままなので
+    // バグ再現の前提条件として、先にShift+クリックでエッジをselectedEdgeIdsに選択させておく
+    // （新仕様ではShiftなしクリックはラベル編集モードを開くだけで選択状態にはならないため。
+    // 未選択のまま右クリック削除しても、selectedEdgeIdsはそもそも空のままなので
     // クリア漏れの有無に差が出ない＝退行テストとして意味をなさない）
+    await page.keyboard.down('Shift');
     await page.mouse.click(point.x, point.y);
+    await page.keyboard.up('Shift');
     await page.waitForTimeout(150);
     // 右クリックは座標クリックではなくdispatchEventで直接エッジのDOM要素に発火させる。
     // デフォルトマップはノード付近で複数のエッジが密集しており、選択後に現れる
     // "+Label ×" オーバーレイや隣接エッジの当たり判定と座標が重なって、
-    // 意図しない別要素に右クリックが奪われることがあったため（座標依存の脆さを回避する）
-    const edgeInteractivePath = page.locator(`.react-flow__edge[data-id="${point.edgeId}"] path`).first();
+    // 意図しない別要素に右クリックが奪われることがあったため（座標依存の脆さを回避する）。
+    // .edge-click-target はCustomEdge.tsx側の自前インタラクションパス専用のクラス
+    // （BaseEdgeの可視パスと区別するため。両方ともpath要素なので単純な`path`セレクタでは
+    // DOM順序に依存してしまい脆い）
+    const edgeInteractivePath = page.locator(`.react-flow__edge[data-id="${point.edgeId}"] path.edge-click-target`);
     await edgeInteractivePath.dispatchEvent('contextmenu', { clientX: point.x, clientY: point.y, button: 2 });
     await page.waitForTimeout(200);
     await openContextMenuAndDelete(page);

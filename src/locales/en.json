@@ -70,9 +70,9 @@
     "opCreateConnectedNode": "Create Connected Node",
     "opCreateConnectedNodeDesc": "Drag a handle and drop on empty canvas",
     "opSelectEdge": "Select Edge",
-    "opSelectEdgeDesc": "Click an edge — press Delete to remove (exclusive with node selection)",
+    "opSelectEdgeDesc": "Shift+Click to select (toggle) — mixes with node selection; press Delete to remove everything selected",
     "opEdgeLabel": "Edge Label",
-    "opEdgeLabelDesc": "Click the middle of an edge",
+    "opEdgeLabelDesc": "Click anywhere on an edge — opens the label input with a × button to delete it",
     "opDeleteMenu": "Delete Menu",
     "opDeleteMenuDesc": "Right-click / Long-press",
     "formatIntro": "While editing a node, a formatting panel stays visible in the top-right corner of the canvas. Selecting text also shows a floating formatting toolbar next to the selection with the same options.",
@@ -108,7 +108,8 @@
     "zoomIn": "Zoom In",
     "zoomOut": "Zoom Out",
     "fitView": "Fit View",
-    "toggleLayoutDirection": "Toggle Layout Direction"
+    "toggleLayoutDirection": "Toggle Layout Direction",
+    "autoLayout": "Align"
   },
   "editor": {
     "newNode": "New node",

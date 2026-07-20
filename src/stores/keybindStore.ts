@@ -24,6 +24,19 @@ export const normalizeKey = (
   return parts.join('+');
 };
 
+// 照合用の正規形。実ブラウザでは Shift+文字 の event.key が大文字（'Z'）になる一方、
+// 保存済みバインドは 'Ctrl+Shift+z' のように小文字の場合がある（過去のデフォルト値や
+// localStorage に永続化済みのユーザー設定）。1文字キーのみ小文字に揃えて比較することで、
+// 表記の大文字小文字によらず一致させる。ArrowUp / Tab / F2 等の複数文字キーはそのまま
+const canonicalizeKeybind = (binding: string): string => {
+  const parts = binding.split('+');
+  const last = parts[parts.length - 1];
+  if (last.length === 1) {
+    parts[parts.length - 1] = last.toLowerCase();
+  }
+  return parts.join('+');
+};
+
 export const useKeybindStore = create<KeybindState>()(
   persist(
     (set, get) => ({
@@ -43,11 +56,11 @@ export const useKeybindStore = create<KeybindState>()(
       },
 
       getActionForKey: (key, modifiers) => {
-        const normalizedKey = normalizeKey(key, modifiers);
+        const normalizedKey = canonicalizeKeybind(normalizeKey(key, modifiers));
         const { keybinds } = get();
 
         for (const [action, boundKey] of Object.entries(keybinds)) {
-          if (boundKey === normalizedKey) {
+          if (canonicalizeKeybind(boundKey) === normalizedKey) {
             return action as KeybindAction;
           }
         }

@@ -70,9 +70,9 @@
     "opCreateConnectedNode": "创建已连接的新节点",
     "opCreateConnectedNodeDesc": "拖动连接点并放开在空白处",
     "opSelectEdge": "选择连线",
-    "opSelectEdgeDesc": "点击连线（按Delete键删除；与节点选择互斥）",
+    "opSelectEdgeDesc": "Shift+点击可切换选择（可与节点选择混合）。按Delete键可批量删除所选内容",
     "opEdgeLabel": "连线标签",
-    "opEdgeLabelDesc": "点击连线中间",
+    "opEdgeLabelDesc": "点击连线上的任意位置，会打开标签输入框和用于删除的×按钮",
     "opDeleteMenu": "删除菜单",
     "opDeleteMenuDesc": "右键点击 / 长按",
     "formatIntro": "编辑节点时，画布右上角会常驻显示格式面板。选中文本时，选区旁还会显示提供相同操作的浮动格式工具栏。",
@@ -108,7 +108,8 @@
     "zoomIn": "放大",
     "zoomOut": "缩小",
     "fitView": "适应视图",
-    "toggleLayoutDirection": "切换布局方向"
+    "toggleLayoutDirection": "切换布局方向",
+    "autoLayout": "对齐"
   },
   "editor": {
     "newNode": "新节点",

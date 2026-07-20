@@ -143,7 +143,11 @@ export function Toolbar() {
   );
 
   const handleAutoLayout = useCallback(() => {
-    applyLayout();
+    // クリック時点の最新の選択状態を取得する（キーバインド側のuseKeyboardShortcutsと
+    // 挙動を揃えるため、stale closureを避けてgetState()で読む）。
+    // 2ノード以上選択中なら選択ノードだけを整列し、それ以外はマップ全体を整列する
+    const { selectedNodeIds } = useUIStore.getState();
+    applyLayout(selectedNodeIds.length >= 2 ? selectedNodeIds : undefined);
   }, [applyLayout]);
 
   // JSONエクスポート

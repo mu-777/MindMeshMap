@@ -56,7 +56,8 @@ export type KeybindAction =
   | 'zoomIn'
   | 'zoomOut'
   | 'fitView'
-  | 'toggleLayoutDirection';
+  | 'toggleLayoutDirection'
+  | 'autoLayout';
 
 export type KeybindMap = Record<KeybindAction, string>;
 

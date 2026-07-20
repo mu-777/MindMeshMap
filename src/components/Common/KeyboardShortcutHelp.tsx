@@ -75,7 +75,7 @@ const shortcutGroups: { titleKey: string; actions: KeybindAction[] }[] = [
   },
   {
     titleKey: 'shortcuts.view',
-    actions: ['zoomIn', 'zoomOut', 'fitView', 'toggleLayoutDirection'],
+    actions: ['zoomIn', 'zoomOut', 'fitView', 'toggleLayoutDirection', 'autoLayout'],
   },
 ];
 

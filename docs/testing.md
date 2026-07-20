@@ -51,7 +51,9 @@ MindMeshMapのE2Eテストは、素の[playwright](https://playwright.dev/)（`@
 | `arrow-navigation.mjs` | 矢印キーでのノード間移動、disableKeyboardA11y | armedノードから矢印キーで隣接ノードへフォーカス移動、移動前後で全ノード位置(transform)が不変（React Flow標準の矢印キー移動と二重に効かないこと） | 自動 |
 | `text-undo-redo.mjs` | アプリレベルUndo/Redo、1編集セッション=1ステップ | armed中のDelete/Ctrl+Zがノード削除のアプリレベルUndoとして働く（ProseMirrorのテキスト内Undoに奪われない）、テキスト編集のUndo/Redo往復。複数アクション後のUndo/Redoは「繰り返せば収束する」ことのみ確認（既知の制限あり、下記tuning.md参照） | 自動 |
 | `format-toolbar-bubblemenu.mjs` | 書式パネル(FormatToolbar)とBubbleMenuの表示切替 | 編集中のみFormatToolbarが表示・終了で消える、テキスト選択中はBubbleMenuが表示され太字ボタンで装飾できる、複数ノードで編集セッションを繰り返してもクラッシュしない（過去のremoveChild例外の回帰確認） | 自動 |
-| `edge-selection-delete.mjs` | エッジ選択・Delete削除・ノードとの排他選択 | エッジクリックで選択状態、Deleteキーで削除、ノード選択⇄エッジ選択が相互に排他であること | 自動 |
+| `edge-label-delete.mjs` | エッジのクリック=ラベル編集+✕削除ボタンの一体化 | エッジのどこをクリックしても（パスの端・中央/ラベルチップ位置いずれも）ラベル編集inputと✕削除ボタンが一体で表示されること（✕なしのinputだけになるケースが無いこと）、✕クリックでエッジのみ削除されノードは残ること、ラベル入力→Enterで確定・表示されること | 自動 |
+| `multi-select-delete.mjs` | Shift+クリックによるノード・エッジ混在の複数選択とDelete一括削除 | ノード2個・エッジ1個をShift+クリックで混在選択できること（選択ハイライト、ノード選択とエッジ選択が互いを消さないこと）、Deleteで選択した要素だけがまとめて削除され非選択ノードは残ること、Ctrl+Z 1回で全部復元されること（＝`deleteNodesAndEdges`が履歴を1エントリしか積んでいないことの検証） | 自動 |
+| `align-keybind.mjs` | 整列のキーバインド化（`Ctrl+Shift+L`）と選択ノードのみの部分整列 | ノード2個をドラッグでバラバラの位置に動かしてShift+クリックで選択、`Ctrl+Shift+L`で選択2ノードだけ位置が変わり非選択ノードは全て不変であること、Ctrl+Z 1回で選択2ノードの位置がドラッグ後の位置に戻ること（＝`applyLayout`が履歴を1エントリしか積んでいないことの検証）、選択なし状態での`Ctrl+Shift+L`はマップ全体を整列すること | 自動 |
 | `context-menu-delete.mjs` | 右クリックメニューでの削除、選択クリア漏れ回帰 | 右クリック→メニューからノード/エッジ削除、削除対象が選択中だった場合にuiStoreの選択がクリアされること（Undoボタンが無効になるまでの押下回数で検証） | 自動 |
 | `menu-outside-click.mjs` | コンテキストメニュー/ファイルメニューの外側クリッククローズ | 右クリックメニュー・ファイルメニューがキャンバス空白クリックで閉じること、メニュー自身のボタンクリックは引き続き機能すること（キャプチャフェーズ化の回帰確認） | 自動 |
 | `png-export.mjs` | PNGエクスポートの実寸・見切れ | 出力画像の実寸がuseExportPng.tsの計算式と一致すること、四辺（外周1px）が背景色のみでノードが見切れていないこと | 自動 |

@@ -25,6 +25,9 @@ interface MapState {
   updateNodeContent: (nodeId: string, content: string, recordHistory: boolean) => void;
   deleteNode: (nodeId: string) => void;
   deleteNodes: (nodeIds: string[]) => void;
+  // ノードと明示指定エッジを1回の履歴エントリでまとめて削除する（複数選択のDelete一括削除用）。
+  // ノードに接続するエッジは自動的に連鎖削除される（deleteNode/deleteNodesと同様）
+  deleteNodesAndEdges: (nodeIds: string[], edgeIds: string[]) => void;
   updateNodePositions: (positions: { id: string; position: { x: number; y: number } }[]) => void;
 
   // エッジ操作
@@ -238,6 +241,48 @@ export const useMapStore = create<MapState>((set, get) => ({
         nodes: currentMap.nodes.filter((node) => !deleteSet.has(node.id)),
         edges: currentMap.edges.filter(
           (edge) => !deleteSet.has(edge.source) && !deleteSet.has(edge.target)
+        ),
+        updatedAt: new Date().toISOString(),
+      },
+      isDirty: true,
+    });
+  },
+
+  // ノード・エッジの複数選択混在Deleteの一括削除用。saveToHistory()を1回だけ呼ぶことで、
+  // 「Ctrl+Z 1回で選択していたノード・エッジが全部戻る」を実現する
+  // （ノードごとdeleteNodesを、エッジごとdeleteEdgeを個別に呼ぶと履歴が複数積まれてしまうため）
+  deleteNodesAndEdges: (nodeIds, edgeIds) => {
+    const { currentMap, saveToHistory } = get();
+    if (!currentMap || (nodeIds.length === 0 && edgeIds.length === 0)) return;
+
+    // ルートノードは削除しない（deleteNodesと同じ保護ロジック）
+    const nodesToDelete = nodeIds.filter((nodeId) => {
+      const incomingEdges = currentMap.edges.filter((e) => e.target === nodeId);
+      const isRoot = incomingEdges.length === 0;
+      // ルートノードで、かつ削除後にノードが残らない場合は削除しない
+      if (isRoot && currentMap.nodes.length - nodeIds.length < 1) {
+        return false;
+      }
+      return true;
+    });
+
+    const nodeDeleteSet = new Set(nodesToDelete);
+    const edgeDeleteSet = new Set(edgeIds);
+
+    if (nodeDeleteSet.size === 0 && edgeDeleteSet.size === 0) return;
+
+    saveToHistory();
+
+    // ノード・そのノードに接続するエッジ・明示指定されたエッジを1回のsetで削除する
+    set({
+      currentMap: {
+        ...currentMap,
+        nodes: currentMap.nodes.filter((node) => !nodeDeleteSet.has(node.id)),
+        edges: currentMap.edges.filter(
+          (edge) =>
+            !nodeDeleteSet.has(edge.source) &&
+            !nodeDeleteSet.has(edge.target) &&
+            !edgeDeleteSet.has(edge.id)
         ),
         updatedAt: new Date().toISOString(),
       },

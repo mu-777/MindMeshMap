@@ -5,7 +5,7 @@ import { useMapStore } from '../../stores/mapStore';
 
 export function ContextMenu() {
   const { t } = useTranslation();
-  const { contextMenu, closeContextMenu, selectedNodeId, selectedEdgeId, setSelectedNodeId, setSelectedEdgeId } = useUIStore();
+  const { contextMenu, closeContextMenu, selectedNodeId, selectedNodeIds, selectedEdgeIds, setSelectedNodeId, toggleNodeSelection, toggleEdgeSelection } = useUIStore();
   const { deleteNode, deleteEdge } = useMapStore();
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -33,8 +33,8 @@ export function ContextMenu() {
   }, [contextMenu, closeContextMenu]);
 
   // 削除処理
-  // 削除対象がuiStore側の選択状態（selectedNodeId/selectedEdgeId）と一致する場合は
-  // 選択も一緒にクリアする。クリアしないと、次にDeleteキーを押したときに
+  // 削除対象がuiStore側の選択状態（selectedNodeId/selectedNodeIds/selectedEdgeIds）と
+  // 一致する場合は選択も一緒にクリアする。クリアしないと、次にDeleteキーを押したときに
   // 既に存在しないノード/エッジのIDが選択されたままになり、何も起きない
   // （無音のno-op）不具合になる
   const handleDelete = useCallback(() => {
@@ -44,15 +44,31 @@ export function ContextMenu() {
         if (selectedNodeId === contextMenu.id) {
           setSelectedNodeId(null);
         }
+        if (selectedNodeIds.includes(contextMenu.id)) {
+          // toggleNodeSelectionは選択済みIDを渡すと選択解除になる
+          toggleNodeSelection(contextMenu.id);
+        }
       } else {
         deleteEdge(contextMenu.id);
-        if (selectedEdgeId === contextMenu.id) {
-          setSelectedEdgeId(null);
+        if (selectedEdgeIds.includes(contextMenu.id)) {
+          // toggleEdgeSelectionは選択済みIDを渡すと選択解除になる
+          toggleEdgeSelection(contextMenu.id);
         }
       }
       closeContextMenu();
     }
-  }, [contextMenu, deleteNode, deleteEdge, closeContextMenu, selectedNodeId, selectedEdgeId, setSelectedNodeId, setSelectedEdgeId]);
+  }, [
+    contextMenu,
+    deleteNode,
+    deleteEdge,
+    closeContextMenu,
+    selectedNodeId,
+    selectedNodeIds,
+    selectedEdgeIds,
+    setSelectedNodeId,
+    toggleNodeSelection,
+    toggleEdgeSelection,
+  ]);
 
   if (!contextMenu) return null;
 

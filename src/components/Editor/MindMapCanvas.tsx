@@ -13,7 +13,6 @@ import {
   type NodeChange,
   type EdgeChange,
   type Node,
-  type Edge,
   type OnConnectEnd,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -59,7 +58,7 @@ export function MindMapCanvas() {
     addEdge: storeAddEdge,
     saveToHistory,
   } = useMapStore();
-  const { selectedNodeId, selectedNodeIds, selectedEdgeId, setSelectedNodeId, setSelectedEdgeId, toggleNodeSelection, clearMultiSelection, setEditingNodeId, closeContextMenu } = useUIStore();
+  const { selectedNodeId, selectedNodeIds, selectedEdgeIds, setSelectedNodeId, toggleNodeSelection, clearMultiSelection, clearEdgeSelection, setEditingNodeId, closeContextMenu } = useUIStore();
   const { screenToFlowPosition, fitView, getViewport } = useReactFlow();
   const connectingInfo = useRef<{ nodeId: string | null; handleId: string | null }>({
     nodeId: null,
@@ -168,7 +167,7 @@ export function MindMapCanvas() {
     const nextCache = new Map<string, CustomEdgeType>();
 
     const result = currentMap.edges.map((edge) => {
-      const selected = edge.id === selectedEdgeId;
+      const selected = selectedEdgeIds.includes(edge.id);
       const prev = prevCache.get(edge.id);
       const unchanged =
         prev !== undefined &&
@@ -197,7 +196,7 @@ export function MindMapCanvas() {
 
     edgesCacheRef.current = nextCache;
     return result;
-  }, [currentMap, selectedEdgeId]);
+  }, [currentMap, selectedEdgeIds]);
 
   // ノード変更ハンドラ
   const onNodesChange = useCallback(
@@ -355,19 +354,11 @@ export function MindMapCanvas() {
   // キャンバスクリックで選択解除
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
-    setSelectedEdgeId(null);
     clearMultiSelection();
+    clearEdgeSelection();
     setEditingNodeId(null);
     closeContextMenu();
-  }, [setSelectedNodeId, setSelectedEdgeId, clearMultiSelection, setEditingNodeId, closeContextMenu]);
-
-  // エッジクリックで選択（Delete キーでの削除を可能にするため、選択状態をアプリ側で明示管理する）
-  const onEdgeClick = useCallback(
-    (_event: React.MouseEvent, edge: Edge) => {
-      setSelectedEdgeId(edge.id);
-    },
-    [setSelectedEdgeId]
-  );
+  }, [setSelectedNodeId, clearMultiSelection, clearEdgeSelection, setEditingNodeId, closeContextMenu]);
 
   // ダブルクリック/ダブルタップで新しいノードを作成
   const createNodeAtPosition = useCallback(
@@ -596,7 +587,6 @@ export function MindMapCanvas() {
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
       onNodeClick={onNodeClick}
-      onEdgeClick={onEdgeClick}
       onPaneClick={onPaneClick}
       onNodeDragStart={onNodeDragStart}
       onNodeDrag={onNodeDrag}
