@@ -240,6 +240,25 @@ export async function getEdgePointNotTouchingNode(page, excludeNodeId, fraction 
 }
 
 /**
+ * CDPで日本語IME入力を模擬する（keydown keyCode=229 → composition逐次 → 確定 insertText）。
+ * 実IMEのcomposition中断挙動まではCDPでは完全再現できないが、「打鍵の前に
+ * contenteditableへフォーカスが当たっているか（=IMEが1文字目からcomposition開始できる前提条件）」
+ * は忠実に再現・検証できる。マウス作成ノードでフォーカスがbodyへ抜ける不具合の回帰検出に使う。
+ * 詳細は docs/decisions.md §13 / docs/testing.md 参照。
+ */
+export async function typeJapaneseIME(page, romaji, kanji) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 229, key: 'Process' });
+  for (let i = 1; i <= romaji.length; i++) {
+    await cdp.send('Input.imeSetComposition', { text: romaji.slice(0, i), selectionStart: i, selectionEnd: i });
+  }
+  await cdp.send('Input.imeSetComposition', { text: kanji, selectionStart: kanji.length, selectionEnd: kanji.length });
+  await cdp.send('Input.insertText', { text: kanji });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: 229, key: 'Process' });
+  await cdp.detach();
+}
+
+/**
  * name/run を受け取り、`node e2e/<file>.mjs` として直接実行された場合にのみテストを実行する。
  * 各テストファイルの末尾で
  *   if (import.meta.url === `file://${process.argv[1]}`) await runStandalone(name, run);

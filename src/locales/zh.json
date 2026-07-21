@@ -112,7 +112,6 @@
     "autoLayout": "对齐"
   },
   "editor": {
-    "newNode": "新节点",
     "placeholder": "输入文本...",
     "addLabel": "+ 标签",
     "deleteEdge": "删除连线",

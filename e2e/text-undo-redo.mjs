@@ -112,12 +112,14 @@ async function testMultipleActionsUndoRedoConverge() {
   }
 }
 
-// テキスト編集（内容置換）のUndo/Redoを確認する
+// テキスト編集（armedからの追記入力）のUndo/Redoを確認する。
+// clearContent廃止によりarmedからのタイプは既存内容の末尾に追記される（docs/decisions.md §13）
 async function testTextEditUndoRedo() {
   const { browser, page, pageErrors } = await launchPage();
   try {
     const rootId = (await getNodeIds(page))[0];
     const originalText = await getNodeText(page, rootId);
+    const expectedEdited = (originalText + 'edited-text').trim();
 
     await page.locator(`.react-flow__node[data-id="${rootId}"]`).click();
     await page.waitForTimeout(150);
@@ -126,7 +128,7 @@ async function testTextEditUndoRedo() {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(150);
     const editedText = await getNodeText(page, rootId);
-    await assertEqual(page, editedText.trim(), 'edited-text', 'タイプ後、内容が置換されていること');
+    await assertEqual(page, editedText.trim(), expectedEdited, 'タイプ後、既存内容の末尾に追記されていること');
 
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(250);
@@ -136,7 +138,7 @@ async function testTextEditUndoRedo() {
     await page.keyboard.press('Control+Shift+z');
     await page.waitForTimeout(250);
     const redoneText = await getNodeText(page, rootId);
-    await assertEqual(page, redoneText.trim(), 'edited-text', 'Redoで編集後の内容が再適用されること');
+    await assertEqual(page, redoneText.trim(), expectedEdited, 'Redoで編集後の内容が再適用されること');
 
     await assertEqual(page, pageErrors.length, 0, 'ページ内未捕捉例外なし: ' + pageErrors.join(', '));
   } finally {

@@ -1,9 +1,12 @@
 import { useCallback } from 'react';
 import { useMapStore } from '../stores/mapStore';
-import { calculateLayout } from '../utils/layout';
+import { calculateLayoutForAlign } from '../utils/alignAlgorithm';
+import { useAlignAlgorithmDebug } from './useAlignAlgorithmDebug';
 
 export function useAutoLayout() {
   const { currentMap, updateNodePositions, saveToHistory } = useMapStore();
+  // dev限定の整列アルゴリズム切り替え（本番ビルドでは常に'uniform'。詳細はフック側参照）
+  const [alignAlgorithm] = useAlignAlgorithmDebug();
 
   // nodeIdsを2件以上指定すると、そのノード群（および両端が指定ノードに含まれるエッジ）だけを
   // ELKで整列し、非対象ノードは動かさない。整列結果は「元の選択ノード群の外接矩形の左上」に
@@ -28,7 +31,12 @@ export function useAutoLayout() {
         const originalMinX = Math.min(...targetNodes.map((n) => n.position.x));
         const originalMinY = Math.min(...targetNodes.map((n) => n.position.y));
 
-        const result = await calculateLayout(targetNodes, targetEdges, currentMap.layoutDirection);
+        const result = await calculateLayoutForAlign(
+          targetNodes,
+          targetEdges,
+          currentMap.layoutDirection,
+          alignAlgorithm
+        );
         if (result.nodes.length === 0) return;
 
         // ELKレイアウト結果の外接矩形の左上
@@ -52,13 +60,18 @@ export function useAutoLayout() {
         updateNodePositions(updatedPositions);
       } else {
         // 全ノードをレイアウト
-        const result = await calculateLayout(currentMap.nodes, currentMap.edges, currentMap.layoutDirection);
+        const result = await calculateLayoutForAlign(
+          currentMap.nodes,
+          currentMap.edges,
+          currentMap.layoutDirection,
+          alignAlgorithm
+        );
 
         saveToHistory();
         updateNodePositions(result.nodes);
       }
     },
-    [currentMap, updateNodePositions, saveToHistory]
+    [currentMap, updateNodePositions, saveToHistory, alignAlgorithm]
   );
 
   return { applyLayout };

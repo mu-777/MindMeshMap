@@ -12,6 +12,9 @@ export interface MindMap {
 // レイアウト方向
 export type LayoutDirection = 'DOWN' | 'RIGHT';
 
+// 整列アルゴリズム（dev限定の切り替え。docs/align-branch-layout.md参照）
+export type AlignAlgorithm = 'uniform' | 'branch' | 'flat-axis' | 'sugiyama-ext';
+
 // ノード
 export interface MapNode {
   id: string;

@@ -24,6 +24,7 @@ import { FormatToolbar } from './FormatToolbar';
 import { useMapStore, loadDraft } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { isFirstVisit, markAsVisited, createDefaultMap } from '../../data/defaultMap';
+import { EMPTY_NODE_CONTENT } from '../../utils/nodeContent';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -64,6 +65,11 @@ export function MindMapCanvas() {
     nodeId: null,
     handleId: null,
   });
+  // ハンドルからエッジを引き伸ばして空白にドロップし新規ノードを作った直後は、その pointerup が
+  // paneのclickとして扱われ onPaneClick が発火して選択・編集を解除してしまうことがある
+  // （新ノードが「どこにも選択されていない」状態になり、IME入力どころかフォーカスも当たらない）。
+  // onConnectEndで新ノードを作ったら短時間このフラグを立て、直後の onPaneClick を1回無視する
+  const justConnectedRef = useRef<boolean>(false);
 
   // 複数ノードドラッグ用
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
@@ -308,13 +314,10 @@ export function MindMapCanvas() {
         const sourceHandle = handleId || (direction === 'RIGHT' ? 'right' : 'bottom');
         const targetHandle = direction === 'RIGHT' ? 'left' : 'top';
 
-        // 新しいノードを作成
+        // 新しいノードを作成（空ノード。理由は utils/nodeContent.ts 参照）
         const newNodeId = addNode(
           {
-            content: JSON.stringify({
-              type: 'doc',
-              content: [{ type: 'paragraph', content: [{ type: 'text', text: t('editor.newNode') }] }],
-            }),
+            content: EMPTY_NODE_CONTENT,
             position,
           },
           nodeId,
@@ -323,6 +326,11 @@ export function MindMapCanvas() {
         );
 
         if (newNodeId) {
+          // 直後に発火しうる onPaneClick による選択解除を防ぐ（300ms内の最初の1回を無視）
+          justConnectedRef.current = true;
+          setTimeout(() => {
+            justConnectedRef.current = false;
+          }, 300);
           setSelectedNodeId(newNodeId);
           setEditingNodeId(newNodeId);
           // ノードがビューポート外の場合は全体表示
@@ -334,7 +342,7 @@ export function MindMapCanvas() {
 
       connectingInfo.current = { nodeId: null, handleId: null };
     },
-    [screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, currentMap, isNodeInViewport, fitView, t]
+    [screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, currentMap, isNodeInViewport, fitView]
   );
 
   // ノードクリック（Shift+クリックで複数選択）
@@ -353,6 +361,12 @@ export function MindMapCanvas() {
 
   // キャンバスクリックで選択解除
   const onPaneClick = useCallback(() => {
+    // ハンドルドラッグでの新規ノード作成直後のonPaneClickは、作ったばかりのノードの
+    // 選択・編集を解除してしまうので1回だけ無視する（詳細はjustConnectedRefのコメント参照）
+    if (justConnectedRef.current) {
+      justConnectedRef.current = false;
+      return;
+    }
     setSelectedNodeId(null);
     clearMultiSelection();
     clearEdgeSelection();
@@ -376,13 +390,10 @@ export function MindMapCanvas() {
         y: clientY,
       });
 
-      // エッジに接続されていない独立したノードを作成
+      // エッジに接続されていない独立したノードを作成（空ノード。理由は utils/nodeContent.ts 参照）
       const newNodeId = addNode(
         {
-          content: JSON.stringify({
-            type: 'doc',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: t('editor.newNode') }] }],
-          }),
+          content: EMPTY_NODE_CONTENT,
           position,
         },
         undefined, // 親ノードなし
@@ -395,7 +406,7 @@ export function MindMapCanvas() {
         setEditingNodeId(newNodeId);
       }
     },
-    [currentMap, screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, t]
+    [currentMap, screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId]
   );
 
   // ペインのダブルクリックハンドラ（デスクトップ用）

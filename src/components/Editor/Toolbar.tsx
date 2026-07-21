@@ -7,10 +7,11 @@ import { useAuthStore } from '../../stores/authStore';
 import { useConfirmStore } from '../../stores/confirmStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useAutoLayout } from '../../hooks/useAutoLayout';
+import { useAlignAlgorithmDebug } from '../../hooks/useAlignAlgorithmDebug';
 import { useSaveMap } from '../../hooks/useSaveMap';
 import { useExportPng } from '../../hooks/useExportPng';
 import { exportMapAsJson, parseImportedMap } from '../../utils/exportImport';
-import { LayoutDirection } from '../../types';
+import { LayoutDirection, AlignAlgorithm } from '../../types';
 import { LanguageSwitcher } from '../Common/LanguageSwitcher';
 
 // メニュー外クリックで閉じるためのカスタムフック
@@ -59,6 +60,8 @@ export function Toolbar() {
   const { addToast } = useToastStore();
   const { save, isLoading } = useSaveMap();
   const { applyLayout } = useAutoLayout();
+  // dev限定：整列アルゴリズムの切り替え（本番ビルドでは常に'uniform'。docs/align-branch-layout.md参照）
+  const [alignAlgorithm, setAlignAlgorithm] = useAlignAlgorithmDebug();
   const { exportPng } = useExportPng();
   const { fitView } = useReactFlow();
 
@@ -420,6 +423,22 @@ export function Toolbar() {
           <option value="DOWN">↓ {t('toolbar.layoutDown')}</option>
           <option value="RIGHT">→ {t('toolbar.layoutRight')}</option>
         </select>
+
+        {/* dev限定：整列アルゴリズム切り替え。本番ビルドでは表示しない
+            （import.meta.env.DEVで出し分け。ユーザー向けUIと開発用機能を混ぜない方針） */}
+        {import.meta.env.DEV && (
+          <select
+            value={alignAlgorithm}
+            onChange={(e) => setAlignAlgorithm(e.target.value as AlignAlgorithm)}
+            className="rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-gray-300 focus:border-blue-500 focus:outline-none"
+            title="Align algorithm (dev only)"
+          >
+            <option value="uniform">uniform</option>
+            <option value="branch">branch</option>
+            <option value="flat-axis">flat-axis</option>
+            <option value="sugiyama-ext">sugiyama-ext</option>
+          </select>
+        )}
 
         <button
           onClick={handleAutoLayout}

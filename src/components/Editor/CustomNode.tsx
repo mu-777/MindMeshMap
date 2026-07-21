@@ -17,6 +17,13 @@ const BUBBLE_MENU_PLUGIN_KEY = 'bubbleMenu';
 
 const LONG_PRESS_DURATION = 500; // 長押し判定時間（ミリ秒）
 
+// 新規ノード作成直後、フォーカスを監視して奪われたら取り戻し続けるフレーム数。
+// ハンドルからエッジを引き伸ばして新規ノードを作る経路（onConnectEnd）では、d3-dragの
+// pointerup後の後始末が非同期でフォーカスをキャンバス側へ奪うことがあり、「一度focusして終わり」
+// だと最初の打鍵時にフォーカスが抜けていて1文字目が英数字になる。約20フレーム(≒320ms)監視して
+// 奪われた分を取り戻すことで、実際に打鍵が来る頃にはフォーカスが安定している。詳細はdocs/decisions.md §13
+const FOCUS_GUARD_FRAMES = 20;
+
 export type CustomNodeData = {
   content: string;
 };
@@ -26,7 +33,7 @@ export type CustomNodeType = Node<CustomNodeData, 'custom'>;
 function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) {
   const { t } = useTranslation();
   const { updateNodeContent } = useMapStore();
-  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu, pendingEditClear, setPendingEditClear } = useUIStore();
+  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu } = useUIStore();
   const setActiveEditor = useEditorStore((state) => state.setActiveEditor);
   const { createChildNode, createSiblingNode } = useNodeCreation();
   const isEditing = editingNodeId === id;
@@ -95,11 +102,10 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
         // 編集中は何もしない（IME変換確定のEnter等を編集終了として扱わないため）
         if (event.isComposing || event.keyCode === 229) {
           if (isArmedNow) {
+            // 既にこのエディタにフォーカスがある（armed-focus）ので、compositionはこの
+            // エディタ上で始まっている。編集モードへ遷移させるだけでよい（内容クリアはしない。
+            // 新規ノードは空なので不要。既存ノードは末尾に追記される）
             flushSync(() => {
-              // 実際のクリア処理はeditingNodeId反映後のuseLayoutEffectで行う
-              // （isFirstEditInSessionRefのリセットより先にクリアしてしまうと、
-              // 「1編集セッション=1 Undo」の記録が1つずれてしまうため）
-              setPendingEditClear(true);
               setEditingNodeId(id);
             });
           }
@@ -151,8 +157,9 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
           const isPrintableChar =
             event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
           if (isPrintableChar) {
+            // フォーカスは既にこのエディタにある（armed-focus）ので、編集モードへ遷移させるだけ。
+            // この打鍵自体はProseMirror/ブラウザのデフォルト処理でエディタに入力される
             flushSync(() => {
-              setPendingEditClear(true);
               setEditingNodeId(id);
             });
             return false;
@@ -198,52 +205,52 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
   // 移っておらず、1文字目の入力を取りこぼしてしまう
   useLayoutEffect(() => {
     if (!editor || editor.isDestroyed) return;
+    const dom = editor.view.dom as HTMLElement;
+
+    // DOMフォーカスを当て、作成直後の一定フレームだけ「奪われたら取り戻す」監視を続ける。
+    // 2種類の要因でノード新規作成直後にフォーカスが確立できない/奪われるため、両方に対応する:
+    //  (1) React Flowは新規追加ノードを寸法計測完了まで visibility:hidden で描画する。非表示要素は
+    //      フォーカスできないため、初回の同期focus()が失敗することがある（可視化後に取り戻す）。
+    //  (2) ハンドルからエッジを引き伸ばして作る経路（onConnectEnd）では、d3-dragのpointerup後の
+    //      後始末が非同期でフォーカスをキャンバス側へ奪う。一度focus()が成功しても直後に奪われるため、
+    //      「成功したら監視停止」だと最初の打鍵時にフォーカスが抜けている。
+    // どちらも症状は同じ「作成ノードにそのままIME入力すると1文字目が英数字になる」。
+    // 既にdomにフォーカスがある間はfocus()を呼ばない（no-op）ので、ユーザーの正常な操作は妨げない。
+    // 別ノード選択等でこのeffectが再実行されればcleanupで監視は止まる。詳細はdocs/decisions.md §13
+    const focusWithRetry = (): (() => void) => {
+      let frames = 0;
+      let rafId: number | null = null;
+      const ensureFocused = () => {
+        rafId = null;
+        if (editor.isDestroyed) return;
+        if (document.activeElement !== dom) {
+          dom.focus();
+        }
+        frames += 1;
+        if (frames < FOCUS_GUARD_FRAMES) {
+          rafId = requestAnimationFrame(ensureFocused);
+        }
+      };
+      dom.focus(); // まず同期的に一度当てる（可視かつ奪取が無ければこれで確定）
+      rafId = requestAnimationFrame(ensureFocused); // 以降、奪われた分を取り戻す
+      return () => {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+      };
+    };
 
     if (isEditing) {
       editor.setEditable(true);
-      // pendingEditClearが立っている場合、既存内容をクリアしてから編集開始する
-      // （文字の挿入自体はブラウザ/IMEのデフォルト処理に任せるため、ここではクリアのみ行う）。
-      // isFirstEditInSessionRefのリセット（上のeffect）は宣言順によりこれより先に実行済みなので、
-      // ここでのクリア操作は正しく「1編集セッション目の変更」として履歴に積まれる
-      if (pendingEditClear) {
-        editor.commands.clearContent();
-        setPendingEditClear(false);
-      }
-      // Tiptapのfocusコマンドは実際のDOMフォーカスをrequestAnimationFrame内で行うため
-      // （「For React we have to focus asynchronously」）、キーボード横取り編集開始の
-      // flushSync内では間に合わず、直後にブラウザが処理する1文字目の入力を取りこぼす。
-      // そのためDOMフォーカス自体はここで同期的に行い、focus('end')ではカーソル位置のみ委ねる
-      editor.view.dom.focus();
+      // Tiptapのfocusコマンド（focus('end')）は実際のDOMフォーカスをrequestAnimationFrame内で
+      // 行うため（「For React we have to focus asynchronously」）、直後の1文字目入力に間に合わない。
+      // DOMフォーカス自体はfocusWithRetryで同期的に確立し、focus('end')はカーソル位置のみ委ねる
       editor.commands.focus('end');
+      return focusWithRetry();
     } else if (armed) {
       // armed-focus方式: 選択中・非編集のノードのエディタに常時フォーカスを当てておく。
       // これにより次の打鍵が発生する「前」からフォーカスがcontenteditableにある状態になり、
       // IMEが1文字目から正しくcomposition開始できる
       editor.setEditable(true);
-      editor.view.dom.focus();
-
-      // React Flowは新規追加ノードを、ハンドル位置計算に必要な寸法計測が完了するまで
-      // visibility:hiddenで描画する（計測完了後にvisibleへ切り替える）。非表示要素は
-      // フォーカスできないため、Tab/Enterでのノード新規作成直後にarmedにする場合など、
-      // 上の同期focus()が効かないことがある。既存ノードをクリックしてarmedにする場合は
-      // 既に可視化済みなので即座に成功する（このリトライは無害・no-op）
-      if (document.activeElement !== editor.view.dom) {
-        let attempts = 0;
-        let rafId: number | null = null;
-        const retryFocus = () => {
-          rafId = null;
-          if (editor.isDestroyed || document.activeElement === editor.view.dom) return;
-          editor.view.dom.focus();
-          attempts += 1;
-          if (document.activeElement !== editor.view.dom && attempts < 20) {
-            rafId = requestAnimationFrame(retryFocus);
-          }
-        };
-        rafId = requestAnimationFrame(retryFocus);
-        return () => {
-          if (rafId !== null) cancelAnimationFrame(rafId);
-        };
-      }
+      return focusWithRetry();
     } else {
       // armedでも編集中でもない（未選択・他ノード選択・タッチ選択直後 等）。
       // editor.commands.blur()はTiptap内部でrequestAnimationFrame経由の非同期実行になる
@@ -252,11 +259,11 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
       // 呼んだ後になって、遅延実行されたblur()が発火してしまい、意図せずフォーカスが
       // documentへ抜けてしまう
       editor.setEditable(false);
-      if (document.activeElement === editor.view.dom) {
-        editor.view.dom.blur();
+      if (document.activeElement === dom) {
+        dom.blur();
       }
     }
-  }, [editor, isEditing, armed, pendingEditClear, setPendingEditClear]);
+  }, [editor, isEditing, armed]);
 
   // 外部（Undo/Redo等）からのcontent変更をエディタに反映する。
   // アプリ側のUndo/RedoはmapStoreのhistoryでdata.contentを戻すが、Tiptapエディタは

@@ -12,7 +12,7 @@ Try this: https://mu-777.github.io/MindMeshMap/
 
 - **循環グラフ対応**: A→B→C→A のような循環構造も表現可能
 - **リッチテキスト編集**: ノード内で太字・斜体・リストなどの書式設定
-- **自動レイアウト**: ELK.jsによる階層的な自動配置（循環があっても破綻しない）
+- **自動レイアウト**: ELK.jsによる階層的な自動配置（循環があっても破綻しない）。整列は現在の配置をなるべく保つ差分的な動作
 - **キーボード操作**: マウスを使わず素早く編集可能。キーバインドはヘルプモーダルからカスタマイズ可能
 - **ローカル自動保存**: 編集内容はブラウザに常時自動保存され、ログインなしでもリロード後に復元される
 - **Google Drive連携**: ログインすると、変更が自動保存（オートセーブ）されクラウドに同期
@@ -66,7 +66,7 @@ Try this: https://mu-777.github.io/MindMeshMap/
 
 エッジの削除方法は3通りあります: (1) エッジをクリックすると開く編集UIの `×` ボタンをクリックする、(2) エッジを右クリック（モバイルは長押し）してメニューから削除する、(3) Shift+クリックでノード・エッジを混在選択し `Delete` キーでまとめて削除する。
 
-複数のノード（2個以上）を選択した状態で整列（`Ctrl+Shift+L`）を行うと、選択したノードだけがその場で整列されます（非選択のノードは動かず、画面表示も飛びません）。選択が1個以下の場合はマップ全体を整列します。
+複数のノード（2個以上）を選択した状態で整列（`Ctrl+Shift+L`）を行うと、選択したノードだけがその場で整列されます（非選択のノードは動かず、画面表示も飛びません）。選択が1個以下の場合はマップ全体を整列します。整列はゼロから配置し直すのではなく、現在の配置（階層・兄弟ノードの並び順・循環エッジの向き）をなるべく保ったまま間隔と階層を整えます。そのため、エッジを少し足して再整列しても全体が組み変わることはありません。
 
 ### キーボード操作
 
@@ -318,16 +318,26 @@ interface MapEdge {
 
 ### 循環グラフのレイアウト
 
-ELK.jsの `layered` アルゴリズムは本来DAG（非循環有向グラフ）向けですが、`cycleBreaking.strategy: 'GREEDY'` オプションにより循環エッジを一時的に逆向きにしてレイアウト計算を行います。
+ELK.jsの `layered` アルゴリズムは本来DAG（非循環有向グラフ）向けですが、`cycleBreaking.strategy` オプションにより循環エッジを一時的に逆向きにしてレイアウト計算を行います。
+
+整列は各ノードの現在座標をヒントとしてELKに渡し、3フェーズ（cycleBreaking / layering / crossingMinimization）を `INTERACTIVE` 戦略で実行します。これにより「現在の配置をなるべく保ったまま整える」差分的なレイアウトになります（決定の経緯と実験データは [docs/decisions.md §26](docs/decisions.md) を参照）。
 
 ```typescript
 // utils/layout.ts
 const graph = {
   layoutOptions: {
     'elk.algorithm': 'layered',
-    'elk.layered.cycleBreaking.strategy': 'GREEDY',
+    'elk.layered.cycleBreaking.strategy': 'INTERACTIVE',
+    'elk.layered.layering.strategy': 'INTERACTIVE',
+    'elk.layered.crossingMinimization.strategy': 'INTERACTIVE',
     // ...
   },
+  children: nodes.map((n) => ({
+    // 現在位置をヒントとして渡す
+    x: n.position.x,
+    y: n.position.y,
+    // ...
+  })),
   // ...
 };
 ```

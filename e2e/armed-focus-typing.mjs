@@ -1,7 +1,8 @@
 // armed-focus方式の中核検証:
 // - ノードをクリックしただけ（ダブルクリックなし）でTiptapエディタにフォーカスが移ること（armed）
 // - armedにするだけではノード位置(transform)が変化しないこと
-// - armed状態からそのままタイプ開始すると、既存内容が「置換」されること（挿入ではない）
+// - armed状態からそのままタイプ開始すると、既存内容の末尾に追記されること
+//   （以前は「置換」だったが、compositionを壊すclearContentを廃止したため追記になった。docs/decisions.md §13）
 // - Escape + 1回のCtrl+Zで元の内容に戻ること
 // （矢印キーでの選択移動・フォーカス追従はe2e/arrow-navigation.mjsで検証する）
 //
@@ -53,11 +54,11 @@ export async function run() {
       'armedにするだけでは全ノードの位置(transform)が変化しないこと'
     );
 
-    // armedから続けてタイプ → 編集モードに入り、既存内容が置換される
+    // armedから続けてタイプ → 編集モードに入り、既存内容の末尾に追記される
     await page.keyboard.type('abc');
     await page.waitForTimeout(200);
     const textAfterType = await getNodeText(page, rootId);
-    await assertEqual(page, textAfterType.trim(), 'abc', 'armedからのタイプ開始で内容が完全に置換されること（追記ではない）');
+    await assertEqual(page, textAfterType.trim(), (originalText + 'abc').trim(), 'armedからのタイプ開始で既存内容の末尾に追記されること');
     await assertTrue(page, await isNodeEditing(page, rootId), 'タイプ開始後は編集モードになっていること');
 
     // Escapeで編集終了 → 1回のCtrl+Zで元の内容に戻る
@@ -67,7 +68,7 @@ export async function run() {
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(300);
     const textAfterUndo = await getNodeText(page, rootId);
-    await assertEqual(page, textAfterUndo.trim(), originalText.trim(), '1回のCtrl+Zで置換前の内容に戻ること');
+    await assertEqual(page, textAfterUndo.trim(), originalText.trim(), '1回のCtrl+Zで追記前の内容に戻ること');
 
     await assertEqual(page, pageErrors.length, 0, 'テスト中にページ内未捕捉例外が発生しないこと: ' + pageErrors.join(', '));
   } finally {

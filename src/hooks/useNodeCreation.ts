@@ -3,6 +3,7 @@ import { useReactFlow } from '@xyflow/react';
 import { useMapStore } from '../stores/mapStore';
 import { useUIStore } from '../stores/uiStore';
 import { buildGraphRelations, getParentNodes } from '../utils/graphTraversal';
+import { EMPTY_NODE_CONTENT } from '../utils/nodeContent';
 import { MapNode } from '../types';
 
 // ノード位置が既存のノードと重複しているかチェックし、重複している場合は位置をずらす
@@ -116,10 +117,7 @@ export function useNodeCreation() {
 
       const newNodeId = addNode(
         {
-          content: JSON.stringify({
-            type: 'doc',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'New Node' }] }],
-          }),
+          content: EMPTY_NODE_CONTENT,
           position: adjustedPosition,
         },
         nodeId,
@@ -179,10 +177,7 @@ export function useNodeCreation() {
 
       const newNodeId = addNode(
         {
-          content: JSON.stringify({
-            type: 'doc',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'New Node' }] }],
-          }),
+          content: EMPTY_NODE_CONTENT,
           position: adjustedPosition,
         },
         parentId, // 親がいない場合は undefined になり、独立ノードになる

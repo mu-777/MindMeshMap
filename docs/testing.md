@@ -46,13 +46,17 @@ MindMeshMapのE2Eテストは、素の[playwright](https://playwright.dev/)（`@
 | ファイル | 対象機能・過去に壊れた課題 | 検証内容 | 自動/手動 |
 |---|---|---|---|
 | `node-creation.mjs` | ノード作成の3経路（ダブルクリック/Tab/Enter） | キャンバス空白ダブルクリックで独立ノード作成＋即編集モード、armedノードでTab→子ノード作成、Enter→兄弟ノード作成。新ノードがarmed状態になること | 自動 |
-| `armed-focus-typing.mjs` | armed-focus方式の中核（1文字目IME問題の対策） | クリックのみ（ダブルクリックなし）でTiptapエディタに事前フォーカスが移ること、armedにするだけでノード位置が動かないこと、armedから直接タイプすると内容が「置換」されること、1回のCtrl+Zで元に戻ること | 自動（実IMEでの変換確認は手動、下記参照） |
+| `armed-focus-typing.mjs` | armed-focus方式の中核（1文字目IME問題の対策） | クリックのみ（ダブルクリックなし）でTiptapエディタに事前フォーカスが移ること、armedにするだけでノード位置が動かないこと、armedから直接タイプすると既存内容の末尾に追記されること、1回のCtrl+Zで元に戻ること | 自動（実IMEでの変換確認は手動、下記参照） |
+| `ime-input.mjs` | 日本語IME入力の1文字目が英数字にならないこと（過去に複数回再発した不具合の回帰） | 3経路を各独立ページで検証。経路B（ダブルクリック作成→即編集）／経路C（ハンドルからエッジを引き伸ばして作成→即編集）／経路A（クリック選択armed→入力）のいずれも、作成/選択直後に`document.activeElement`が`.ProseMirror`になり（bodyに抜けない）、CDP模擬のIME入力が1文字目から正しく入ること。※経路Cのd3-dragによるフォーカス奪取はCDPで再現できないため、実機確認が別途必要（下記） | 自動（実IMEの最終確認は手動、下記参照） |
 | `editing-keys.mjs` | 編集中のTab/Enter/Shift+Enter・タッチ環境のEnter | Tab=確定+子ノード作成(armed)、Enter(非タッチ)=確定+兄弟ノード作成、Shift+Enter=常に改行、Enter(タッチ)=改行のまま（ノードが増えない） | 自動 |
+| `editing-selection-invariant.mjs` | 「編集中ノードは常に選択中」の不変条件（decisions.md §27）の回帰 | 編集中に確定キーを押さず別ノードをクリックすると元ノードの編集が終了し「枠グレー＋緑リング」の操作不能状態が残らないこと、編集中ノード自身をShift+クリックで選択解除しても編集が終了すること | 自動 |
 | `arrow-navigation.mjs` | 矢印キーでのノード間移動、disableKeyboardA11y | armedノードから矢印キーで隣接ノードへフォーカス移動、移動前後で全ノード位置(transform)が不変（React Flow標準の矢印キー移動と二重に効かないこと） | 自動 |
 | `text-undo-redo.mjs` | アプリレベルUndo/Redo、1編集セッション=1ステップ | armed中のDelete/Ctrl+Zがノード削除のアプリレベルUndoとして働く（ProseMirrorのテキスト内Undoに奪われない）、テキスト編集のUndo/Redo往復。複数アクション後のUndo/Redoは「繰り返せば収束する」ことのみ確認（既知の制限あり、下記tuning.md参照） | 自動 |
 | `format-toolbar-bubblemenu.mjs` | 書式パネル(FormatToolbar)とBubbleMenuの表示切替 | 編集中のみFormatToolbarが表示・終了で消える、テキスト選択中はBubbleMenuが表示され太字ボタンで装飾できる、複数ノードで編集セッションを繰り返してもクラッシュしない（過去のremoveChild例外の回帰確認） | 自動 |
 | `edge-label-delete.mjs` | エッジのクリック=ラベル編集+✕削除ボタンの一体化 | エッジのどこをクリックしても（パスの端・中央/ラベルチップ位置いずれも）ラベル編集inputと✕削除ボタンが一体で表示されること（✕なしのinputだけになるケースが無いこと）、✕クリックでエッジのみ削除されノードは残ること、ラベル入力→Enterで確定・表示されること | 自動 |
 | `multi-select-delete.mjs` | Shift+クリックによるノード・エッジ混在の複数選択とDelete一括削除 | ノード2個・エッジ1個をShift+クリックで混在選択できること（選択ハイライト、ノード選択とエッジ選択が互いを消さないこと）、Deleteで選択した要素だけがまとめて削除され非選択ノードは残ること、Ctrl+Z 1回で全部復元されること（＝`deleteNodesAndEdges`が履歴を1エントリしか積んでいないことの検証） | 自動 |
+| `layout-stability.mjs` | 整列の差分的レイアウト（ELKのINTERACTIVE戦略。decisions.md §26） | `src/utils/layout.ts`のソースから実際のELKオプションを抽出し、3フェーズ戦略がすべて`INTERACTIVE`で位置ヒント（`x`/`y`）を渡していること（ドリフト検出）、抽出した実オプションで「エッジ1本追加→再整列」したときの平均移動量が閾値以下・兄弟ノードの並び順が維持されること。**ブラウザ・devサーバ不要の純Nodeテスト**（elkjsを直接実行） | 自動 |
+| `branch-layout-algorithms.mjs` | dev限定の整列アルゴリズム切り替え（`branch`/`flat-axis`/`sugiyama-ext`。align-branch-layout.md） | `calculateBranchLayout`でright/bottom両方向の子が正しい軸に分離・再帰合成されること、循環グラフ・複数親グラフでクラッシュせず決定的（2回実行で同一結果）であること、`calculateFlatAxisLayout`で横系/縦系ノード群のx/y分散が期待通り分離すること、`calculateSugiyamaExtLayout`で右ハンドル子が前方・上/下ハンドル子が親のprimary帯に被って上/下に配置されること／rootが現在位置を保つこと／DOWN方向へ自然に回転すること／循環・複数親で決定的なこと、`calculateLayoutForAlign(..., 'uniform')`が既存`calculateLayout`と完全に同じ結果を返すこと（非破壊の保証）。**ブラウザ・devサーバ不要の純Nodeテスト**（esbuildでsrc配下の.tsを直接importして実行） | 自動 |
 | `align-keybind.mjs` | 整列のキーバインド化（`Ctrl+Shift+L`）と選択ノードのみの部分整列 | ノード2個をドラッグでバラバラの位置に動かしてShift+クリックで選択、`Ctrl+Shift+L`で選択2ノードだけ位置が変わり非選択ノードは全て不変であること、Ctrl+Z 1回で選択2ノードの位置がドラッグ後の位置に戻ること（＝`applyLayout`が履歴を1エントリしか積んでいないことの検証）、選択なし状態での`Ctrl+Shift+L`はマップ全体を整列すること | 自動 |
 | `context-menu-delete.mjs` | 右クリックメニューでの削除、選択クリア漏れ回帰 | 右クリック→メニューからノード/エッジ削除、削除対象が選択中だった場合にuiStoreの選択がクリアされること（Undoボタンが無効になるまでの押下回数で検証） | 自動 |
 | `menu-outside-click.mjs` | コンテキストメニュー/ファイルメニューの外側クリッククローズ | 右クリックメニュー・ファイルメニューがキャンバス空白クリックで閉じること、メニュー自身のボタンクリックは引き続き機能すること（キャプチャフェーズ化の回帰確認） | 自動 |
@@ -66,10 +70,13 @@ MindMeshMapのE2Eテストは、素の[playwright](https://playwright.dev/)（`@
 
 - **実IME（日本語IME等）での1文字目変換**: CDPの`Input.insertText`/`Input.imeSetComposition`では、
   実際のOS/ブラウザが発火するcompositionstart/compositionupdate/compositionendのイベント列を
-  完全には再現できない。`armed-focus-typing.mjs`で「打鍵前にフォーカスがcontenteditableに
-  移っていること」自体は自動検証済みだが、変換候補が実際に正しく出るかは人間の確認が必要。
-  手順: ノードを1回クリックして選択（armed）→ そのままローマ字入力を始め、1文字目から
-  変換候補が正しく出ることを確認する。
+  完全には再現できない。`ime-input.mjs`/`armed-focus-typing.mjs`で「打鍵前にフォーカスが
+  contenteditableに当たっていること」（＝1文字目問題の真因の有無）自体は自動検証済みだが、
+  変換候補が実際に正しく出るかは人間の確認が必要。**必ず次の2経路を両方確認すること**（過去に
+  経路Bだけ未検証で不具合が再発した）:
+  1. 経路A: ノードを1回クリックして選択（armed）→ そのままローマ字入力 → 1文字目から変換候補が出る
+  2. 経路B: 空白を**ダブルクリック**してノードを作成 → 何もせずそのままローマ字入力 → 1文字目から変換候補が出る
+  3. 経路C: ノードのハンドル（青い丸）から**エッジを引き伸ばして空白にドロップ**して新規ノードを作成 → そのままローマ字入力 → 1文字目から変換候補が出る（この経路のフォーカス奪取はCDPで再現できず自動テストで守れないため、実機確認が特に重要）
 - **Android実機でのURLバー出入り時の100dvh挙動とソフトキーボード表示時のレイアウト**:
   Playwrightのモバイルエミュレーションは固定ビューポートで、実機のURLバーの出入りに伴う
   ビューポート変化やソフトキーボード表示時の`interactive-widget=resizes-content`の挙動を

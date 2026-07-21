@@ -14,7 +14,7 @@ import { LayoutDirection } from '../types';
 export function useKeyboardShortcuts() {
   const { fitView, zoomIn, zoomOut } = useReactFlow();
   const { currentMap, deleteNodesAndEdges, undo, redo, setLayoutDirection } = useMapStore();
-  const { setSelectedNodeId, setEditingNodeId, setPendingEditClear, setHelpModalOpen, clearMultiSelection, clearEdgeSelection } = useUIStore();
+  const { setSelectedNodeId, setEditingNodeId, setHelpModalOpen, clearMultiSelection, clearEdgeSelection } = useUIStore();
   const { getActionForKey } = useKeybindStore();
   const { isOpen: isConfirmDialogOpen } = useConfirmStore();
   const { applyLayout } = useAutoLayout();
@@ -95,7 +95,6 @@ export function useKeyboardShortcuts() {
         ) {
           flushSync(() => {
             setSelectedNodeId(activeNodeId);
-            setPendingEditClear(true);
             setEditingNodeId(activeNodeId);
           });
         }
@@ -292,7 +291,6 @@ export function useKeyboardShortcuts() {
       setLayoutDirection,
       setSelectedNodeId,
       setEditingNodeId,
-      setPendingEditClear,
       setHelpModalOpen,
       clearMultiSelection,
       clearEdgeSelection,

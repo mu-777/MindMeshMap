@@ -17,8 +17,14 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://mu-777.github.io/MindMeshMap/" />
-    <!-- og:image は未設定（1200x630のPNG素材が必要。docs/decisions.md参照） -->
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:locale" content="en_US" />
+    <!-- og:image はデフォルト（英語）。日本語版 og-image.ja.png も public/ に同梱（ロケール別に共有URLを用意する場合の手動用）。詳細: docs/decisions.md §10 -->
+    <meta property="og:image" content="https://mu-777.github.io/MindMeshMap/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Mind Mesh Map — a graph-structured mind map editor that allows cycles" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://mu-777.github.io/MindMeshMap/og-image.png" />
   </head>
   <body>
     <div id="root"></div>

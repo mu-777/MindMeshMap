@@ -112,7 +112,6 @@
     "autoLayout": "Align"
   },
   "editor": {
-    "newNode": "New node",
     "placeholder": "Enter text...",
     "addLabel": "+ Label",
     "deleteEdge": "Delete edge",

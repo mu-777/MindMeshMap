@@ -15,8 +15,6 @@ interface UIStoreState extends UIState {
   // （単独クリックは常にラベル編集モードを開く。docs/decisions.md参照）
   selectedEdgeIds: string[];
   contextMenu: ContextMenuState | null;
-  // 編集開始時に既存内容をクリアするフラグ（印字可能文字入力によるキーボード横取り編集開始用）
-  pendingEditClear: boolean;
   // Drive保存が成功するたびにインクリメントするカウンタ。
   // MapListの一覧取得useEffectの依存に加えることで、保存後に一覧（名前・更新日時）を再取得させる
   mapListVersion: number;
@@ -26,7 +24,6 @@ interface UIStoreState extends UIState {
   clearMultiSelection: () => void;
   clearEdgeSelection: () => void;
   setEditingNodeId: (nodeId: string | null) => void;
-  setPendingEditClear: (clear: boolean) => void;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
   setHelpModalOpen: (open: boolean) => void;
@@ -45,7 +42,6 @@ export const useUIStore = create<UIStoreState>((set) => ({
   isSidebarOpen: true,
   isHelpModalOpen: false,
   contextMenu: null,
-  pendingEditClear: false,
   mapListVersion: 0,
 
   setSelectedNodeId: (nodeId) =>
@@ -57,6 +53,11 @@ export const useUIStore = create<UIStoreState>((set) => ({
       // nodeId===null（選択解除）の呼び出しでは他の選択状態には触れない
       selectedNodeIds: nodeId !== null ? [] : state.selectedNodeIds,
       selectedEdgeIds: nodeId !== null ? [] : state.selectedEdgeIds,
+      // 不変条件「編集中ノードは常に選択中」を保つ。この呼び出し後の選択は nodeId 単体
+      // （複数選択はクリアされる）なので、編集中ノードが nodeId 自身でなければ編集を終了する。
+      // これにより「ノードAを編集中に別ノードBをクリック→Aは選択解除されるのに editingNodeId が
+      // A のまま残り、枠グレー＋緑リングの操作不能状態になる」不具合を防ぐ（docs/decisions.md §27）
+      editingNodeId: state.editingNodeId === nodeId ? state.editingNodeId : null,
     })),
 
   toggleNodeSelection: (nodeId) =>
@@ -82,6 +83,13 @@ export const useUIStore = create<UIStoreState>((set) => ({
         selectedNodeId: null,
         lastSelectedNodeId: nodeId,
         // エッジの選択状態は維持する（ノード・エッジ混在選択を許すため）
+        // 不変条件「編集中ノードは常に選択中」を保つ。トグル後の選択集合（newSelectedNodeIds）に
+        // 編集中ノードが含まれなくなった場合（編集中ノード自身をShift+クリックで選択解除した等）は
+        // 編集を終了する。枠グレー＋緑リングの操作不能状態を防ぐ（docs/decisions.md §27）
+        editingNodeId:
+          state.editingNodeId && newSelectedNodeIds.includes(state.editingNodeId)
+            ? state.editingNodeId
+            : null,
       };
     }),
 
@@ -103,8 +111,6 @@ export const useUIStore = create<UIStoreState>((set) => ({
     set({ selectedEdgeIds: [] }),
 
   setEditingNodeId: (nodeId) => set({ editingNodeId: nodeId }),
-
-  setPendingEditClear: (clear) => set({ pendingEditClear: clear }),
 
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
 

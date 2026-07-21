@@ -112,7 +112,6 @@
     "autoLayout": "整列"
   },
   "editor": {
-    "newNode": "新しいノード",
     "placeholder": "テキストを入力...",
     "addLabel": "+ ラベル",
     "deleteEdge": "エッジを削除",
