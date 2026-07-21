@@ -60,7 +60,7 @@ export function Toolbar() {
   const { addToast } = useToastStore();
   const { save, isLoading } = useSaveMap();
   const { applyLayout } = useAutoLayout();
-  // dev限定：整列アルゴリズムの切り替え（本番ビルドでは常に'uniform'。docs/align-branch-layout.md参照）
+  // 整列アルゴリズムの切り替え（本番ビルドでは常に既定のsugiyama-ext、devのみ切り替え可。docs/align-branch-layout.md参照）
   const [alignAlgorithm, setAlignAlgorithm] = useAlignAlgorithmDebug();
   const { exportPng } = useExportPng();
   const { fitView } = useReactFlow();

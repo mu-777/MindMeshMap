@@ -1,17 +1,21 @@
 import { create } from 'zustand';
 import { AlignAlgorithm } from '../types';
 
-// dev限定：整列アルゴリズムの切り替えをlocalStorageに保存するデバッグ用の状態。
-// 本番ビルドでは常に'uniform'を返し、setterは何もしない
+// 整列アルゴリズムの状態。本番ビルドでは常に既定アルゴリズム（DEFAULT_ALGORITHM）を返し、
+// setterは何もしない。devビルドではlocalStorageに保存した値で切り替えられる
 // （UIの出し分けだけでなく、状態管理側にもガードを入れることで、万一UIの出し分けが
 // 漏れても本番挙動が変わらないようにする。docs/align-branch-layout.md「切り替え方法」参照）。
 //
 // 重要: コンポーネントローカルのuseStateではなくZustandストアにしている。書き込み側（Toolbarの
 // セレクト）と読み取り側（useAutoLayout.applyLayout）は別々のコンポーネント/フックなので、
-// useStateだと各自が独立した状態を持ち、セレクトを変えても整列側に伝わらない（4パターンとも
-// uniformで実行されるバグの原因になっていた）。ストアで単一の状態を共有し、変更が即座に伝わるようにする。
+// useStateだと各自が独立した状態を持ち、セレクトを変えても整列側に伝わらない（既定値のまま
+// 実行されるバグの原因になっていた）。ストアで単一の状態を共有し、変更が即座に伝わるようにする。
 const STORAGE_KEY = 'mindmeshmap-debug-align-algorithm';
 const VALID_ALGORITHMS: AlignAlgorithm[] = ['uniform', 'branch', 'flat-axis', 'sugiyama-ext'];
+
+// 既定の整列アルゴリズム。本番ビルドで常に使う値であり、devで保存値が無いときのフォールバックでもある。
+// （本番＝dev既定を揃えることで、devで確認する挙動が本番と一致する。docs/align-branch-layout.md参照）
+const DEFAULT_ALGORITHM: AlignAlgorithm = 'sugiyama-ext';
 
 function readStoredAlgorithm(): AlignAlgorithm {
   try {
@@ -22,7 +26,7 @@ function readStoredAlgorithm(): AlignAlgorithm {
   } catch {
     // localStorageが使えない環境（プライベートモード等）では既定値にフォールバック
   }
-  return 'uniform';
+  return DEFAULT_ALGORITHM;
 }
 
 interface AlignAlgorithmDebugState {
@@ -31,8 +35,8 @@ interface AlignAlgorithmDebugState {
 }
 
 const useAlignAlgorithmStore = create<AlignAlgorithmDebugState>((set) => ({
-  // 本番ビルドではlocalStorageを読まず常に'uniform'（devでのみ保存値を復元）
-  algorithm: import.meta.env.DEV ? readStoredAlgorithm() : 'uniform',
+  // 本番ビルドではlocalStorageを読まず常に既定アルゴリズム（devでのみ保存値を復元）
+  algorithm: import.meta.env.DEV ? readStoredAlgorithm() : DEFAULT_ALGORITHM,
   setAlgorithm: (next) => {
     if (!import.meta.env.DEV) return;
     set({ algorithm: next });
@@ -48,9 +52,9 @@ export function useAlignAlgorithmDebug(): [AlignAlgorithm, (algorithm: AlignAlgo
   const algorithm = useAlignAlgorithmStore((s) => s.algorithm);
   const setAlgorithm = useAlignAlgorithmStore((s) => s.setAlgorithm);
 
-  // 本番ビルドではUIの出し分けとは独立に、フック自体でも'uniform'固定にする（多重ガード）
+  // 本番ビルドではUIの出し分けとは独立に、フック自体でも既定アルゴリズム固定にする（多重ガード）
   if (!import.meta.env.DEV) {
-    return ['uniform', () => {}];
+    return [DEFAULT_ALGORITHM, () => {}];
   }
 
   return [algorithm, setAlgorithm];

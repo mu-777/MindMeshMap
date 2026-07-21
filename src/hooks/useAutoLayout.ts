@@ -5,7 +5,7 @@ import { useAlignAlgorithmDebug } from './useAlignAlgorithmDebug';
 
 export function useAutoLayout() {
   const { currentMap, updateNodePositions, saveToHistory } = useMapStore();
-  // dev限定の整列アルゴリズム切り替え（本番ビルドでは常に'uniform'。詳細はフック側参照）
+  // 整列アルゴリズム。本番ビルドでは常に既定（sugiyama-ext）、devのみ切り替え可能（詳細はフック側参照）
   const [alignAlgorithm] = useAlignAlgorithmDebug();
 
   // nodeIdsを2件以上指定すると、そのノード群（および両端が指定ノードに含まれるエッジ）だけを

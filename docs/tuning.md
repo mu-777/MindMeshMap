@@ -24,15 +24,15 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 | `nodeWidth` / `nodeHeight`（デフォルト引数） | 180 / 60 | ノードの実測サイズ（`n.width`/`n.height`）が無い場合にELKへ渡す概算サイズ（px） |
 | 3フェーズの戦略（cycleBreaking / layering / crossingMinimization） | すべて `INTERACTIVE` | 現在のノード座標をヒントに使う差分的整列。値を変えると `e2e/layout-stability.mjs` がドリフト検出で意図的にFAILする（変える場合はテストとdecisions.md §26も同期すること） |
 
-### 整列アルゴリズムのdev限定切り替え（検討中）
+### 整列アルゴリズム（本番=sugiyama-ext・dev限定で切り替え可）
 
-ノードの右側についた子と上/下についた子を別方向でレイアウトする代替アルゴリズムを検討中（詳細・設計経緯は [align-branch-layout.md](./align-branch-layout.md) 参照）。まだ`uniform`/`branch`/`flat-axis`/`sugiyama-ext`のどれを採用するか決まっていないため、本番ビルドには影響しないdev限定の切り替えとして実装してある。
+ノードの右側についた子と上/下についた子を別方向でレイアウトする代替アルゴリズム（詳細・設計経緯は [align-branch-layout.md](./align-branch-layout.md) 参照）。**本番ビルドの既定は `sugiyama-ext`**（暫定採用）。`uniform`/`branch`/`flat-axis`/`sugiyama-ext` の比較切り替えUIは引き続きdev限定で残してある（他候補はまだ削除していない）。
 
 | 項目 | 内容 |
 |---|---|
 | 切り替えUI | `src/components/Editor/Toolbar.tsx`。デスクトップ表示のみ、`import.meta.env.DEV`が真の場合だけ表示される`<select>`（レイアウト方向selectと整列ボタンの間） |
-| 状態管理フック | `src/hooks/useAlignAlgorithmDebug.ts`。`import.meta.env.DEV`が偽なら常に`'uniform'`を返しsetterは何もしない（UIの出し分けとは独立に、フック自体にもガードを入れている） |
-| 保存先 | `localStorage`キー `mindmeshmap-debug-align-algorithm`（`AlignAlgorithm`型の値以外・読み取り失敗時は`'uniform'`にフォールバック） |
+| 状態管理フック | `src/hooks/useAlignAlgorithmDebug.ts`。`import.meta.env.DEV`が偽なら常に既定の`'sugiyama-ext'`（`DEFAULT_ALGORITHM`）を返しsetterは何もしない（UIの出し分けとは独立に、フック自体にもガードを入れている） |
+| 保存先 | `localStorage`キー `mindmeshmap-debug-align-algorithm`（`AlignAlgorithm`型の値以外・読み取り失敗時は既定の`'sugiyama-ext'`にフォールバック。本番＝dev既定を揃えている） |
 | アルゴリズム実装 | `src/utils/branchLayout.ts`（`branch`＝再帰的ブランチ合成）、`src/utils/flatAxisLayout.ts`（`flat-axis`＝2パス軸射影）、`src/utils/sugiyamaExtLayout.ts`（`sugiyama-ext`＝スギヤマ拡張。ELK不使用の自前実装）、`src/utils/alignAlgorithm.ts`（`calculateLayoutForAlign`：各アルゴリズムを振り分けるディスパッチャ） |
 | 統合箇所 | `src/hooks/useAutoLayout.ts`の`applyLayout`（部分整列・全体整列の両方） |
 | テスト | `e2e/branch-layout-algorithms.mjs`（ブラウザ不要の純Nodeテスト。branch/flat-axis/sugiyama-ext全てをカバー） |
