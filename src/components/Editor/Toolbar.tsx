@@ -225,7 +225,9 @@ export function Toolbar() {
 
         <div className="hidden items-center gap-1.5 md:flex">
           <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="MindMeshMap" className="h-6 w-6" />
-          <span className="font-semibold text-blue-400">MindMeshMap</span>
+          <span className="font-semibold text-white">
+            Mind<span className="text-blue-400">Mesh</span>Map
+          </span>
         </div>
 
         <div className="hidden h-6 w-px bg-gray-700 md:block" />
