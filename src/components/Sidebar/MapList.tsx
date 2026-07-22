@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/authStore';
 import { useMapStore } from '../../stores/mapStore';
+import { useLocalMapStore } from '../../stores/localMapStore';
 import { useConfirmStore } from '../../stores/confirmStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -33,20 +34,40 @@ function sortMaps(maps: MapMeta[], order: SortOrder): MapMeta[] {
   );
 }
 
+// マップ一覧セクションの見出し（既存のToolbarファイルメニューのセクション見出しと同じスタイル）
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return <div className="px-3 py-1 text-xs text-gray-500">{children}</div>;
+}
+
 export function MapList() {
   const { t } = useTranslation();
   const { isSignedIn } = useAuthStore();
-  const { currentFileId, isDirty, setDirty } = useMapStore();
-  const { listMaps, loadMap, deleteMap, isLoading, error } = useGoogleDrive();
+  const { currentMap, currentFileId, isDirty, setDirty, setCurrentMap, setCurrentFileId } = useMapStore();
+  const { listMaps, loadMap, deleteMap, saveMap, isLoading, error } = useGoogleDrive();
   const { signIn } = useGoogleAuth();
-  const { setCurrentMap } = useMapStore();
   const { requestConfirm } = useConfirmStore();
   const { addToast } = useToastStore();
   const mapListVersion = useUIStore((state) => state.mapListVersion);
+  const bumpMapListVersion = useUIStore((state) => state.bumpMapListVersion);
+  const { maps: localMapsById, deleteLocalMap, getLocalMap } = useLocalMapStore();
 
-  const [maps, setMaps] = useState<MapMeta[]>([]);
+  const [driveMaps, setDriveMaps] = useState<MapMeta[]>([]);
   const [sortOrder, setSortOrder] = useState<SortOrder>(loadSortOrder);
-  const sortedMaps = useMemo(() => sortMaps(maps, sortOrder), [maps, sortOrder]);
+  const sortedDriveMaps = useMemo(() => sortMaps(driveMaps, sortOrder), [driveMaps, sortOrder]);
+
+  // ローカル保存マップ一覧をDrive一覧と同じMapMeta[]形式へ導出する（fileId=マップID）。
+  // こうすることで既存のsortMaps/MapListItemをローカル・Drive両方でそのまま使い回せる
+  const localMaps: MapMeta[] = useMemo(
+    () =>
+      Object.values(localMapsById).map((map) => ({
+        fileId: map.id,
+        name: map.name,
+        updatedAt: map.updatedAt,
+        createdAt: map.createdAt,
+      })),
+    [localMapsById]
+  );
+  const sortedLocalMaps = useMemo(() => sortMaps(localMaps, sortOrder), [localMaps, sortOrder]);
 
   // 並び順の選択を保存し、次回表示時にも復元する
   const handleSortOrderChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -65,13 +86,13 @@ export function MapList() {
     });
   }, [addToast, signIn, t]);
 
-  // マップ一覧を取得
+  // Driveマップ一覧を取得
   const fetchMaps = useCallback(async () => {
     if (!isSignedIn) return;
 
     try {
       const mapList = await listMaps();
-      setMaps(mapList);
+      setDriveMaps(mapList);
     } catch (err) {
       console.error('Failed to fetch maps:', err);
       if (err instanceof AuthExpiredError) {
@@ -86,7 +107,7 @@ export function MapList() {
     fetchMaps();
   }, [fetchMaps, mapListVersion]);
 
-  // マップを開く
+  // Driveのマップを開く
   const handleOpenMap = useCallback(
     async (fileId: string) => {
       if (isDirty) {
@@ -110,7 +131,7 @@ export function MapList() {
     [isDirty, loadMap, setCurrentMap, setDirty, requestConfirm, addToast, showSessionExpiredToast, t]
   );
 
-  // マップを削除
+  // Driveのマップを削除
   const handleDeleteMap = useCallback(
     async (fileId: string, name: string) => {
       const confirmed = await requestConfirm(t('dialogs.deleteConfirm', { name }));
@@ -131,29 +152,73 @@ export function MapList() {
     [deleteMap, fetchMaps, requestConfirm, addToast, showSessionExpiredToast, t]
   );
 
-  if (!isSignedIn) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center p-4 text-center">
-        <svg
-          className="mb-4 h-12 w-12 text-gray-600"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-          />
-        </svg>
-        <p className="mb-4 text-sm text-gray-400">
-          {t('mapList.signInPrompt')}
-        </p>
-        <GoogleAuthButton />
-      </div>
-    );
-  }
+  // ローカル保存マップを開く（fileId=nullでlocal-backedとして開く）
+  const handleOpenLocalMap = useCallback(
+    async (id: string) => {
+      if (isDirty) {
+        const confirmed = await requestConfirm(t('dialogs.unsavedChangesContinue'));
+        if (!confirmed) return;
+      }
+
+      const map = getLocalMap(id);
+      if (!map) return;
+      setCurrentMap(map, null);
+    },
+    [isDirty, getLocalMap, setCurrentMap, requestConfirm, t]
+  );
+
+  // ローカル保存マップを削除
+  const handleDeleteLocalMap = useCallback(
+    async (id: string, name: string) => {
+      const confirmed = await requestConfirm(t('dialogs.deleteConfirm', { name }));
+      if (!confirmed) return;
+      deleteLocalMap(id);
+    },
+    [deleteLocalMap, requestConfirm, t]
+  );
+
+  // ローカル保存マップをGoogle Driveへ移行する（新規Driveファイルとして保存 → 成功したらローカルから削除）。
+  // 移行中のマップが現在開いているマップと同じ場合は、drive-backed（currentFileIdあり）へ昇格させる
+  const handleMigrateToDrive = useCallback(
+    async (id: string) => {
+      const map = getLocalMap(id);
+      if (!map) return;
+
+      try {
+        const newFileId = await saveMap(map, null);
+        deleteLocalMap(id);
+        if (currentMap?.id === id) {
+          setCurrentFileId(newFileId);
+        }
+        await fetchMaps();
+        bumpMapListVersion();
+        addToast({ type: 'success', message: t('toast.migratedToDrive') });
+      } catch (err) {
+        console.error('Failed to migrate map to Drive:', err);
+        if (err instanceof AuthExpiredError) {
+          showSessionExpiredToast();
+        } else {
+          addToast({ type: 'error', message: t('dialogs.saveFailed') });
+        }
+      }
+    },
+    [
+      getLocalMap,
+      saveMap,
+      deleteLocalMap,
+      currentMap,
+      setCurrentFileId,
+      fetchMaps,
+      bumpMapListVersion,
+      addToast,
+      showSessionExpiredToast,
+      t,
+    ]
+  );
+
+  // ログイン中は「ローカルマップが1件以上あるときだけ」ローカルセクションを出す
+  // （未ログイン時は常にローカルセクションのみを出す。docs/decisions.md参照）
+  const showLocalSection = !isSignedIn || sortedLocalMaps.length > 0;
 
   return (
     <div className="flex h-full flex-col">
@@ -162,7 +227,7 @@ export function MapList() {
         <h2 className="text-sm font-medium text-gray-300">{t('mapList.title')}</h2>
         <button
           onClick={fetchMaps}
-          disabled={isLoading}
+          disabled={isLoading || !isSignedIn}
           className="rounded p-1 text-gray-400 hover:bg-gray-700 hover:text-white disabled:opacity-50"
           title={t('common.refresh')}
         >
@@ -203,33 +268,66 @@ export function MapList() {
         </div>
       )}
 
-      {/* マップリスト */}
+      {/* マップリスト（ログイン中はGoogle Drive＋ローカルの2セクション、未ログインはローカルのみ） */}
       <div className="flex-1 overflow-y-auto">
-        {isLoading && maps.length === 0 ? (
-          <div className="flex items-center justify-center p-8">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-600 border-t-blue-500" />
+        {isSignedIn && (
+          <div>
+            <SectionHeading>{t('mapList.sectionDrive')}</SectionHeading>
+            {isLoading && sortedDriveMaps.length === 0 ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-600 border-t-blue-500" />
+              </div>
+            ) : sortedDriveMaps.length === 0 ? (
+              <div className="p-4 text-center text-sm text-gray-500">
+                {t('mapList.noMaps')}
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-700">
+                {sortedDriveMaps.map((map) => (
+                  <MapListItem
+                    key={map.fileId}
+                    map={map}
+                    isActive={map.fileId === currentFileId}
+                    onOpen={() => handleOpenMap(map.fileId)}
+                    onDelete={() => handleDeleteMap(map.fileId, map.name)}
+                  />
+                ))}
+              </ul>
+            )}
           </div>
-        ) : maps.length === 0 ? (
-          <div className="p-4 text-center text-sm text-gray-500">
-            {t('mapList.noMaps')}
+        )}
+
+        {showLocalSection && (
+          <div>
+            <SectionHeading>{t('mapList.sectionLocal')}</SectionHeading>
+            {sortedLocalMaps.length === 0 ? (
+              <div className="p-4 text-center text-sm text-gray-500">
+                {t('mapList.noMaps')}
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-700">
+                {sortedLocalMaps.map((map) => (
+                  <MapListItem
+                    key={map.fileId}
+                    map={map}
+                    isActive={currentFileId === null && currentMap?.id === map.fileId}
+                    onOpen={() => handleOpenLocalMap(map.fileId)}
+                    onDelete={() => handleDeleteLocalMap(map.fileId, map.name)}
+                    // Driveへの移行はログイン中のみ意味を持つ操作なので、未ログイン時は渡さない
+                    onMigrate={isSignedIn ? () => handleMigrateToDrive(map.fileId) : undefined}
+                  />
+                ))}
+              </ul>
+            )}
           </div>
-        ) : (
-          <ul className="divide-y divide-gray-700">
-            {sortedMaps.map((map) => (
-              <MapListItem
-                key={map.fileId}
-                map={map}
-                isActive={map.fileId === currentFileId}
-                onOpen={() => handleOpenMap(map.fileId)}
-                onDelete={() => handleDeleteMap(map.fileId, map.name)}
-              />
-            ))}
-          </ul>
         )}
       </div>
 
-      {/* ユーザー情報 */}
+      {/* ユーザー情報 / サインイン導線 */}
       <div className="border-t border-gray-700 p-3">
+        {!isSignedIn && (
+          <p className="mb-2 text-xs text-gray-500">{t('mapList.signInPrompt')}</p>
+        )}
         <GoogleAuthButton />
       </div>
     </div>

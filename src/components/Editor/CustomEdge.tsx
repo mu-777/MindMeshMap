@@ -11,6 +11,9 @@ import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 
 const LONG_PRESS_DURATION = 500; // 長押し判定時間（ミリ秒）
+// 編集中のエッジラベル（input+✕）のz-index。react-flow__edgelabel-rendererはz-index未指定のため、
+// 選択中ノード（z-index≈1000）の下に隠れることがある。編集中だけ確実に上回る値を明示的に付与する
+const EDITING_LABEL_Z_INDEX = 1500;
 
 export type CustomEdgeData = {
   label?: string;
@@ -219,6 +222,9 @@ function CustomEdgeComponent({
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             pointerEvents: 'all',
+            // 編集中のみ最前面に引き上げる（ノードの選択時z-indexを確実に上回らせるため）。
+            // 非編集時（通常のラベルチップ表示）はundefinedのまま既定のスタッキング順に委ねる
+            zIndex: isEditing ? EDITING_LABEL_Z_INDEX : undefined,
           }}
           className="nodrag nopan"
         >
@@ -243,22 +249,22 @@ function CustomEdgeComponent({
                 ×
               </button>
             </div>
-          ) : (
+          ) : data?.label ? (
+            // ラベルがある場合のみチップを表示する。ラベルが無い場合は何も描画しない
+            // （旧「+ラベル」ホバーヒントは、クリックで編集+削除UIが開くことが伝われば冗長なため廃止。
+            // 透明なクリック用パス（edge-click-target）は残っているのでクリック自体は引き続き可能。
+            // docs/decisions.md参照）
             <div
               onClick={handleEdgeClick}
               className={`
                 group flex items-center gap-1 rounded px-2 py-1 text-xs
-                ${
-                  data?.label
-                    ? 'bg-gray-700 text-gray-200'
-                    : 'cursor-pointer bg-gray-700/50 text-gray-400 opacity-0 hover:opacity-100'
-                }
+                bg-gray-700 text-gray-200
                 ${selected ? 'opacity-100' : ''}
               `}
             >
-              <span>{data?.label || t('editor.addLabel')}</span>
+              <span>{data.label}</span>
             </div>
-          )}
+          ) : null}
         </div>
       </EdgeLabelRenderer>
     </>

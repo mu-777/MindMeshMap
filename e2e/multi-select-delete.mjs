@@ -1,11 +1,18 @@
-// Shift+クリックによるノード・エッジ混在の複数選択と、Deleteキーでの一括削除（Undo1回で全復元）を検証する。
+// Ctrl+クリックによるノード・エッジ混在の複数選択と、Deleteキーでの一括削除（Undo1回で全復元）を検証する。
 //
 // タスク2（複数選択のDelete一括削除）の仕様確認用。デフォルトマップ（defaultMap.ts）の構造
 // （"Start with a thought"がルート、そこから3方向に分岐しDAGで"See the whole picture"に収束する）
 // を前提に、ルートではない2ノード（"Shape your thinking" / "Discover new angles"）と、
-// その2ノードに接続していない独立したエッジ（自動検出）をShift+クリックで混在選択し、
+// その2ノードに接続していない独立したエッジ（自動検出）を混在選択し、
 // Deleteで一括削除されること・Ctrl+Z 1回で全部復元されること
 // （＝mapStore.deleteNodesAndEdgesがsaveToHistory()を1回しか呼んでいないこと）を確認する。
+//
+// ノードの複数選択にはCtrl+クリック（単体トグル追加）を使う。Shift+クリックは
+// 「アンカーからの無向最短経路をunion追加」の意味になっており（docs/decisions.md §36）、
+// shape/discoverはどちらもbigPictureへ収束するエッジを持つため、Shift+クリックだと
+// 経路上のbigPictureまで一緒に選択されてしまい「2ノードだけを選ぶ」というこのテストの
+// 前提が崩れる。Ctrl+クリックなら常に単体トグルなので、意図通り2ノードだけを選択できる。
+// エッジの複数選択（Shift+クリックでトグル）はこの変更の対象外なので従来通り。
 import {
   launchPage,
   closeBrowser,
@@ -93,14 +100,14 @@ export async function run() {
     const rootNodeId = nodeIds[0];
     const findConnectionsNodeId = nodeIds[3];
 
-    // --- (1) ノード2個をShift+クリックで複数選択 ---
-    await nodeLocator(page, shapeNodeId).click({ modifiers: ['Shift'] });
+    // --- (1) ノード2個をCtrl+クリックで複数選択 ---
+    await nodeLocator(page, shapeNodeId).click({ modifiers: ['Control'] });
     await page.waitForTimeout(150);
-    await nodeLocator(page, discoverNodeId).click({ modifiers: ['Shift'] });
+    await nodeLocator(page, discoverNodeId).click({ modifiers: ['Control'] });
     await page.waitForTimeout(150);
 
-    await assertTrue(page, await isNodeSelected(page, shapeNodeId), 'Shift+クリックした1つ目のノードが選択状態になること');
-    await assertTrue(page, await isNodeSelected(page, discoverNodeId), 'Shift+クリックした2つ目のノードが選択状態になること');
+    await assertTrue(page, await isNodeSelected(page, shapeNodeId), 'Ctrl+クリックした1つ目のノードが選択状態になること');
+    await assertTrue(page, await isNodeSelected(page, discoverNodeId), 'Ctrl+クリックした2つ目のノードが選択状態になること');
 
     // --- エッジ1本をShift+クリックで選択（選択中の2ノードに接続していない独立したエッジを自動で探す） ---
     const edgePoint = await findIndependentEdgePoint(page, [shapeNodeId, discoverNodeId]);

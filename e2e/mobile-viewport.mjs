@@ -1,6 +1,8 @@
 // モバイルビューポートでの表示・操作を検証する。
 // - ツールバーが画面上端(y=0)から可視であること（.app-heightのdvhフォールバック対応の確認）
 // - React Flow Controlsがビューポート内に完全に収まること（はみ出さないこと）
+// - ドキュメント（html/body）がスクロールしないこと。トップバー/左カラムを触るとドキュメントごと
+//   スクロールしてトップバーが画面外へ消えていた不具合の回帰確認（docs/decisions.md §46）
 // - 1タップ目はノードを選択するだけで、Tiptapエディタにフォーカスが入らない
 //   （armed-focus方式はタッチ操作直後は無効化している。誤ってソフトキーボードが開くのを防ぐため。
 //   docs/decisions.md参照）
@@ -41,6 +43,21 @@ export async function run() {
       page,
       controlsBox.x + controlsBox.width <= vp.width + 0.5 && controlsBox.y + controlsBox.height <= vp.height + 0.5,
       'Controlsが右下にはみ出していないこと: ' + JSON.stringify({ controlsBox, vp })
+    );
+
+    // --- ドキュメント（html/body）がスクロールしないこと ---
+    // 修正前はbodyのmin-height:100vhがモバイルの可視ビューポート(dvh)より大きくなり、
+    // ドキュメント自体がスクロール可能になっていた（トップバーが画面外へ消える不具合の原因）
+    await page.evaluate(() => window.scrollTo(0, 300));
+    await page.waitForTimeout(100);
+    const scrollY = await page.evaluate(() => window.scrollY);
+    await assertEqual(page, scrollY, 0, 'window.scrollTo後もドキュメントがスクロールしないこと（overflow:hidden）');
+    const toolbarBoxAfterScrollAttempt = await toolbar.boundingBox();
+    await assertEqual(
+      page,
+      toolbarBoxAfterScrollAttempt.y,
+      0,
+      'スクロール試行後もツールバーが画面上端(y=0)に留まること'
     );
 
     // --- (c)(d) 1タップ目は選択のみ（エディタにフォーカスが入らない）、2タップ目で編集モード ---

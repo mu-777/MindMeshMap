@@ -240,18 +240,37 @@ MindMeshMap における設計判断のうち、選択肢を比較して決め�
 
 ## 20. 編集中のEnter/Tabの挙動: デスクトップはEnter=確定+兄弟作成、タッチはEnter=改行
 
-- **決定**: ノード編集中のキー操作を次のように統一する。
+- **決定（初版。第2バッチで反転済み。下記「改訂」参照）**: ノード編集中のキー操作を次のように統一する。
   - **Tab**: 環境を問わず「編集確定＋子ノード作成」（新ノードはarmed。マインドマップ標準の階層操作）。
   - **Enter（非タッチ環境）**: 「編集確定＋兄弟ノード作成」（新ノードはarmed）。
   - **Enter（タッチ環境）**: 改行のまま（ノードを増やさない）。判定は `wasLastInteractionTouch()`（直近のポインタ操作がタッチ由来だったか）で行う。
   - **Shift+Enter**: 環境を問わず常に改行（Tiptapのデフォルト処理に委ねる）。
   - **IME変換確定のEnter**（`event.isComposing` または `keyCode === 229`）: 編集終了・ノード作成のトリガーにはしない（変換確定のためのEnterをそのまま消費してしまうと、変換を終えただけでノードが作られてしまう）。
-- **採用理由**:
+- **採用理由（初版）**:
   - デスクトップでは「Enterで確定して次を作る」という高速な連続入力が主要な操作感（他の多くのアウトライナー/マインドマップアプリの慣習）であり、それを優先した。
   - **タッチ環境でEnter=兄弟ノード作成にしてしまうと、スマホのソフトキーボードで文章中に改行を入れる手段が失われる**（Shift+Enterはソフトキーボード上で押しづらい・存在しないことが多い）。ノード作成はハンドルドラッグや長押しメニュー等の別手段で引き続き可能なため、タッチ環境ではEnterの意味をあえて「改行」に固定した。
-- **不採用案とその理由**:
+- **不採用案とその理由（初版）**:
   - **タッチ環境でもEnter=兄弟ノード作成に統一する**: スマホで長文をノードに入力する際に改行できなくなり、実用上の後退が大きい。
-- **再検討の条件**: なし（現状の方針を維持）。
+
+### 改訂（第2バッチ）: デスクトップの編集中Enterは「確定のみ」に反転（兄弟作成はしない）
+
+- **決定**: デスクトップの編集中`Enter`（非Shift）の挙動を「編集確定＋兄弟ノード作成」から**「編集確定のみ（armedへ戻る）」**に変更した。弟ノード作成は行わない。続けて`Enter`を押す（armed状態でのEnter）と、`useKeyboardShortcuts`側の`createSiblingNode`が発火して弟ノードが作成される（既存のキーバインド`createSiblingNode: 'Enter'`をそのまま使う。armed状態のEnterはこの反転以前から弟ノード作成に割り当て済みだった）。タッチ環境のEnter（改行のまま）・Tab（子作成）・Shift+Tab（親作成）・Shift+Enter（改行）は変更なし。
+- **背景（なぜ反転したか）**: 初版の「確定+兄弟作成を1回のEnterで行う」仕様は、ユーザーが**確定だけしたい**（次のノードを作るつもりはなく、単に入力を終えたい）場面でも常に兄弟ノードが作られてしまい、不要なノードができてから都度削除する手間が生じていた。「確定」と「作成」を意味的に別のアクションとして分離し、作成したい場合だけ追加でEnterを押す（＝2回Enterで1個作成、というアウトライナー的操作感）方が意図と一致する、というユーザー判断による。
+- **不採用案とその理由**:
+  - **初版のまま（確定+作成を1回のEnterで統一）を維持する**: 上記の「確定だけしたい場面で不要なノードができる」問題が残る。
+  - **確定+作成のままにしつつ、作成したノードが空なら次のEnter/Escapeで自動的に削除する**: 「空ノードは自動削除される」という別の暗黙ルールを追加することになり、ユーザーが意図的に空ノードを一時的に残したいケース（後で書く用のプレースホルダ等）と衝突する。単純に「確定」と「作成」を分離する方が挙動として素直。
+- **影響**: `CustomNode.tsx`の`editorProps.handleKeyDown`から`createSiblingNode(id)`呼び出しを削除（`setEditingNodeId(null)`のみ）。これに伴い`CustomNode`内で`createSiblingNode`が未使用になったため`useNodeCreation()`の分割代入からも削除した（フック自体・armed経由の呼び出しは維持）。`e2e/editing-keys.mjs`の`testEnterConfirmsAndCreatesSibling`をこの反転後の挙動（1回目のEnterは確定のみでノード数不変、armedになった後の2回目のEnterで兄弟ノードが1個作成される）に更新した。
+- **再検討の条件**: 「確定+作成を1操作で」に戻したいニーズが実際に出た場合（例: 高速な箇条書き入力を主用途とするユーザーからの要望）は、キーバインドで切り替え可能にする等の選択式を検討する。現状は決め打ちの単純な挙動を優先する。
+
+### 再改訂: 編集中のEnterは「改行」に統一（デスクトップも改行）
+
+- **決定**: 編集中`Enter`（非Shift・非IME）の挙動を、上の「確定のみ」からさらに変更し、**デスクトップ・タッチとも「改行」（Tiptapのデフォルト処理に委ねる）**に統一した。編集中Enterでは編集確定もノード作成もしない。弟ノード作成は、`Escape`/`Tab`等で編集を終えて**armed（ノード選択）状態にしてから`Enter`**を押すと`useKeyboardShortcuts`側の`createSiblingNode`で発火する（キーバインド`createSiblingNode: 'Enter'`はそのまま）。Shift+Enter（改行）・Tab（子作成）・Shift+Tab（親作成）は変更なし。
+- **背景（なぜさらに変えたか）**: 「確定のみ」でも、ノード内で改行を入れたい（1ノードに複数行のテキストを書きたい）場面で、デスクトップだと編集中Enterが確定になってしまい改行できなかった。ノード内改行を最優先するというユーザー判断により、編集中Enterを素直に「改行」に固定した。これによりデスクトップとタッチで編集中Enterの意味が一致し、挙動もシンプルになる。
+- **不採用案とその理由**:
+  - **「確定のみ」を維持**: ノード内改行の手段がデスクトップで失われる（Shift+Enterはあるが、一般的なテキスト入力の直感に反する）。
+  - **Enter=確定、別キー（例 `Ctrl+Enter`）=改行**: 改行のための追加キーを覚える必要があり、「Enter＝改行」という一般的な編集の直感から外れる。
+- **影響**: `CustomNode.tsx`の`editorProps.handleKeyDown`の編集中Enter分岐を丸ごと削除し、Enterは他キー同様 `return false` でTiptapへ委ねるだけにした（`wasLastInteractionTouch()`分岐も不要になり削除。ただし同関数は`armed`判定で引き続き使用）。`e2e/editing-keys.mjs`の該当テストを`testEnterInsertsNewlineThenSiblingFromArmed`（編集中Enter＝改行で編集継続、Escape→armed→Enterで弟ノード1個作成）に更新。README「編集中のEnter/Tab」表もEnter＝改行に更新。
+- **再検討の条件**: 「編集中Enterで弟ノード作成/確定」に戻したいニーズが出た場合は、キーバインドで編集中Enterの意味（改行/確定/確定+作成）を選べるようにする方式を検討する。
 
 ---
 
@@ -427,3 +446,181 @@ MindMeshMap における設計判断のうち、選択肢を比較して決め�
 - **検証**: 型チェック（`tsc -b`）・ESLint・`npm run build`で確認。実ブラウザでの実際のキー入力による兄弟複数時の局所挿入・サブツリー平行移動・親作成時のレイヤ整列・`Ctrl+Z`一回での巻き戻しは、WSL環境では確認できないためユーザーによる実機での手動確認が必要。
 - **関連**: キーバインド自体の追加は #29。
 - **調整箇所**: 兄弟の既定間隔 `defaultGap`（[src/hooks/useNodeCreation.ts](../src/hooks/useNodeCreation.ts) の `computeSiblingInsertion` 内、RIGHT=100/DOWN=200）、レイヤ間隔 `layerGap`（同ファイル `createParentNode` 内、RIGHT=200/DOWN=120）。
+
+## 31. ローカル保存はlocalStorageでGoogle Driveと別系統に、移行導線でDriveへ昇格
+
+- **決定**: 未ログイン時の明示保存（保存ボタン/`Ctrl+S`）は`localStorage`（新規`localMapStore`、キー`mindmeshmap-local-maps`、マップIDをキーにした`Record<string, MindMap>`）へ保存する。既存のDrive保存とは完全に別系統のストレージとして扱い、「今このマップはDrive保存済みか/ローカル保存済みか/未保存か」は追加フィールドを持たず`currentFileId === null && localMapStore.maps[currentMap.id] != null`で判定する。ログイン中はサイドバーに「Google Drive」「ローカル」の2セクションを表示し（ローカルは1件以上あるときのみ表示）、各ローカルマップに「Driveへ保存」ボタン（`handleMigrateToDrive`）を用意する。移行は`saveMap(map, null)`でDrive新規ファイルを作成し、成功後に`deleteLocalMap`でローカルから削除する（開いていたマップであれば`currentFileId`をセットしてdrive-backedへ昇格させる）。
+- **採用理由**: 既存の下書き自動保存（`mindmeshmap-draft`、§1）と同じ同期API・追加依存なしの方式を踏襲でき実装コストが低い。個人プロジェクトのランニングコストゼロ方針にも合致する。
+- **不採用案とその理由**:
+  - **IndexedDB**: 非同期APIでスキーマ設計・容量管理の実装コストがかかる。マインドマップ1件分のJSONサイズに対しては過剰（§1のドラフト保存の判断と同じ理由）。
+  - **既存の下書き（`mindmeshmap-draft`）を名前付き保存として流用する**: 下書きは「直近の作業内容を1件だけ」保持する単一スロットの仕組みで、複数マップの一覧管理・命名・個別削除ができない。今回は複数マップを一覧・選択・削除できる必要があるため、別ストアとして新設した。
+- **制限**: 下書き（§1）と同じくlocalStorageのため、複数タブ・複数ブラウザ間の同期は行わない（後勝ち）。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 32. OAuthスコープにopenid/email/profileを追加しアカウント表示
+
+- **決定**: Google OAuthのスコープに`openid` `https://www.googleapis.com/auth/userinfo.email` `https://www.googleapis.com/auth/userinfo.profile`を追加する（既存の`drive.file`はそのまま維持）。`oauth2/v2/userinfo`から取得した`picture`を`authStore`の`userPicture`に保存し、`GoogleAuthButton`のログイン中表示にアバター画像（`referrerPolicy="no-referrer"`）を名前・メールの左に追加する（画像取得失敗時は頭文字のグレー丸アイコンにフォールバック）。
+- **背景**: 従来は`drive.file`のみのスコープだったため、`userinfo`エンドポイントが`name`/`email`/`picture`を返さず、どのGoogleアカウントでログイン中か画面上わからなかった。
+- **採用理由**: 追加スコープはいずれも基本的なOIDC/プロフィール参照権限で、Drive操作に必要な権限は増えない。ユーザーがどのアカウントでログイン中か一目でわかるようになる。
+- **注意点（既存ユーザーへの影響・再ログイン必要）**: スコープ変更により、既存セッション（sessionStorageに保存済みのアクセストークン）はプロフィール権限を持たないため、**次回の同意画面でスコープ追加を確認する再ログインが必要になる**。トークン自体はexpiresAtで自然に失効するため、強制的なマイグレーション処理は行わない。
+- **avatar画像のreferrerPolicy**: GoogleのアバターURLはリファラーを送信すると403で拒否されることがあるため、`referrerPolicy="no-referrer"`を必須にする。
+- **不採用案とその理由**: なし（追加スコープが必要な情報を過不足なく満たすため、他の実現方法は検討していない）。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 33. 既存接続間の新エッジは後勝ち
+
+- **決定**: `mapStore.addEdge`で、既に同一source&targetのエッジが存在する場合、従来は追加をキャンセルして`null`を返していたが、既存エッジを削除してから新しいエッジを追加するように変更した（新しいハンドルの組み合わせ・ラベルが有効になる）。自己ループ禁止のガードは維持。逆向き（B→AとA→B）は別エッジとして扱われるため対象外（変更なし）。
+- **背景**: 2ノード間に既に接続がある状態で別のハンドル（例: 上下ハンドル接続への変更）を使って再度ドラッグ接続すると、何も起きず無反応に見える不具合になっていた。
+- **採用理由**: 「後から引いた接続が有効になる」は多くの図形描画・ダイアグラムツールの一般的な直感的挙動であり、無反応よりも分かりやすい。既存エッジを完全に置き換えるため、ハンドル・ラベルが不整合な重複エッジが残らない。
+- **不採用案とその理由**:
+  - **従来通り無視する（現状維持）**: ユーザーが意図して別ハンドルへ繋ぎ直そうとしても無反応になり、混乱の原因になっていた。
+  - **多重エッジを許容する（両方残す）**: 同じノード間に複数のエッジが重なって描画され、視覚的に見分けがつかなくなる。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 34. ツールバー中央タイトルは左右UI実測幅からmaxWidthをクランプ
+
+- **決定**: `Toolbar`で左グループ・右グループ（デスクトップ/モバイルのうち表示中の方）の`offsetWidth`をResizeObserverで実測し、中央タイトルの`maxWidth`を`ツールバー幅 - 2*max(左幅, 右幅) - TITLE_SIDE_GAP(16px)`にクランプする。中央タイトルはウインドウ幅の中央基準（`absolute left-1/2 -translate-x-1/2`）の配置を維持したまま、その位置で許容される最大幅を制限する。ウインドウ幅・タイトル文言・言語切替（`currentMap?.name`、`i18n.language`の変化）で再計算する。
+- **背景**: 従来はタイトルの`max-width`がツールバー全幅相当（`max-w-full`）だったため、タイトルが長い・ウインドウが狭い場合に左右のボタン群と重なって見えていた。
+- **採用理由**: UI優先（左右の操作ボタンは常に機能する必要があり、タイトルは表示上の情報なので縮んでよい）という方針に合致する。ウインドウ中央基準の見た目自体は変えたくない（左右非対称にすると、左右グループの幅が違うたびにタイトルの視覚的な中心がずれてしまう）ため、「大きい方のグループ幅の2倍」を引く対称なクランプにした。
+- **不採用案とその理由**:
+  - **3カラムflexレイアウト（左/中央/右をflexアイテムにして中央の残り幅を使う）**: 中央カラムが「ウインドウ中央」ではなく「左右グループに挟まれた残り領域の中央」に配置されるようになり、左右グループの幅が違うと見た目の中心がウインドウ中央からずれてしまう。現状の「常にウインドウ中央基準」という見た目を変えたくないため不採用。
+- **調整箇所**: `TITLE_SIDE_GAP`（[src/components/Editor/Toolbar.tsx](../src/components/Editor/Toolbar.tsx)冒頭、16px、左右の追加余白）。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 35. 編集中エッジラベルの最前面化と「+ラベル」ホバーヒントの廃止
+
+- **決定**:
+  - `CustomEdge`の編集中ラベル（input+✕）のwrapperに`zIndex: 1500`（`EDITING_LABEL_Z_INDEX`）を付与し、選択中ノードのz-index（≈1000）を確実に上回るようにした。編集中のみ適用し、通常のラベルチップ表示には適用しない。
+  - 非編集時、ラベルが無いエッジに表示していた「+ラベル」ホバーヒント（`opacity-0 hover:opacity-100`のチップ）を廃止した。ラベルがある場合のみチップを表示し、無い場合は何も描画しない（`null`）。透明なクリック用パス（`edge-click-target`）は維持しているため、クリックしてラベル編集+削除UIを開く操作自体はそのまま可能（視覚的なヒントはカーソル変化のみになる）。
+- **背景（z-index）**: `.react-flow__edgelabel-renderer`自体はz-index未指定でスタッキングコンテキストを作らないため、ノード（選択時z-index≈1000等）の下に編集中のラベル入力が隠れることがあった。
+- **背景（+ラベル廃止）**: 「+ラベル」ヒントは、クリックすれば編集+削除UIが開くことが伝われば冗長なUIだと判断した（ユーザー判断）。
+- **採用理由**: z-indexの引き上げは編集中という一時的な状態にのみ適用され、通常表示への影響がない。ホバーヒント廃止は視覚的なノイズを減らし、クリックで開くという操作自体は変わらない。
+- **不採用案とその理由**: なし（いずれも単純な修正で、他の実現方法は検討していない）。
+- **調整箇所**: `EDITING_LABEL_Z_INDEX`（[src/components/Editor/CustomEdge.tsx](../src/components/Editor/CustomEdge.tsx)冒頭、1500）。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 36. 複数選択: Ctrl=単体トグル追加、Shift=アンカーからの無向最短経路をunion追加
+
+- **決定**: ノードクリック時の複数選択セマンティクスを変更した。
+  - **Ctrl/Meta+クリック**: そのノード単体を選択にトグル追加する（従来Shiftに割り当てていた`toggleNodeSelection`の挙動をCtrl/Metaに移した）。
+  - **Shift+クリック**: アンカー（`selectedNodeId`、無ければ`lastSelectedNodeId`）からクリックしたノードまでの無向最短経路（`getUndirectedShortestPath`、新規BFS実装）上のノード群を、現在の選択にunionで追加する（`uiStore.addNodesToSelection`）。アンカーが無い、または経路が存在しない（別の連結成分）場合はノード単体のトグル追加にフォールバックする。
+  - 修飾なしクリックは従来通り単一選択。Shift+ドラッグの矩形選択（React Flow既定）は変更していない。
+  - `CustomNode.handleClick`・`MindMapCanvas.onNodeClick`の2箇所を同一セマンティクスに揃えた。
+- **採用理由**: OS標準のファイルエクスプローラ（Ctrl=個別追加、Shift=範囲選択）に近いメンタルモデルを踏襲した。グラフ構造では「範囲」が矩形や連番ではなく「経路」になるため、Shiftの意味を「アンカーからの最短経路をまとめて選択」と再定義した。
+- **不採用案とその理由**:
+  - **Shiftのままトグル、Ctrlは未使用のまま（現状維持）**: 複数ノードをまとめて選ぶ操作（経路選択）が無く、1つずつShift+クリックする必要があった。
+  - **Shift+クリックでアンカーとの直線距離が近いノード群を選択する**: グラフの接続関係と無関係な基準になり、循環・DAG構造で直感的でない。エッジをたどった経路のほうがグラフ構造に即している。
+- **関連**: 削除後の矢印キーフォーカスは§38、経路探索の実装は`src/utils/graphTraversal.ts`の`getUndirectedShortestPath`。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 37. 兄弟作成は親エッジのハンドルを継承する
+
+- **決定**: `useNodeCreation.ts`の`computeSiblingInsertion`（Enter/Shift+Enterの兄弟ノード作成）で、新しい兄弟ノードのsourceHandle/targetHandleを、対象ノードのレイアウト方向に基づくforward固定値ではなく、対象ノードの「親→対象」エッジが実際に使っているハンドルを継承するように変更した。親が無い（ルート等）場合のみ、従来通りレイアウト方向に基づくforward既定値を使う。
+- **背景**: 上/下ハンドル接続（crossNeg/crossPos、`sugiyama-ext`整列が使う分岐表現）のノードの兄弟をEnter/Shift+Enterで作ると、forward固定（RIGHTレイアウトなら`right`/`left`固定）で作られてしまい、意図した接続方向と食い違っていた。
+- **採用理由**: 「兄弟ノードは元のノードと同じ種類の接続であるべき」という直感に合致する。親エッジのハンドルをそのまま引き継ぐことで、crossNeg/crossPosの兄弟もcrossNeg/crossPosのまま作られる。
+- **不採用案とその理由**: なし（forward固定は明確な不具合であり、親エッジ継承以外の代替案は検討していない）。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 38. 削除後の矢印キーフォーカスは、削除したノードの位置をアンカーに使う
+
+- **決定**: ノード削除直後に矢印キーによるナビゲーション（`selectParent`/`selectChild`/`selectPrevSibling`/`selectNextSibling`）が機能しない不具合を修正した。
+  - `graphTraversal.ts`の`getNearestNodeInDirection`を、座標起点版`getNearestNodeInDirectionFromPoint(point, direction, nodes)`に処理を委譲する形にリファクタし、新関数をexportした（既存のノードID起点のシグネチャは維持）。
+  - `uiStore`に`deletedFocusAnchor: {x,y} | null`と`setDeletedFocusAnchor`を追加。ノード削除の実行前（`useKeyboardShortcuts`のDeleteキー処理、`ContextMenu`の右クリック削除）に、削除対象の代表ノードの位置をこのアンカーに退避する。
+  - 矢印キー処理側で、通常の`getNearestNodeInDirection`が`null`を返した場合のフォールバックとして、`deletedFocusAnchor`があれば`getNearestNodeInDirectionFromPoint`でその位置を起点に方向探索する。
+  - `deletedFocusAnchor`は、`setSelectedNodeId(nodeId)`が非null値で呼ばれた時点（矢印キーでの移動が成功した時点を含む）で自動的にクリアされる。
+- **背景**: 削除後は`selectedNodeId=null`、`lastSelectedNodeId`は消えたノードIDのまま残る。矢印キー処理は`getNearestNodeInDirection(消えたノードID)`を呼ぶが、そのノードはもう`currentMap.nodes`に存在しないため`null`を返し、どこにもフォーカスが移らなかった。
+- **採用理由**: 「消したノードがあった場所」を明示的に退避しておくことで、ノードそのものが存在しなくても方向探索を続行できる。既存の`getNearestNodeInDirection`のロジック（座標比較部分）をそのまま再利用でき、重複実装にならない。
+- **不採用案とその理由**:
+  - **削除時にlastSelectedNodeIdを親/兄弟ノードのIDに付け替える**: 「どの方向へ移動するか」は矢印キーを押した時点で決まるため、削除時点でどのIDに付け替えるべきかが一意に決まらない（上下左右で最寄りのノードが異なりうる）。座標そのものを保持するほうが単純で正確。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 39. 整列にReact Flowの実測ノード寸法を渡し、重なりを解消
+
+- **決定**: `useAutoLayout.applyLayout`で、整列アルゴリズムへノードを渡す直前に、React Flowの実測寸法（`useReactFlow().getNodes()`の`node.measured.width/height`）を`MapNode.width/height`へマージする。全体整列・部分整列（選択ノードのみ）の両方の経路に適用する。
+- **背景**: `MapNode.width/height`はこれまで一切書き込まれておらず、全整列アルゴリズム（既定のsugiyama-ext、ELK系）は`n.width || 180`, `n.height || 60`という既定サイズを前提に間隔を計算していた。改行で高くなった・長文で幅広になったノードの実際のサイズを考慮せずに詰めるため、整列後にノード同士が重なる不具合があった。
+- **採用理由**: React Flowはノードの実DOM寸法を`ResizeObserver`で計測し`node.measured`として保持しているため、`getNodes()`から取得するだけで正確な表示サイズが手に入る。ストア（`mapStore`）側にサイズ同期の仕組みを新設する必要がない。
+- **不採用案とその理由**:
+  - **`onNodesChange`のdimensions変更を`mapStore`へ同期し、`MapNode.width/height`を常時更新する**: PNGエクスポートのbounds算出で同様の設計判断を既に見送っている（§11参照）。常時発火するdimensions変更のハンドリングをストアに追加するコストが、整列時にその場で実測値を読むだけで済む本方式に見合わない。
+- **再検討の条件**: なし（現状の方式を維持）。§11のPNGエクスポート実測ロジック（DOM実測ベース）とはアプローチが異なる（今回はReact Flowの`measured`を使う）が、目的（実サイズ考慮）が異なる箇所（整列 vs エクスポート）なので統一の必要はない。
+
+## 40. BubbleMenuを廃止し、書式GUIを右上のFormatToolbarへ一本化
+
+- **決定**: §6/§17で導入した、ノードごとのTiptap BubbleMenu（テキスト選択時にポップアップする書式バー）を廃止した。書式操作は、キャンバス右上の常設パネル`FormatToolbar`（`editorStore.activeEditor`を操作対象とする）のみに一本化する。`CustomNode.tsx`からBubbleMenu関連（`BubbleMenuPlugin`のimport、pluginKey定数、`bubbleMenuElement` state、登録/解除のuseLayoutEffect、ノード内書式ボタン群のJSX）を全削除し、`@tiptap/extension-bubble-menu`をpackage.jsonから削除した（`setActiveEditor`のuseEffectと`<EditorContent>`は維持）。
+- **背景（§6の前提が崩れていた）**: §6は「BubbleMenuは部分選択への書式適用に必要」として併存を選んだが、実際には`FormatToolbar`のボタンは`onMouseDown`で`preventDefault`した上で`chain().focus()`するため、**テキスト選択範囲を保持したまま選択文字にだけ書式を適用できる**実装に既になっていた。つまりBubbleMenuが担っていた「部分選択への適用」はFormatToolbarで既に満たされており、両者は完全に重複するUIだった。
+- **採用理由**: 同じ操作を2箇所（ノードごとのポップアップ＋キャンバス右上の固定パネル）で提供する必要がなくなり、UIの重複・保守コスト（§17に記録されたtippy.js/Reactマウント管理の競合というBubbleMenu特有の複雑さ）を削減できる。
+- **不採用案とその理由**:
+  - **両方式を維持する（現状維持）**: 上記の通り機能が完全に重複しており、BubbleMenu固有の実装上の複雑さ（§17）を維持するコストに見合わない。
+- **再検討の条件**: 「選択範囲のすぐそばに書式ボタンが欲しい」という要望が具体的に出た場合（右上パネルまで視線移動が長いと感じるケース等）に、BubbleMenuではなく別の軽量な実装（例: `@tiptap/extension-bubble-menu`に頼らない自前のフローティングUI）を再検討する。
+
+## 41. ノード内リストはtypographyプラグイン不使用でスコープCSS対応
+
+- **決定**: 箇条書き/番号付きリスト（`ul`/`ol`）がFormatToolbarのボタンで生成されても視覚的にマーカーが出ない不具合を、`@tailwindcss/typography`プラグインの導入ではなく、`index.css`にスコープしたCSS（`.ProseMirror ul/ol/li`）を追加する形で修正した。
+- **背景（根本原因）**: `CustomNode`の`prose prose-sm prose-invert`クラスは、`tailwind.config.js`の`plugins: []`によりtypographyプラグインが入っていないため実際には何の効果も持たない。一方Tailwind preflightは`ul`/`ol`を`list-style:none; margin:0; padding:0`にリセットするため、リストはドキュメント構造としては正しく生成されるのにマーカー無しの平文に見えるだけだった。
+- **採用理由**: typographyプラグインは見出し・引用・コードブロック等ノードでは使わない要素まで含む幅広いスタイルセットを持ち込む。今回必要なのはリストのマーカー表示だけなので、影響範囲を`.ProseMirror`配下に限定した数行のCSSで十分かつ安全（他のTailwindユーティリティとの衝突リスクが無い）。
+- **不採用案とその理由**:
+  - **`@tailwindcss/typography`を導入し`prose`クラスを有効化する**: リスト以外の見た目（見出しサイズ、コードブロック配色等）も一括で変わり、意図しないデザイン変更が広範囲に及ぶリスクがある。依存追加にもなる。
+- **調整箇所**: リストのpadding/marginは`index.css`の`.ProseMirror ul/ol/li`（[docs/tuning.md](./tuning.md)参照）。
+- **再検討の条件**: 見出し・引用・コードブロック等、リスト以外のリッチテキスト要素もノード内で本格的に使うようになった場合はtypographyプラグイン導入を再検討する。
+
+## 42. URLの自動リンク化は`@tiptap/extension-link`＋`openOnClick:false`＋自前クリックハンドラ
+
+- **決定**: ノード内のURL自動リンク化に公式の`@tiptap/extension-link`を採用した（`autolink: true`, `linkOnPaste: true`）。リンクのクリックによる別タブオープンは拡張機能の`openOnClick`には任せず、`openOnClick: false`にした上で`CustomNode.handleClick`内で自前判定して`window.open(...)`する。
+- **背景（`openOnClick:false`にした理由）**: 本アプリのノードは「未選択」「armed（選択中・エディタにフォーカス済みだが非編集）」「編集中」の3状態を持ち、armed状態でもエディタは`editable:true`になっている（§13）。`openOnClick:true`のままだと、armed状態でのリンククリックが拡張機能側のリンクオープン処理とアプリ側のクリックハンドラ（選択/編集開始）の両方で処理されようとして競合しうる。`openOnClick:false`にして「非編集時のクリックは常に自前ハンドラでリンクを開き、選択/編集には進めない（`return`）」という単純な分岐に統一することで、armed/読み取り専用状態でも確実に別タブで開ける。
+- **採用理由**: `@tiptap/extension-link`は他の`@tiptap/*`パッケージと同じくTiptap公式拡張であり、autolink（入力時に自動でリンク化）・linkOnPaste（貼り付け時）という要件をそのままカバーする。自前でURL検出の正規表現を書くよりも枯れた実装に乗る方が安全。
+- **不採用案とその理由**:
+  - **`openOnClick: true`のまま拡張機能にオープンを任せる**: armed状態でのクリックの扱いがアプリ独自の選択/編集ロジックと競合するリスクがある。自前ハンドラに統一した方が、他のクリック処理（Ctrl/Shift+クリックでの複数選択等）と同じ場所で一貫して扱える。
+  - **自前の正規表現でURLを検出しリンク化する**: 稚拙な正規表現はエッジケース（末尾の句読点、日本語との混在等）で誤検出しやすく、公式拡張の自動リンク化ロジックに乗る方が安全。
+- **調整箇所**: リンクの見た目（色・下線）は`index.css`の`.ProseMirror a`（[docs/tuning.md](./tuning.md)参照）。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 43. Toggle interactivityロック時は新規ノード作成の全ルートを禁止する（`nodesConnectable`を判定に採用）
+
+- **決定**: React Flow標準Controlsの「Toggle interactivity」ロックは`nodesDraggable`/`nodesConnectable`/`elementsSelectable`を一括でfalseにする。本アプリはこのうち`nodesConnectable`をロック判定に使い、ロック中は新規ノード作成の全ルート（ダブルクリック・長押し・ハンドルドラッグ・キーボードのTab/Enter/Shift+Enter/Shift+Tab）をno-opにする。`MindMapCanvas.tsx`の`createNodeAtPosition`（ダブルクリック/長押し共通）・`onConnectEnd`（ハンドルドラッグ）と、`useKeyboardShortcuts.ts`の4つの作成アクション（`createChildNode`/`createSiblingNode`/`createOlderSiblingNode`/`createParentNode`）の実行前にガードを追加した。
+- **背景**: ロック時にノードの位置変更は`nodesDraggable=false`により自動的に止まるが、ノード新規作成は自前実装のハンドラ（React Flow標準機能の外）のため、ロックしても素通りしてしまっていた。「ロック」の直感的な意味（このマップを触れなくする）に対し、新規ノードだけ作れてしまうのは一貫性を欠く。
+- **採用理由**: `nodesConnectable`はReact Flowが既に管理しているロック状態の一部であり、新たな状態を自前で持つ必要がない。`useStore`/`useStoreApi`経由でReact Flowストアから直接読むだけで済む。
+- **不採用案とその理由**:
+  - **ロック用の状態をアプリ独自に持つ（例: uiStoreに`isLocked`を追加）**: React Flow標準Controlsの「Toggle interactivity」ボタンが既にロック状態を管理しており、二重管理になる。既存の状態（`nodesConnectable`）をそのまま判定に使う方が単純。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 44. 手動でのノード作成間隔を実測サイズ＋sugiyama-ext定数（PRIMARY_GAP/SIBLING_GAP）に統一
+
+- **決定**: `Enter`/`Shift+Enter`（兄弟ノード作成）・`Tab`（子ノード作成）で新規ノードを配置する際の間隔計算を、自動レイアウト「sugiyama-ext」（`src/utils/sugiyamaExtLayout.ts`）と同じ定数・同じ式に統一した。
+  - `sugiyamaExtLayout.ts`の`PRIMARY_GAP`・`SIBLING_GAP`・`DEFAULT_NODE_WIDTH`・`DEFAULT_NODE_HEIGHT`をexportし、`useNodeCreation.ts`から共有する。
+  - **子ノード作成（`Tab`、RIGHT/DOWN共通）**: 親ノードの実測primaryサイズ（React Flowの`node.measured`、無ければDEFAULT）＋`PRIMARY_GAP`だけ前方に配置する（`childPosition = parent.position + parentPrimary + PRIMARY_GAP`）。これにより親右端(下端)と子左端(上端)の間隔が親の幅（高さ）によらず常に`PRIMARY_GAP`で一定になる（sugiyama-extのforward配置と同じ式）。
+  - **兄弟ノード作成（`Enter`/`Shift+Enter`）**: cross方向のオフセットを、従来の「最寄り兄弟までの距離 or 固定defaultGap」ではなく、`boxGap = 対象のcross実測サイズ/2 + SIBLING_GAP + 新規ノードのcrossサイズ/2`（sugiyama-extの兄弟サブツリー間隔の式と同一）に統一した。新規ノードは常に空ノードのため実測が無く、cross既定サイズ（RIGHT:`DEFAULT_NODE_HEIGHT`、DOWN:`DEFAULT_NODE_WIDTH`）を使う。押し出す（遠い側の）兄弟＋その子孫は従来通り同じdelta分だけ平行移動する（相互距離は保持され、対象↔新規ノードの間隔のみboxGapになる）。親を持たない対象（ルート等）もboxGapベースの間隔を使う。
+- **背景**: 手動作成（`computeSiblingInsertion`の`defaultGap`固定値、`createChildNode`の`x+200`固定値等）と自動整列（sugiyama-ext）が別々の間隔基準を使っていたため、Enter連打で作った兄弟ノードをその後Alignすると間隔が変わってしまい、「手で作った直後の配置」と「整列後の配置」が一致しなかった。
+- **採用理由**: 双方が同じ定数・同じ式を共有することで、手動作成した直後の配置がAlign後（葉ノードの場合）もほぼ動かなくなり、ユーザーが「整列するとレイアウトが崩れる」と感じる場面を減らせる。
+- **不採用案とその理由**:
+  - **手動作成後に自動的にAlignを呼ぶ**: §30で既に検討・不採用にした案と同じ理由（stale closureのリスク、履歴エントリが分かれてUndo一発で戻らなくなる、ユーザーの可変間隔レイアウトを壊す）で見送り。今回のように配置計算の式自体を合わせる方が安全。
+  - **sugiyama-ext側の定数を手動作成用に複製する**: 値がズレるリスク（片方だけ変更して同期を忘れる）があるため、単一のソース（`sugiyamaExtLayout.ts`のexport）を共有する方式にした。
+- **調整箇所**: `PRIMARY_GAP`/`SIBLING_GAP`/`DEFAULT_NODE_WIDTH`/`DEFAULT_NODE_HEIGHT`は引き続き`src/utils/sugiyamaExtLayout.ts`冒頭が単一のソース（[docs/tuning.md](./tuning.md)参照）。
+- **再検討の条件**: なし（現状の方針を維持）。
+
+## 45. Shift+ドラッグの矩形選択をReact Flowの`onSelectionChange`経由でuiStoreへ橋渡し（2件以上のみ反映）
+
+- **決定**: React Flowの`onSelectionChange`コールバックをuiStoreの新規action `setMultiSelection(ids: string[])`へ橋渡しする。`MindMapCanvas`側のハンドラは、選択ノード数が**2件以上**のときだけ`setMultiSelection`を呼ぶ（1件以下は何もしない）。既に同一集合が選択されている場合もno-op（無限ループ防止）。`setMultiSelection`は他の複数選択action（`toggleNodeSelection`/`addNodesToSelection`）と同様、`selectedNodeId=null`・編集中ノードが選択集合に含まれなければ`editingNodeId=null`（不変条件§27の維持）・`selectedEdgeIds`は維持、というセマンティクスにした。
+- **背景**: 本アプリの選択状態はuiStore独自管理（`selectedNodeId`/`selectedNodeIds`）で、React Flow内部の選択状態（各ノードの`selected`プロパティ）とは別系統。`onNodesChange`の`select`種別の変更は明示的に無視している（`MindMapCanvas`のコメント参照）ため、React Flow標準機能であるShift+ドラッグの矩形選択がuiStoreに一切反映されず、矩形選択でハイライトされたノードを`Delete`キーで削除できない不具合になっていた（`Delete`処理はuiStoreの`selectedNodeIds`を見るため）。
+- **採用理由**: `onSelectionChange`はReact Flowが矩形選択・Shift+クリック等あらゆる内部選択変更で発火する標準コールバックのため、矩形選択専用の座標計算やヒットテストを自前実装する必要がない。
+- **2件以上のみ反映する理由（不採用案との比較）**:
+  - **1件・0件でも常に反映する**: 単一クリックは`CustomNode.handleClick`/`MindMapCanvas.onNodeClick`が既に`setSelectedNodeId`等で管理しており、React Flowの内部選択変更（クリックでも`onSelectionChange`は発火する）まで拾ってしまうと、同じクリックに対して2つのハンドラが競合して意図しない選択状態になるリスクがある。矩形選択は「2個以上まとめて選ぶ」操作のため2件以上に限定することで、単一選択系のロジックとの競合を避けつつ矩形選択のユースケースだけを確実にカバーできる。
+- **再検討の条件**: 単一ノードの矩形選択（1個だけを矩形で囲む操作）でも独自の見た目・挙動が必要になった場合は、1件のケースの扱いを再検討する。
+
+## 46. モバイルのドキュメントスクロールを抑止（html/body非スクロール化＋#root=100dvh）
+
+- **決定**: `index.css`で`html, body { height:100%; overflow:hidden; overscroll-behavior:none; }`とし、`body`の`min-height:100vh`を撤去、`#root`を`height:100vh; height:100dvh;`にした。ドキュメント（`html`/`body`）自体をスクロール不可にし、可視ビューポート高（`100dvh`）に`#root`を固定する。
+- **背景（根本原因）**: `body`の`min-height:100vh`は、モバイルでURLバーの出入りにより変動する可視ビューポート（`100dvh`）より`100vh`の方が大きくなる場面があり、ドキュメント自体がスクロール可能になっていた。トップバー/左カラム（MapList）を触った際にこのドキュメントスクロールが発生すると、`height:100vh`固定の`#root`ごと上へずれ、`h-12`のトップバーが画面外へ消える不具合になっていた。
+- **採用理由**: `overflow:hidden`でドキュメントそのものをスクロール不可にし、`#root`を可視ビューポート高（dvh）に固定することで、「ドキュメントがずれてトップバーが消える」経路自体を断てる。デスクトップは`100dvh≈100vh`のため実質的な影響がない。左カラム内のリスト等、要素ごとのスクロールは既存の`overflow-y-auto`領域内でそのまま機能する。
+- **不採用案とその理由**:
+  - **`#root`の`height`を`100vh`のまま維持し、トップバーに`position:sticky`を付与する**: ドキュメントスクロール自体は残るため、他の要素（React Flow Controls等）が同様にずれる問題が個別に再発しうる。ドキュメントレベルでスクロールを止める方が根本対策になる。
+- **再検討の条件**: モバイルでソフトウェアキーボード表示時のレイアウト崩れ等、`overflow:hidden`が原因で新たな不具合が確認された場合に見直す（現状はWSL環境では実機確認ができないため、docs/testing.mdの手動確認チェックリストに追加した）。
+
+## 47. ノードのコンテキストメニューは対象のDOM矩形（anchorRect）を基準に自己サイズ計測して配置する
+
+- **決定**: ノードの右クリック/長押しメニュー（`ContextMenu.tsx`）を、タップ/クリック座標にメニュー左上を置く方式から、対象ノードのDOM矩形（`anchorRect`）を基準にした位置決めへ変更した。`uiStore.ContextMenuState`に任意項目`anchorRect?: {left,top,right,bottom}`を追加し、`openContextMenu`の引数に追加した（既存呼び出しは省略可）。`ContextMenu`は`useLayoutEffect`でメニュー自身のサイズ（`offsetWidth`/`offsetHeight`）を計測し、`anchorRect`があれば「ノードの左側・上端揃え」を既定、左に入りきらなければ「ノードの右側」にフォールバック、最後にビューポート内へクランプする。`anchorRect`が無い場合（エッジのメニュー、フォールバック）は従来通り座標を左上に使いつつビューポートクランプのみ追加する。
+- **背景**: モバイルの長押しはタップ座標にメニューの左上を出していたため、指でメニューが隠れる・対象ノードとメニューが重なる問題があった。
+- **採用理由**: 対象のDOM矩形を基準にすることで、タップ位置に依存せず常に「対象の左上あたり・対象に重ならない」位置に安定して出せる。自己サイズ計測（`useLayoutEffect`）を使うことで、メニュー項目数が将来増減してもハードコードした幅を使わずに済む。
+- **不採用案とその理由**:
+  - **タップ座標をそのまま使い、オフセット（例: 上に固定px）を加えるだけ**: メニュー自身のサイズが不明なため、対象ノードやビューポート端との重なりを確実に避けられない。
+  - **エッジのメニューも同様にDOM矩形基準にする**: エッジはノードのような単一の矩形を持たず（パス全体が対象）、有意な「矩形」を定義しづらい。現状維持（座標＋ビューポートクランプ）で実用上問題ないため対象外とした。
+- **調整箇所**: メニューと対象/ビューポート端の余白`CONTEXT_MENU_GAP`（`src/components/Editor/ContextMenu.tsx`冒頭、[docs/tuning.md](./tuning.md)参照）。
+- **再検討の条件**: エッジのコンテキストメニューでも同様の重なり問題が報告された場合、エッジの当たり判定矩形（例: クリック位置周辺の小さな矩形）をanchorRateとして構築することを検討する。

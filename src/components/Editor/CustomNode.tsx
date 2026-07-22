@@ -1,19 +1,17 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { useEditor, EditorContent } from '@tiptap/react';
-import { BubbleMenuPlugin } from '@tiptap/extension-bubble-menu';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import Link from '@tiptap/extension-link';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { useNodeCreation } from '../../hooks/useNodeCreation';
 import { wasLastInteractionTouch } from '../../utils/pointerTracker';
-
-// BubbleMenu用ProseMirrorプラグインのpluginKey（ノードごとのエディタに閉じているので固定文字列でよい）
-const BUBBLE_MENU_PLUGIN_KEY = 'bubbleMenu';
+import { getUndirectedShortestPath } from '../../utils/graphTraversal';
 
 const LONG_PRESS_DURATION = 500; // 長押し判定時間（ミリ秒）
 
@@ -24,6 +22,13 @@ const LONG_PRESS_DURATION = 500; // 長押し判定時間（ミリ秒）
 // 奪われた分を取り戻すことで、実際に打鍵が来る頃にはフォーカスが安定している。詳細はdocs/decisions.md §13
 const FOCUS_GUARD_FRAMES = 20;
 
+// DOMRectはgetBoundingClientRect()の戻り値そのものを保存するとゲッタープロパティのみで
+// JSON化・比較がしづらいため、uiStore.ContextMenuState.anchorRectが期待するプレーンな
+// {left,top,right,bottom}に変換する
+function rectToAnchorRect(rect: DOMRect): { left: number; top: number; right: number; bottom: number } {
+  return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+}
+
 export type CustomNodeData = {
   content: string;
 };
@@ -33,9 +38,9 @@ export type CustomNodeType = Node<CustomNodeData, 'custom'>;
 function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) {
   const { t } = useTranslation();
   const { updateNodeContent } = useMapStore();
-  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu } = useUIStore();
+  const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, addNodesToSelection, openContextMenu } = useUIStore();
   const setActiveEditor = useEditorStore((state) => state.setActiveEditor);
-  const { createChildNode, createSiblingNode, createParentNode } = useNodeCreation();
+  const { createChildNode, createParentNode } = useNodeCreation();
   const isEditing = editingNodeId === id;
   // armed状態（選択中かつ編集中でない）。この状態ではTiptapエディタをeditable+フォーカス済みに
   // しておく（armed-focus方式）。IMEは打鍵時点でフォーカスされている要素を見てcomposition開始を
@@ -54,13 +59,6 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
   const tapHandledRef = useRef<boolean>(false);
   // 編集セッション中の最初の変更かどうか（最初の変更のみ履歴を積み、1編集セッション=1 Undoにする）
   const isFirstEditInSessionRef = useRef<boolean>(true);
-  // BubbleMenu（テキスト選択時の書式バー）の中身を入れる要素。@tiptap/reactの<BubbleMenu>を
-  // isEditingで直接マウント/アンマウントすると、内部でtippyがこの要素を実DOM上で
-  // ポップアップ側へ再親子付けするため、Reactが後からremoveChildしようとして
-  // 「The node to be removed is not a child of this node」でクラッシュする。
-  // そのため要素自体は常時マウントしたままにし、下のuseEffectでプラグインの登録/解除だけを
-  // isEditingで切り替える（要素を動かすtippy側の処理と、Reactのマウント管理を分離する）
-  const [bubbleMenuElement, setBubbleMenuElement] = useState<HTMLDivElement | null>(null);
 
   // Tiptapエディタの初期化
   const editor = useEditor({
@@ -68,6 +66,15 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
       StarterKit,
       Placeholder.configure({
         placeholder: t('editor.placeholder'),
+      }),
+      // URLの自動リンク化（入力/貼り付け時）。クリックでの別タブオープンは自前のhandleClickで
+      // 処理する（openOnClick:false。armed/読み取り専用状態でも確実に別タブで開けるようにするため。
+      // 詳細はdocs/decisions.md参照）
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        linkOnPaste: true,
+        HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer nofollow' },
       }),
     ],
     content: (() => {
@@ -142,21 +149,12 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
             });
             return true;
           }
-          // Enterで編集確定＋兄弟ノード作成。ただしタッチ環境では改行のまま
-          // （スマホのソフトキーボードで改行できることを維持する。兄弟ノード作成は
-          // ハンドルドラッグ等の別手段で可能）。Shift+Enterは常にTiptapに任せて改行にする
-          if (event.key === 'Enter' && !event.shiftKey) {
-            if (wasLastInteractionTouch()) {
-              return false;
-            }
-            event.preventDefault();
-            event.stopPropagation();
-            flushSync(() => {
-              setEditingNodeId(null);
-              createSiblingNode(id);
-            });
-            return true;
-          }
+          // 編集中のEnter（Shift無し）は改行にする（Tiptapのデフォルト処理に委ねる）。
+          // 挙動は「確定＋弟ノード作成」→「確定のみ」→「改行」と変遷したが、テキスト内で
+          // 改行できることを優先する方針に落ち着いた（docs/decisions.md参照）。弟ノード作成は、
+          // Escape/Tab等で編集を終えたarmed状態でEnterを押すと発火する（useKeyboardShortcuts側の
+          // createSiblingNode）。Shift+Enterも従来通りTiptapに任せて改行にする。
+          // Enterは特別扱いせず、下の return false で他キーと同様にTiptap/ブラウザへ委ねる
           // 他のキーはTiptapに任せる（通常のテキスト入力、Ctrl+Zでのテキスト内Undo等）
           return false;
         }
@@ -308,38 +306,27 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     }
   }, [isEditing, editor, setActiveEditor]);
 
-  // BubbleMenu（テキスト選択時の書式バー）のProseMirrorプラグインをisEditingに応じて
-  // 登録/解除する。編集中でないノードはプラグイン自体が存在しない状態になるため、
-  // tippyインスタンスやeditor.on('focus'/'blur')等のリスナーはノード数分ではなく
-  // 編集中の1ノード分（最大1インスタンス）しか生きない。
-  // useLayoutEffectにしているのは、下のclassName切り替え（isEditing===falseで.hidden付与）と
-  // 同じコミットで同期的に実行するため（ズレるとプラグインのdestroy前後で1フレーム分
-  // 表示が不安定になりうる）
-  useLayoutEffect(() => {
-    if (!isEditing || !editor || !bubbleMenuElement || editor.isDestroyed) return;
-
-    const plugin = BubbleMenuPlugin({
-      pluginKey: BUBBLE_MENU_PLUGIN_KEY,
-      editor,
-      element: bubbleMenuElement,
-      tippyOptions: { zIndex: 9999, placement: 'top' },
-    });
-    editor.registerPlugin(plugin);
-    return () => {
-      if (!editor.isDestroyed) {
-        editor.unregisterPlugin(BUBBLE_MENU_PLUGIN_KEY);
-      }
-    };
-  }, [isEditing, editor, bubbleMenuElement]);
-
   // ダブルクリックで編集モードに
   const handleDoubleClick = useCallback(() => {
     setEditingNodeId(id);
   }, [id, setEditingNodeId]);
 
-  // クリックで選択（Shift+クリックで複数選択）
+  // クリックで選択。修飾キーで挙動を変える（エクスプローラ風の複数選択。docs/decisions.md参照）:
+  // Ctrl/Meta+クリック＝そのノード単体を選択にトグル追加、Shift+クリック＝アンカー（直近選択
+  // ノード）からクリックしたノードまでの無向最短経路上のノードをまとめて選択にunion追加、
+  // 修飾なし＝単一選択
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      // 非編集時にリンク（自動リンク化されたURL）をクリックしたら別タブで開く
+      // （Link拡張はopenOnClick:falseにしているため自前で処理する）。選択/編集には進めない。
+      // 編集中はリンク上クリックでもカーソル移動＝通常のテキスト編集をさせたいのでopenしない
+      const anchor = (e.target as HTMLElement).closest('a');
+      if (!isEditing && anchor?.href) {
+        e.stopPropagation();
+        window.open(anchor.href, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
       e.stopPropagation();
 
       // タッチ由来のタップはhandleTouchEndで処理済みのため、
@@ -349,17 +336,31 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
         return;
       }
 
-      if (!isEditing) {
-        if (e.shiftKey) {
-          // Shift+クリックで複数選択をトグル
-          toggleNodeSelection(id);
+      if (isEditing) return;
+
+      if (e.shiftKey) {
+        // 常に最新の選択状態・マップを読む（レンダー時点の古いクロージャを避けるためgetState()経由）
+        const uiState = useUIStore.getState();
+        const anchor = uiState.selectedNodeId ?? uiState.lastSelectedNodeId;
+        const currentMap = useMapStore.getState().currentMap;
+        const path =
+          anchor && currentMap ? getUndirectedShortestPath(anchor, id, currentMap.edges) : [];
+        if (path.length > 0) {
+          addNodesToSelection(path);
         } else {
-          // 通常クリックで単一選択
-          setSelectedNodeId(id);
+          // アンカーが無い、またはアンカーからクリックノードへ到達できない（別の連結成分）場合は
+          // そのノード単体をトグル追加するフォールバック
+          toggleNodeSelection(id);
         }
+      } else if (e.ctrlKey || e.metaKey) {
+        // そのノード単体を選択にトグル追加
+        toggleNodeSelection(id);
+      } else {
+        // 通常クリックで単一選択
+        setSelectedNodeId(id);
       }
     },
-    [id, isEditing, setSelectedNodeId, toggleNodeSelection]
+    [id, isEditing, setSelectedNodeId, toggleNodeSelection, addNodesToSelection]
   );
 
   // 編集中のキーイベント処理。
@@ -379,12 +380,14 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
     [isEditing]
   );
 
-  // 右クリックでコンテキストメニュー表示
+  // 右クリックでコンテキストメニュー表示。ノードのDOM矩形をanchorRectとして渡し、
+  // ContextMenu側でノードに重ならない位置（左側優先）に配置させる
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      openContextMenu('node', id, e.clientX, e.clientY);
+      const rect = containerRef.current?.getBoundingClientRect();
+      openContextMenu('node', id, e.clientX, e.clientY, rect ? rectToAnchorRect(rect) : undefined);
     },
     [id, openContextMenu]
   );
@@ -411,7 +414,16 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
       longPressTimerRef.current = setTimeout(() => {
         longPressTriggeredRef.current = true;
         if (touchStartPosRef.current) {
-          openContextMenu('node', id, touchStartPosRef.current.x, touchStartPosRef.current.y);
+          // タップ座標(x,y)はフォールバック用に渡しつつ、anchorRectでノードに重ならない
+          // 位置（左上あたり）へ配置させる（指で隠れる・ノードに重なる問題への対策）
+          const rect = containerRef.current?.getBoundingClientRect();
+          openContextMenu(
+            'node',
+            id,
+            touchStartPosRef.current.x,
+            touchStartPosRef.current.y,
+            rect ? rectToAnchorRect(rect) : undefined
+          );
         }
       }, LONG_PRESS_DURATION);
     },
@@ -524,74 +536,6 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
           ${!isEditing ? 'caret-transparent [&_*]:caret-transparent' : ''}
         `}
       >
-        {/* テキスト選択時に表示される書式バー。
-            要素自体は常時マウントしておき（理由は上のuseEffectのコメント参照）、
-            表示に使われるBubbleMenuPluginの登録/解除をisEditingで切り替えることで、
-            実質的に編集中の1ノードだけがtippyインスタンスを持つようにしている */}
-        {editor && (
-          <div
-            ref={setBubbleMenuElement}
-            // isEditingがfalseの間はプラグイン未登録でtippyに引き取られないため、
-            // 素のインライン要素としてレイアウトに残ってしまう。hiddenクラスで場所を取らせない
-            // （visibility:hiddenだとボタン分の高さが常にノード内に残ってしまうため）
-            className={
-              isEditing
-                ? 'nodrag flex items-center gap-0.5 rounded border border-gray-600 bg-gray-800 p-1 shadow-lg'
-                : 'hidden'
-            }
-          >
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().toggleBold().run()}
-              title={t('editor.bold')}
-              className={`rounded px-2 py-1 text-xs font-bold ${
-                editor.isActive('bold') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              B
-            </button>
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-              title={t('editor.italic')}
-              className={`rounded px-2 py-1 text-xs italic ${
-                editor.isActive('italic') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              I
-            </button>
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().toggleStrike().run()}
-              title={t('editor.strike')}
-              className={`rounded px-2 py-1 text-xs line-through ${
-                editor.isActive('strike') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              S
-            </button>
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-              title={t('editor.bulletList')}
-              className={`rounded px-2 py-1 text-xs ${
-                editor.isActive('bulletList') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              •
-            </button>
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              title={t('editor.orderedList')}
-              className={`rounded px-2 py-1 text-xs ${
-                editor.isActive('orderedList') ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              1.
-            </button>
-          </div>
-        )}
         <EditorContent editor={editor} />
       </div>
     </div>

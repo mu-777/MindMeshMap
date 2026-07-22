@@ -5,11 +5,25 @@ import { useAuthStore } from '../../stores/authStore';
 export function GoogleAuthButton() {
   const { t } = useTranslation();
   const { isSignedIn, signIn, signOut } = useGoogleAuth();
-  const { userName, userEmail } = useAuthStore();
+  const { userName, userEmail, userPicture } = useAuthStore();
 
   if (isSignedIn) {
     return (
       <div className="flex items-center gap-3">
+        {userPicture ? (
+          // GoogleのアバターURLはreferrerを送るとサーバー側で拒否される（403）ことがあるためno-referrer必須
+          <img
+            src={userPicture}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="h-8 w-8 flex-shrink-0 rounded-full"
+          />
+        ) : (
+          // pictureが取得できない場合のフォールバック（既存の名前頭文字が無いグレー丸アイコン）
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-600 text-xs text-gray-300">
+            {userName ? userName.charAt(0).toUpperCase() : '?'}
+          </div>
+        )}
         <div className="text-right">
           <div className="text-sm text-gray-300">{userName}</div>
           <div className="text-xs text-gray-500">{userEmail}</div>

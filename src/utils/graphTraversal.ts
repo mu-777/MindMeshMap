@@ -180,23 +180,20 @@ export function getPrevSibling(
 }
 
 /**
- * 指定方向にある最も近いノードを取得
+ * 指定座標を起点に、指定方向にある最も近いノードを取得。
+ * ノード削除直後（起点ノード自体はもう存在しない）の矢印キーナビゲーションでも使えるよう、
+ * 起点をノードIDではなく座標そのもので受け取る（getNearestNodeInDirectionの実体）。
  */
-export function getNearestNodeInDirection(
-  nodeId: string,
+export function getNearestNodeInDirectionFromPoint(
+  point: { x: number; y: number },
   direction: 'up' | 'down' | 'left' | 'right',
   nodes: MapNode[]
 ): MapNode | null {
-  const currentNode = nodes.find((n) => n.id === nodeId);
-  if (!currentNode) return null;
-
   const candidates: { node: MapNode; distance: number }[] = [];
 
   for (const node of nodes) {
-    if (node.id === nodeId) continue;
-
-    const dx = node.position.x - currentNode.position.x;
-    const dy = node.position.y - currentNode.position.y;
+    const dx = node.position.x - point.x;
+    const dy = node.position.y - point.y;
 
     let isInDirection = false;
     switch (direction) {
@@ -229,6 +226,80 @@ export function getNearestNodeInDirection(
   // 最も近いノードを返す
   candidates.sort((a, b) => a.distance - b.distance);
   return candidates[0].node;
+}
+
+/**
+ * 指定ノードを起点に、指定方向にある最も近いノードを取得
+ */
+export function getNearestNodeInDirection(
+  nodeId: string,
+  direction: 'up' | 'down' | 'left' | 'right',
+  nodes: MapNode[]
+): MapNode | null {
+  const currentNode = nodes.find((n) => n.id === nodeId);
+  if (!currentNode) return null;
+
+  // 自分自身を候補から除外するため、起点ノードを除いたリストで探索する
+  return getNearestNodeInDirectionFromPoint(
+    currentNode.position,
+    direction,
+    nodes.filter((n) => n.id !== nodeId)
+  );
+}
+
+/**
+ * fromId から toId までの無向最短経路（ノードID列）をBFSで求める。
+ * エッジの向きは無視し、source/target どちらの方向にもたどる。到達不能なら空配列を返す。
+ * from === to の場合は [from] を返す（複数選択のShift+クリックのアンカー用途）。
+ */
+export function getUndirectedShortestPath(
+  fromId: string,
+  toId: string,
+  edges: MapEdge[]
+): string[] {
+  if (fromId === toId) return [fromId];
+
+  // 無向隣接リストを構築（source/targetどちらの方向からも辿れるようにする）
+  const adjacency = new Map<string, string[]>();
+  const addEdge = (a: string, b: string) => {
+    const list = adjacency.get(a);
+    if (list) list.push(b);
+    else adjacency.set(a, [b]);
+  };
+  for (const e of edges) {
+    addEdge(e.source, e.target);
+    addEdge(e.target, e.source);
+  }
+
+  // BFSで最短経路を探索し、各ノードへの直前ノードを記録して復元する
+  const cameFrom = new Map<string, string>();
+  const visited = new Set<string>([fromId]);
+  const queue: string[] = [fromId];
+  let queueHead = 0;
+
+  while (queueHead < queue.length) {
+    const current = queue[queueHead++];
+    if (current === toId) break;
+
+    for (const neighbor of adjacency.get(current) ?? []) {
+      if (visited.has(neighbor)) continue;
+      visited.add(neighbor);
+      cameFrom.set(neighbor, current);
+      queue.push(neighbor);
+    }
+  }
+
+  if (!visited.has(toId)) return [];
+
+  const path: string[] = [toId];
+  let node = toId;
+  while (node !== fromId) {
+    const prev = cameFrom.get(node);
+    if (!prev) return []; // 到達不能（理論上visited.has(toId)で弾かれるが念のため）
+    path.push(prev);
+    node = prev;
+  }
+  return path.reverse();
 }
 
 /**

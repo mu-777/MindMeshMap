@@ -18,13 +18,16 @@ import { MapNode, MapEdge, LayoutDirection } from '../types';
 import { LayoutResult } from './layout';
 import { classifyEdgeSide, HandleSide } from './branchLayout';
 
-const DEFAULT_NODE_WIDTH = 180;
-const DEFAULT_NODE_HEIGHT = 60;
+// DEFAULT_NODE_WIDTH/HEIGHT・PRIMARY_GAP/SIBLING_GAPはexportし、Enter/Shift+Enter等の
+// 手動でのノード作成（useNodeCreation.ts）でも同じ間隔基準を共有する（docs/decisions.md参照。
+// 「手動作成の間隔を実測サイズ＋sugiyama定数に統一」）
+export const DEFAULT_NODE_WIDTH = 180;
+export const DEFAULT_NODE_HEIGHT = 60;
 
 // --- チューニング定数（意味・調整箇所は docs/tuning.md「整列アルゴリズムのdev限定切り替え」参照）---
-const PRIMARY_GAP = 60; // 層と層の間隔（primary方向、px）。ELKの nodeNodeBetweenLayers=80 に合わせている
+export const PRIMARY_GAP = 60; // 層と層の間隔（primary方向、px）。ELKの nodeNodeBetweenLayers=80 に合わせている
 const CROSS_GAP = 10; // 積み重ねる兄弟の間隔（cross方向、px）。ELKの nodeNode=50 に合わせている
-const SIBLING_GAP = 8; // forward/backward群の兄弟サブツリー間の間隔（cross方向、px）
+export const SIBLING_GAP = 8; // forward/backward群の兄弟サブツリー間の間隔（cross方向、px）
 // cross(上/下)の子を親のprimary帯にどれだけ被せるか。子サブツリーの後端を
 // 「親の後端(-W/2)から primary幅×この比率だけ前方」に合わせる。0=全被り、0.5=前半分に被る、1=被らない
 const CROSS_OVERLAP_RATIO = 0.8;

@@ -22,6 +22,7 @@ const signedOutState: AuthState = {
   accessToken: null,
   userEmail: null,
   userName: null,
+  userPicture: null,
   expiresAt: null,
 };
 
@@ -46,6 +47,7 @@ export const useAuthStore = create<AuthStoreState>()(
           state.accessToken = null;
           state.userEmail = null;
           state.userName = null;
+          state.userPicture = null;
           state.expiresAt = null;
         }
       },

@@ -11,6 +11,7 @@ E2Eテスト（挙動を変更した際の回帰確認手段）は [testing.md](
 |---|---|---|---|
 | `DRAFT_SAVE_DEBOUNCE_MS` | `src/stores/mapStore.ts` | 500 | ローカル下書き（localStorage）保存のデバウンス時間（ms） |
 | `AUTO_SAVE_DELAY_MS` | `src/hooks/useAutoSave.ts` | 3000 | Google Drive オートセーブのデバウンス時間（ms）。変更が止まってからこの時間後に保存 |
+| `LOCAL_AUTO_SAVE_DELAY_MS` | `src/hooks/useLocalAutoSave.ts` | 3000 | この端末（localStorage）への明示保存のオートセーブのデバウンス時間（ms）。`AUTO_SAVE_DELAY_MS`と同値・同思想（未ログイン時、既に名前付き保存済みのマップのみ対象） |
 | 履歴上限 | `src/stores/mapStore.ts` の `saveToHistory` | 50 | Undo/Redo の履歴保持件数 |
 
 ## レイアウト（整列）
@@ -41,14 +42,17 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 
 | 定数 | 現在値 | 意味 |
 |---|---|---|
-| `PRIMARY_GAP` | 60 | 層と層の間隔（流れ方向、px） |
+| `PRIMARY_GAP` | 60 | 層と層の間隔（流れ方向、px）。**export済み**。`src/hooks/useNodeCreation.ts`の子ノード作成（`Tab`）でも、親の実測primaryサイズに加える間隔として共有する（[decisions.md §44](./decisions.md)参照） |
 | `CROSS_GAP` | 10 | 積み重ねる兄弟の間隔（直交方向、px） |
-| `SIBLING_GAP` | 8 | forward/backward群の兄弟サブツリー間の間隔（直交方向、px） |
+| `SIBLING_GAP` | 8 | forward/backward群の兄弟サブツリー間の間隔（直交方向、px）。**export済み**。`useNodeCreation.ts`の兄弟ノード作成（`Enter`/`Shift+Enter`）の`boxGap`計算でも共有する（[decisions.md §44](./decisions.md)参照） |
 | `CROSS_OVERLAP_RATIO` | 0.8 | 上/下ハンドル子を親の流れ方向の帯にどれだけ被せるか。0=全被り、0.5=前半分に被る、1=被らない |
 | `TREE_MARGIN` | 40 | 複数root（複数ツリー）が重なるとき空けるツリー間の最小マージン（px） |
 | `TREE_SEPARATION_MAX_ITER` | 200 | ツリー分離（押し離し）反復の上限。通常は数回で収束する |
+| `DEFAULT_NODE_WIDTH` / `DEFAULT_NODE_HEIGHT` | 180 / 60 | ノードの実測サイズ（React Flowの`node.measured`）が無い場合のフォールバック既定サイズ（px）。**export済み**。`useNodeCreation.ts`でも実測が取れない場合（新規作成する空ノード等）のフォールバックとして共有する |
 
 いずれかに決まったら、決定記録を`decisions.md`へ移し、不採用側のファイル・この切り替えUI・関連テストを削除する予定（`align-branch-layout.md`「今後の運び」参照）。
+
+**手動でのノード作成（`Enter`/`Shift+Enter`/`Tab`）も上記のPRIMARY_GAP/SIBLING_GAP/DEFAULT_NODE_WIDTH/DEFAULT_NODE_HEIGHTを共有するようになった**（自動整列との間隔の一致。詳細は[decisions.md §44](./decisions.md)）。手動作成用の実測サイズ取得ロジック（`measuredPrimarySize`/`measuredCrossSize`、React Flowの`node.measured`から取得）は`src/hooks/useNodeCreation.ts`冒頭。
 
 ## 認証（Google）
 
@@ -76,6 +80,21 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 |---|---|---|---|
 | `AUTO_DISMISS_DELAY_MS` | `src/stores/toastStore.ts` | success/info: 4000、error: 8000 | 自動消滅までの時間（ms）。`actionLabel` 付きトーストは自動消滅しない |
 
+## UI表示（ツールバー・エッジラベル）
+
+| 定数 | 場所 | 現在値 | 意味 |
+|---|---|---|---|
+| `TITLE_SIDE_GAP` | `src/components/Editor/Toolbar.tsx` | 16（px） | 中央タイトルのmaxWidthをクランプする際、左右UIグループとの間に追加で確保する余白。詳細は[decisions.md §34](./decisions.md)参照 |
+| `EDITING_LABEL_Z_INDEX` | `src/components/Editor/CustomEdge.tsx` | 1500 | 編集中のエッジラベル（input+✕）のz-index。選択中ノードのz-index（≈1000）を確実に上回る値。詳細は[decisions.md §35](./decisions.md)参照 |
+| `CONTEXT_MENU_GAP` | `src/components/Editor/ContextMenu.tsx` | 8（px） | ノードのコンテキストメニューと対象ノード（anchorRect）/ビューポート端との間に空ける余白。詳細は[decisions.md §47](./decisions.md)参照 |
+
+## リッチテキスト（ノード内Tiptapエディタ）
+
+| 定数 | 場所 | 現在値 | 意味 |
+|---|---|---|---|
+| リンクの色 | `src/index.css` の `.ProseMirror a` | `#63b3ed`（下線あり） | 自動リンク化されたURLの見た目。Tailwind preflightで`a`は`color:inherit`・下線なしになるため明示している。詳細は[decisions.md §42](./decisions.md)参照 |
+| リストのpadding/margin | `src/index.css` の `.ProseMirror ul/ol/li` | padding-left: 1.25rem、margin: 0.25rem 0 | 箇条書き/番号付きリストのインデント・行間。typographyプラグイン不使用のためスコープCSSで指定している。詳細は[decisions.md §41](./decisions.md)参照 |
+
 ## ノード編集・IME（armed-focus方式）
 
 | 定数 | 場所 | 現在値 | 意味 |
@@ -91,7 +110,7 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 | `LONG_PRESS_DURATION` | `src/components/Editor/CustomNode.tsx` / `CustomEdge.tsx` | 500 | ノード/エッジ長押し（コンテキストメニュー表示）の判定時間（ms） |
 | `LONG_PRESS_DELAY` | `src/components/Editor/MindMapCanvas.tsx` | 500 | キャンバス空白の長押し（ノード作成）の判定時間（ms） |
 | `MOVE_THRESHOLD` | `MindMapCanvas.tsx` / `CustomNode.tsx` のタッチ処理 | 10 | 長押し判定をキャンセルする指の移動量（px） |
-| `thresholdX` / `thresholdY` / `offsetStep` | `src/hooks/useKeyboardShortcuts.ts` の `adjustPositionToAvoidOverlap` | 150 / 60 / 100 | キーボードでのノード作成時の重複判定しきい値とずらし量（px） |
+| `thresholdX` / `thresholdY` / `offsetStep` | `src/hooks/useNodeCreation.ts` の `adjustPositionToAvoidOverlap` | 150 / 60 / 100 | キーボードでのノード作成時の重複判定しきい値とずらし量（px） |
 
 ## ストレージキー
 
@@ -100,7 +119,8 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 | キー | ストレージ | 場所 | 内容 |
 |---|---|---|---|
 | `mindmeshmap-draft` | localStorage | `src/stores/mapStore.ts` | 編集中マップの下書き（map / fileId / isDirty） |
-| `mindmeshmap-auth` | sessionStorage | `src/stores/authStore.ts` | 認証状態（トークン・有効期限・ユーザー情報）。タブ単位 |
+| `mindmeshmap-local-maps` | localStorage | `src/stores/localMapStore.ts` | 未ログイン時に明示保存したマップ一覧（マップIDをキーにした`Record<string, MindMap>`）。Google Driveとは別系統 |
+| `mindmeshmap-auth` | sessionStorage | `src/stores/authStore.ts` | 認証状態（トークン・有効期限・ユーザー情報。アイコン画像URLを含む）。タブ単位 |
 | `mindmap-keybinds` | localStorage | `src/stores/keybindStore.ts` | キーバインド設定 |
 | `mindmap-has-visited` | localStorage | `src/data/defaultMap.ts` | 初回訪問フラグ（デフォルトマップ表示判定） |
 | `mindmeshmap-maplist-sort` | localStorage | `src/components/Sidebar/MapList.tsx` | マップ一覧の並び順（`updatedDesc` / `updatedAsc` / `createdDesc` / `createdAsc`） |

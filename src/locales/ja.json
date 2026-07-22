@@ -18,7 +18,7 @@
     "redo": "やり直し (Ctrl+Shift+Z)",
     "clickToEditTitle": "クリックしてタイトルを編集",
     "untitledMap": "無題のマップ",
-    "autoLayout": "自動レイアウト",
+    "autoLayout": "自動レイアウト (Ctrl+Shift+L)",
     "align": "整列",
     "helpShortcut": "ヘルプ (?)",
     "layoutDirection": "レイアウト方向",
@@ -41,7 +41,10 @@
     "sortUpdatedDesc": "更新日時（新しい順）",
     "sortUpdatedAsc": "更新日時（古い順）",
     "sortCreatedDesc": "作成日時（新しい順）",
-    "sortCreatedAsc": "作成日時（古い順）"
+    "sortCreatedAsc": "作成日時（古い順）",
+    "sectionLocal": "ローカル",
+    "sectionDrive": "Google Drive",
+    "migrateToDrive": "Driveへ保存"
   },
   "shortcuts": {
     "nodeOperations": "ノード操作",
@@ -54,7 +57,7 @@
     "title": "ヘルプ",
     "tabBasic": "基本操作",
     "tabFormat": "書式",
-    "tabKeyboard": "キーボード",
+    "tabKeyboard": "キーボード (PC)",
     "opCreateNode": "ノード作成",
     "opCreateNodeDesc": "空白をダブルクリック / 長押し",
     "opEditNode": "ノード編集",
@@ -116,7 +119,6 @@
   },
   "editor": {
     "placeholder": "テキストを入力...",
-    "addLabel": "+ ラベル",
     "deleteEdge": "エッジを削除",
     "bold": "太字 (Ctrl+B)",
     "italic": "斜体 (Ctrl+I)",
@@ -134,7 +136,8 @@
     "deleteFailed": "削除に失敗しました"
   },
   "toast": {
-    "localAutoSaved": "変更はこの端末に自動保存されています。Google Drive に保存するにはログインしてください。",
+    "localSaved": "この端末に保存しました",
+    "migratedToDrive": "Google Drive に保存しました",
     "alreadySaved": "保存済みです",
     "sessionExpired": "ログインの有効期限が切れました。再ログインしてください。",
     "importSuccess": "マップをインポートしました",

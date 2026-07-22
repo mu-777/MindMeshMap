@@ -8,12 +8,14 @@ import { ConfirmDialog } from './components/Common/ConfirmDialog';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useUnloadGuard } from './hooks/useUnloadGuard';
 import { useAutoSave } from './hooks/useAutoSave';
+import { useLocalAutoSave } from './hooks/useLocalAutoSave';
 import { useUIStore } from './stores/uiStore';
 
 function AppContent() {
   useKeyboardShortcuts();
   useUnloadGuard();
   useAutoSave();
+  useLocalAutoSave();
   const { isSidebarOpen, isHelpModalOpen, setHelpModalOpen } = useUIStore();
 
   return (

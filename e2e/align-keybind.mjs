@@ -70,7 +70,9 @@ export async function run() {
 
     // defaultMap.tsのnodes配列順: [root, explore, question, findConnections, shape, discover, bigPicture]
     // explore→shapeは直接つながるエッジがある（両端が選択対象に含まれるエッジだけをELKに渡す仕様の
-    // 確認を兼ねて、あえて接続済みの2ノードを選ぶ）
+    // 確認を兼ねて、あえて接続済みの2ノードを選ぶ）。この直接接続は、下のShift+クリックが
+    // 「アンカーからの無向最短経路をunion追加」の意味になった後も（docs/decisions.md §36）、
+    // 経路が[explore, shape]の2ノードちょうどになり中間ノードを巻き込まないことを保証している
     const exploreId = nodeIds[1];
     const shapeId = nodeIds[4];
     const targetIds = new Set([exploreId, shapeId]);

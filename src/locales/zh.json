@@ -18,7 +18,7 @@
     "redo": "重做 (Ctrl+Shift+Z)",
     "clickToEditTitle": "点击编辑标题",
     "untitledMap": "未命名地图",
-    "autoLayout": "自动布局",
+    "autoLayout": "自动布局 (Ctrl+Shift+L)",
     "align": "对齐",
     "helpShortcut": "帮助 (?)",
     "layoutDirection": "布局方向",
@@ -41,7 +41,10 @@
     "sortUpdatedDesc": "更新时间（从新到旧）",
     "sortUpdatedAsc": "更新时间（从旧到新）",
     "sortCreatedDesc": "创建时间（从新到旧）",
-    "sortCreatedAsc": "创建时间（从旧到新）"
+    "sortCreatedAsc": "创建时间（从旧到新）",
+    "sectionLocal": "本地",
+    "sectionDrive": "Google Drive",
+    "migrateToDrive": "保存到 Drive"
   },
   "shortcuts": {
     "nodeOperations": "节点操作",
@@ -54,7 +57,7 @@
     "title": "帮助",
     "tabBasic": "基本操作",
     "tabFormat": "格式",
-    "tabKeyboard": "键盘",
+    "tabKeyboard": "键盘 (PC)",
     "opCreateNode": "创建节点",
     "opCreateNodeDesc": "双击空白处 / 长按",
     "opEditNode": "编辑节点",
@@ -116,7 +119,6 @@
   },
   "editor": {
     "placeholder": "输入文本...",
-    "addLabel": "+ 标签",
     "deleteEdge": "删除连线",
     "bold": "粗体 (Ctrl+B)",
     "italic": "斜体 (Ctrl+I)",
@@ -134,7 +136,8 @@
     "deleteFailed": "删除失败"
   },
   "toast": {
-    "localAutoSaved": "更改已自动保存在此设备上。要保存到 Google Drive，请使用 Google 登录。",
+    "localSaved": "已保存到本机",
+    "migratedToDrive": "已保存到 Google Drive",
     "alreadySaved": "已保存",
     "sessionExpired": "登录会话已过期，请重新登录。",
     "importSuccess": "地图导入成功",

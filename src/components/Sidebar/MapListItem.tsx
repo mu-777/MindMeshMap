@@ -7,6 +7,9 @@ interface MapListItemProps {
   isActive: boolean;
   onOpen: () => void;
   onDelete: () => void;
+  // 指定された場合のみ「Driveへ保存」ボタン（ローカル保存マップの移行導線）を表示する。
+  // Drive一覧のアイテムには渡さない
+  onMigrate?: () => void;
 }
 
 function MapListItemComponent({
@@ -14,6 +17,7 @@ function MapListItemComponent({
   isActive,
   onOpen,
   onDelete,
+  onMigrate,
 }: MapListItemProps) {
   const { t, i18n } = useTranslation();
 
@@ -67,6 +71,32 @@ function MapListItemComponent({
         </div>
         <div className="mt-1 text-xs text-gray-500">{formattedDate}</div>
       </div>
+
+      {/* onMigrateが渡されたとき（ローカル保存マップ）のみ「Driveへ保存」ボタンを表示する */}
+      {onMigrate && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onMigrate();
+          }}
+          className="ml-2 rounded p-1 text-gray-500 opacity-0 transition-opacity hover:bg-gray-600 hover:text-blue-400 group-hover:opacity-100"
+          title={t('mapList.migrateToDrive')}
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+            />
+          </svg>
+        </button>
+      )}
 
       <button
         onClick={(e) => {

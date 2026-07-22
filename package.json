@@ -11,7 +11,7 @@
     "test:e2e": "node e2e/run-all.mjs"
   },
   "dependencies": {
-    "@tiptap/extension-bubble-menu": "^2.27.2",
+    "@tiptap/extension-link": "^2.27.2",
     "@tiptap/extension-placeholder": "^2.10.0",
     "@tiptap/pm": "^2.10.0",
     "@tiptap/react": "^2.10.0",

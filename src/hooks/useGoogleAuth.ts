@@ -3,7 +3,10 @@ import { useAuthStore } from '../stores/authStore';
 
 // Google API クライアントID（実際の値は環境変数または設定ファイルから取得）
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+// openid/email/profileを追加し、userinfoエンドポイントからname/email/pictureを取得できるようにする
+// （drive.fileのみだとユーザー情報が空で返り、どのGoogleアカウントでログイン中か画面上わからない）
+const SCOPES =
+  'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file';
 // GISのトークンレスポンスにexpires_inが含まれない場合のフォールバック（秒）
 const DEFAULT_EXPIRES_IN_SEC = 3600;
 
@@ -68,6 +71,7 @@ export function useGoogleAuth() {
           setAuth({
             userEmail: data.email,
             userName: data.name,
+            userPicture: data.picture,
           });
         }
       } catch (error) {

@@ -48,20 +48,21 @@ MindMeshMapのE2Eテストは、素の[playwright](https://playwright.dev/)（`@
 | `node-creation.mjs` | ノード作成の3経路（ダブルクリック/Tab/Enter） | キャンバス空白ダブルクリックで独立ノード作成＋即編集モード、armedノードでTab→子ノード作成、Enter→兄弟ノード作成。新ノードがarmed状態になること | 自動 |
 | `armed-focus-typing.mjs` | armed-focus方式の中核（1文字目IME問題の対策） | クリックのみ（ダブルクリックなし）でTiptapエディタに事前フォーカスが移ること、armedにするだけでノード位置が動かないこと、armedから直接タイプすると既存内容の末尾に追記されること、1回のCtrl+Zで元に戻ること | 自動（実IMEでの変換確認は手動、下記参照） |
 | `ime-input.mjs` | 日本語IME入力の1文字目が英数字にならないこと（過去に複数回再発した不具合の回帰） | 3経路を各独立ページで検証。経路B（ダブルクリック作成→即編集）／経路C（ハンドルからエッジを引き伸ばして作成→即編集）／経路A（クリック選択armed→入力）のいずれも、作成/選択直後に`document.activeElement`が`.ProseMirror`になり（bodyに抜けない）、CDP模擬のIME入力が1文字目から正しく入ること。※経路Cのd3-dragによるフォーカス奪取はCDPで再現できないため、実機確認が別途必要（下記） | 自動（実IMEの最終確認は手動、下記参照） |
-| `editing-keys.mjs` | 編集中のTab/Enter/Shift+Enter・タッチ環境のEnter | Tab=確定+子ノード作成(armed)、Enter(非タッチ)=確定+兄弟ノード作成、Shift+Enter=常に改行、Enter(タッチ)=改行のまま（ノードが増えない） | 自動 |
-| `editing-selection-invariant.mjs` | 「編集中ノードは常に選択中」の不変条件（decisions.md §27）の回帰 | 編集中に確定キーを押さず別ノードをクリックすると元ノードの編集が終了し「枠グレー＋緑リング」の操作不能状態が残らないこと、編集中ノード自身をShift+クリックで選択解除しても編集が終了すること | 自動 |
+| `editing-keys.mjs` | 編集中のTab/Enter/Shift+Enter・タッチ環境のEnter | Tab=確定+子ノード作成(armed)、Enter(非タッチ・1回目)=確定のみ(ノードは増えずarmedに戻る)、続けてEnter(2回目・armed)で兄弟ノードが1個作成されること（decisions.md §20「改訂」）、Shift+Enter=常に改行、Enter(タッチ)=改行のまま（ノードが増えない） | 自動 |
+| `editing-selection-invariant.mjs` | 「編集中ノードは常に選択中」の不変条件（decisions.md §27）の回帰 | 編集中に確定キーを押さず別ノードをクリックすると元ノードの編集が終了し「枠グレー＋緑リング」の操作不能状態が残らないこと、編集中ノード自身をCtrl+クリックで選択解除しても編集が終了すること | 自動 |
 | `arrow-navigation.mjs` | 矢印キーでのノード間移動、disableKeyboardA11y | armedノードから矢印キーで隣接ノードへフォーカス移動、移動前後で全ノード位置(transform)が不変（React Flow標準の矢印キー移動と二重に効かないこと） | 自動 |
 | `text-undo-redo.mjs` | アプリレベルUndo/Redo、1編集セッション=1ステップ | armed中のDelete/Ctrl+Zがノード削除のアプリレベルUndoとして働く（ProseMirrorのテキスト内Undoに奪われない）、テキスト編集のUndo/Redo往復。複数アクション後のUndo/Redoは「繰り返せば収束する」ことのみ確認（既知の制限あり、下記tuning.md参照） | 自動 |
-| `format-toolbar-bubblemenu.mjs` | 書式パネル(FormatToolbar)とBubbleMenuの表示切替 | 編集中のみFormatToolbarが表示・終了で消える、テキスト選択中はBubbleMenuが表示され太字ボタンで装飾できる、複数ノードで編集セッションを繰り返してもクラッシュしない（過去のremoveChild例外の回帰確認） | 自動 |
+| `format-toolbar-bubblemenu.mjs` | 書式パネル(FormatToolbar、BubbleMenu廃止後は書式UIはこれのみ。decisions.md §40) | 編集中のみFormatToolbarが表示・終了で消える、テキストを選択した状態でFormatToolbarのボタンを押すと選択範囲に書式が適用される（選択範囲を保持したまま適用できることの確認）、複数ノードで編集セッションを繰り返してもクラッシュしない（BubbleMenu時代のremoveChild例外の回帰確認） | 自動 |
 | `edge-label-delete.mjs` | エッジのクリック=ラベル編集+✕削除ボタンの一体化 | エッジのどこをクリックしても（パスの端・中央/ラベルチップ位置いずれも）ラベル編集inputと✕削除ボタンが一体で表示されること（✕なしのinputだけになるケースが無いこと）、✕クリックでエッジのみ削除されノードは残ること、ラベル入力→Enterで確定・表示されること | 自動 |
-| `multi-select-delete.mjs` | Shift+クリックによるノード・エッジ混在の複数選択とDelete一括削除 | ノード2個・エッジ1個をShift+クリックで混在選択できること（選択ハイライト、ノード選択とエッジ選択が互いを消さないこと）、Deleteで選択した要素だけがまとめて削除され非選択ノードは残ること、Ctrl+Z 1回で全部復元されること（＝`deleteNodesAndEdges`が履歴を1エントリしか積んでいないことの検証） | 自動 |
+| `multi-select-delete.mjs` | Ctrl+クリック（ノード）とShift+クリック（エッジ）によるノード・エッジ混在の複数選択とDelete一括削除 | ノード2個をCtrl+クリック・エッジ1個をShift+クリックで混在選択できること（選択ハイライト、ノード選択とエッジ選択が互いを消さないこと）、Deleteで選択した要素だけがまとめて削除され非選択ノードは残ること、Ctrl+Z 1回で全部復元されること（＝`deleteNodesAndEdges`が履歴を1エントリしか積んでいないことの検証） | 自動 |
 | `layout-stability.mjs` | 整列の差分的レイアウト（ELKのINTERACTIVE戦略。decisions.md §26） | `src/utils/layout.ts`のソースから実際のELKオプションを抽出し、3フェーズ戦略がすべて`INTERACTIVE`で位置ヒント（`x`/`y`）を渡していること（ドリフト検出）、抽出した実オプションで「エッジ1本追加→再整列」したときの平均移動量が閾値以下・兄弟ノードの並び順が維持されること。**ブラウザ・devサーバ不要の純Nodeテスト**（elkjsを直接実行） | 自動 |
 | `branch-layout-algorithms.mjs` | dev限定の整列アルゴリズム切り替え（`branch`/`flat-axis`/`sugiyama-ext`。align-branch-layout.md） | `calculateBranchLayout`でright/bottom両方向の子が正しい軸に分離・再帰合成されること、循環グラフ・複数親グラフでクラッシュせず決定的（2回実行で同一結果）であること、`calculateFlatAxisLayout`で横系/縦系ノード群のx/y分散が期待通り分離すること、`calculateSugiyamaExtLayout`で右ハンドル子が前方・上/下ハンドル子が親のprimary帯に被って上/下に配置されること／rootが現在位置を保つこと／DOWN方向へ自然に回転すること／循環・複数親で決定的なこと、`calculateLayoutForAlign(..., 'uniform')`が既存`calculateLayout`と完全に同じ結果を返すこと（非破壊の保証）。**ブラウザ・devサーバ不要の純Nodeテスト**（esbuildでsrc配下の.tsを直接importして実行） | 自動 |
 | `align-keybind.mjs` | 整列のキーバインド化（`Ctrl+Shift+L`）と選択ノードのみの部分整列 | ノード2個をドラッグでバラバラの位置に動かしてShift+クリックで選択、`Ctrl+Shift+L`で選択2ノードだけ位置が変わり非選択ノードは全て不変であること、Ctrl+Z 1回で選択2ノードの位置がドラッグ後の位置に戻ること（＝`applyLayout`が履歴を1エントリしか積んでいないことの検証）、選択なし状態での`Ctrl+Shift+L`はマップ全体を整列すること | 自動 |
-| `context-menu-delete.mjs` | 右クリックメニューでの削除、選択クリア漏れ回帰 | 右クリック→メニューからノード/エッジ削除、削除対象が選択中だった場合にuiStoreの選択がクリアされること（Undoボタンが無効になるまでの押下回数で検証） | 自動 |
+| `context-menu-delete.mjs` | 右クリックメニューでの削除、選択クリア漏れ回帰、メニュー位置決め（anchorRect。decisions.md §47） | 右クリック→メニューが対象ノードに重ならずビューポート内に収まって表示されること、メニューからノード/エッジ削除、削除対象が選択中だった場合にuiStoreの選択がクリアされること（Undoボタンが無効になるまでの押下回数で検証） | 自動 |
 | `menu-outside-click.mjs` | コンテキストメニュー/ファイルメニューの外側クリッククローズ | 右クリックメニュー・ファイルメニューがキャンバス空白クリックで閉じること、メニュー自身のボタンクリックは引き続き機能すること（キャプチャフェーズ化の回帰確認） | 自動 |
+| `rect-select-delete.mjs` | Shift+ドラッグの矩形選択をuiStoreの複数選択へ橋渡し（`onSelectionChange`。decisions.md §45） | 全ノードを囲むShift+ドラッグの矩形選択で各ノードが選択状態(青枠)になること、Deleteキーで選択したノードがまとめて削除され保護されたルートノードのみ残ること（uiStoreへ未反映だとDeleteが無反応になる不具合の回帰確認） | 自動 |
 | `png-export.mjs` | PNGエクスポートの実寸・見切れ | 出力画像の実寸がuseExportPng.tsの計算式と一致すること、四辺（外周1px）が背景色のみでノードが見切れていないこと | 自動 |
-| `mobile-viewport.mjs` | モバイル表示・2タップ編集フロー | ツールバーが画面上端から可視、React Flow Controlsがビューポート内に収まる、1タップ目はエディタにフォーカスが入らない（選択のみ）、2タップ目で編集モードに入る | 自動 |
+| `mobile-viewport.mjs` | モバイル表示・2タップ編集フロー、ドキュメントスクロール抑止（decisions.md §46） | ツールバーが画面上端から可視、React Flow Controlsがビューポート内に収まる、`window.scrollTo`後もドキュメントがスクロールせずツールバーが画面上端に留まること、1タップ目はエディタにフォーカスが入らない（選択のみ）、2タップ目で編集モードに入る | 自動 |
 
 ## 手動確認チェックリスト
 
@@ -82,7 +83,10 @@ MindMeshMapのE2Eテストは、素の[playwright](https://playwright.dev/)（`@
   ビューポート変化やソフトキーボード表示時の`interactive-widget=resizes-content`の挙動を
   再現できない。手順: Android Chrome実機でページを開き、スクロールでURLバーを隠す/出す、
   ノードをタップしてソフトキーボードを表示する、の両方でツールバー・キャンバスのレイアウトが
-  崩れないことを確認する。
+  崩れないことを確認する。`mobile-viewport.mjs`は`window.scrollTo`によるドキュメントスクロール
+  抑止（html/body非スクロール化。decisions.md §46）を自動検証済みだが、実機のタッチスクロール
+  ジェスチャ（トップバー/左カラムを指で触って動かす操作）そのものはCDPでは再現できないため、
+  上記の実機確認で併せて「触ってもトップバーが画面外へ消えないこと」を確認する。
 - **Googleログインが必要な一連の機能**: Drive保存・オートセーブ・リネームのDrive反映・
   マップ一覧のソート・トークン失効時の再ログイン導線。実際のGoogleアカウントでのOAuth同意を
   伴うため自動化していない。手順: `docs/decisions.md`の該当決定（§2, 3, 9, 15）を参照しつつ、

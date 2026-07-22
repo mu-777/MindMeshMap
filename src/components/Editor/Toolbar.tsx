@@ -1,9 +1,8 @@
-import { useCallback, useState, useRef, useEffect } from 'react';
+import { useCallback, useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useReactFlow } from '@xyflow/react';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
-import { useAuthStore } from '../../stores/authStore';
 import { useConfirmStore } from '../../stores/confirmStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useAutoLayout } from '../../hooks/useAutoLayout';
@@ -39,8 +38,13 @@ function useClickOutside(
   }, [ref, handler]);
 }
 
+// 中央タイトルと左右UIグループの間に追加で確保する余白（px）。
+// タイトルのmaxWidthをツールバー幅から左右グループ幅を引いた残りに合わせてクランプする際、
+// ぴったり隙間ゼロだと詰まって見えるため、見た目の余裕分として加える
+const TITLE_SIDE_GAP = 40;
+
 export function Toolbar() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     currentMap,
     isDirty,
@@ -55,7 +59,6 @@ export function Toolbar() {
     historyIndex,
   } = useMapStore();
   const { toggleSidebar, setHelpModalOpen } = useUIStore();
-  const { isSignedIn } = useAuthStore();
   const { requestConfirm } = useConfirmStore();
   const { addToast } = useToastStore();
   const { save, isLoading } = useSaveMap();
@@ -72,7 +75,9 @@ export function Toolbar() {
 
   // モバイル用ツールメニューのstate
   const [isToolMenuOpen, setIsToolMenuOpen] = useState(false);
-  const toolMenuRef = useRef<HTMLDivElement>(null);
+  // このrefはコールバックref（setRightMobileEl）で手動代入するため、書き込み可能な
+  // MutableRefObjectを得られる `useRef<T | null>(null)` の形で宣言する
+  const toolMenuRef = useRef<HTMLDivElement | null>(null);
   useClickOutside(toolMenuRef as React.RefObject<HTMLElement>, () =>
     setIsToolMenuOpen(false)
   );
@@ -94,6 +99,51 @@ export function Toolbar() {
       titleInputRef.current.select();
     }
   }, [isEditingTitle]);
+
+  // 中央タイトルが左右UIグループと重ならないよう、タイトルのmaxWidthをツールバー幅・左右グループ
+  // 幅の実測値から算出する。中央タイトルはウインドウ中央基準（absolute + -translate-x-1/2）の
+  // ままなので、左右対称に「大きい方のグループ幅の2倍」を引くことでどちらとも重ならないようにする
+  // （UI優先。タイトルは必要なら省略/実質非表示になってよい。docs/decisions.md参照）
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const leftGroupRef = useRef<HTMLDivElement>(null);
+  const rightDesktopRef = useRef<HTMLDivElement>(null);
+  const rightMobileRef = useRef<HTMLDivElement | null>(null);
+  // モバイル右側グループのdivは、既存のtoolMenuRef（外側クリックで閉じる判定用）と
+  // rightMobileRef（幅測定用）の2つのrefを同時に持たせる必要があるため、
+  // 両方のcurrentを設定するコールバックrefにまとめる
+  const setRightMobileEl = useCallback((node: HTMLDivElement | null) => {
+    toolMenuRef.current = node;
+    rightMobileRef.current = node;
+  }, []);
+  const [titleMaxWidth, setTitleMaxWidth] = useState<number | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    const toolbarEl = toolbarRef.current;
+    const leftEl = leftGroupRef.current;
+    const rightDesktopEl = rightDesktopRef.current;
+    const rightMobileEl = rightMobileRef.current;
+    if (!toolbarEl || !leftEl || !rightDesktopEl || !rightMobileEl) return;
+
+    const recalc = () => {
+      const toolbarWidth = toolbarEl.offsetWidth;
+      const leftWidth = leftEl.offsetWidth;
+      // デスクトップ/モバイルは片方しか表示されない（もう片方はoffsetWidth=0になる）ので、
+      // 表示されている方の実測値がそのまま使われる
+      const rightWidth = Math.max(rightDesktopEl.offsetWidth, rightMobileEl.offsetWidth);
+      const available = Math.max(0, toolbarWidth - 2 * Math.max(leftWidth, rightWidth) - TITLE_SIDE_GAP);
+      setTitleMaxWidth(available);
+    };
+
+    recalc();
+
+    const observer = new ResizeObserver(recalc);
+    observer.observe(toolbarEl);
+    observer.observe(leftEl);
+    observer.observe(rightDesktopEl);
+    observer.observe(rightMobileEl);
+    return () => observer.disconnect();
+    // currentMap?.nameやi18n.languageの変化でもタイトル文言の長さ・左右UIの文言幅が変わるため再計算する
+  }, [currentMap?.name, i18n.language]);
 
   const handleTitleClick = useCallback(() => {
     setEditingTitle(currentMap?.name || '');
@@ -200,9 +250,12 @@ export function Toolbar() {
   );
 
   return (
-    <div className="relative flex h-12 items-center justify-between border-b border-gray-700 bg-gray-800 px-2 md:px-4">
+    <div
+      ref={toolbarRef}
+      className="relative flex h-12 items-center justify-between border-b border-gray-700 bg-gray-800 px-2 md:px-4"
+    >
       {/* 左側：アプリ名・ファイル操作 */}
-      <div className="z-10 flex flex-shrink-0 items-center gap-1 md:gap-2">
+      <div ref={leftGroupRef} className="z-10 flex flex-shrink-0 items-center gap-1 md:gap-2">
         <button
           onClick={toggleSidebar}
           className="rounded p-1.5 text-gray-400 hover:bg-gray-700 hover:text-white md:p-2"
@@ -254,40 +307,40 @@ export function Toolbar() {
           <span className="hidden text-sm md:inline">{t('common.new')}</span>
         </button>
 
-        {isSignedIn && (
-          <button
-            onClick={save}
-            disabled={isLoading || !isDirty}
-            className={`
-              rounded p-1.5 md:px-3 md:py-1.5
-              ${
-                isDirty
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'text-gray-400 hover:bg-gray-700 hover:text-white'
-              }
-              disabled:cursor-not-allowed disabled:opacity-50
-            `}
-            title={t('common.save')}
+        {/* 保存ボタンは常時表示（未ログイン時はこの端末へ、ログイン時はDriveへ。useSaveMapが
+            内部で分岐する。docs/decisions.md参照） */}
+        <button
+          onClick={save}
+          disabled={isLoading || !isDirty}
+          className={`
+            rounded p-1.5 md:px-3 md:py-1.5
+            ${
+              isDirty
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+            }
+            disabled:cursor-not-allowed disabled:opacity-50
+          `}
+          title={t('common.save')}
+        >
+          {/* モバイル：アイコン、デスクトップ：テキスト */}
+          <svg
+            className="h-4 w-4 md:hidden"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            {/* モバイル：アイコン、デスクトップ：テキスト */}
-            <svg
-              className="h-4 w-4 md:hidden"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-              />
-            </svg>
-            <span className="hidden text-sm md:inline">
-              {isLoading ? t('common.saving') : t('common.save')}
-            </span>
-          </button>
-        )}
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+            />
+          </svg>
+          <span className="hidden text-sm md:inline">
+            {isLoading ? t('common.saving') : t('common.save')}
+          </span>
+        </button>
 
         {/* ファイルメニュー（デスクトップのみ。モバイルは⋮メニューに同項目がある） */}
         <div className="relative hidden md:block" ref={fileMenuRef}>
@@ -390,8 +443,13 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* 中央：マップ名（クリックで編集可能）- 絶対位置でブラウザ中央に配置 */}
-      <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1 md:gap-2">
+      {/* 中央：マップ名（クリックで編集可能）- 絶対位置でブラウザ中央に配置。
+          maxWidthは左右UIグループの実測幅から算出し、どのタイトル長・ウインドウ幅でも
+          左右のボタン類に重ならないようにする（UI優先でタイトル側が縮む。上のuseLayoutEffect参照） */}
+      <div
+        className="absolute left-1/2 flex min-w-0 -translate-x-1/2 items-center gap-1 md:gap-2"
+        style={{ maxWidth: titleMaxWidth }}
+      >
         {isEditingTitle ? (
           <input
             ref={titleInputRef}
@@ -416,7 +474,7 @@ export function Toolbar() {
 
       {/* 右側：レイアウト・ズーム・認証 */}
       {/* デスクトップ表示 */}
-      <div className="z-10 hidden flex-shrink-0 items-center gap-2 md:flex">
+      <div ref={rightDesktopRef} className="z-10 hidden flex-shrink-0 items-center gap-2 md:flex">
         <select
           value={currentMap?.layoutDirection || 'DOWN'}
           onChange={handleLayoutDirectionChange}
@@ -476,7 +534,7 @@ export function Toolbar() {
       </div>
 
       {/* モバイル表示：⋮ドロップダウン */}
-      <div className="relative z-10 flex-shrink-0 md:hidden" ref={toolMenuRef}>
+      <div className="relative z-10 flex-shrink-0 md:hidden" ref={setRightMobileEl}>
         <button
           onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
           className="rounded p-2 text-gray-400 hover:bg-gray-700 hover:text-white"

@@ -17,15 +17,28 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ドキュメント（html/body）自体を非スクロール化する。モバイルでトップバー/左カラムを
+   触った際に、ドキュメント全体がスクロールしてトップバー(h-12)が画面外へ消えてしまう不具合の
+   対策。原因は body の min-height:100vh が、モバイルの可視ビューポート（URLバー分だけ
+   小さいdvh）より大きくなり、ドキュメントがスクロール可能になっていたこと。
+   デスクトップは100dvh≈100vhのため影響なし。左カラム(MapList)内のリスト等は各要素の
+   overflow-y-auto領域内でのみスクロールする */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
 }
 
 #root {
   width: 100%;
   height: 100vh;
+  height: 100dvh;
 }
 
 /* 100vhをフォールバックとしつつ、対応ブラウザでは動的ビューポート高（dvh）を優先する。
@@ -34,4 +47,44 @@ body {
 .app-height {
   height: 100vh;
   height: 100dvh;
+}
+
+/* ノード内リストのスタイル（@tailwindcss/typography未導入への対応）。
+   Tailwind preflightがul/olをlist-style:none;margin:0;padding:0にリセットするため、
+   FormatToolbarの箇条書き/番号付きリストボタンで生成したリストがマーカー無しの平文に
+   見えてしまう問題の修正。影響範囲をノード内(.ProseMirror配下)のみに限定するため、
+   typographyプラグイン導入ではなくスコープCSSで対応する（docs/decisions.md参照） */
+.ProseMirror ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.25rem 0;
+}
+.ProseMirror ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  margin: 0.25rem 0;
+}
+.ProseMirror li {
+  margin: 0;
+}
+.ProseMirror li > p {
+  margin: 0;
+}
+
+/* 自動リンク化されたURLの見た目。Tailwind preflightでaはcolor:inherit・下線なしになるため、
+   リンクだと視認できるように明示する */
+.ProseMirror a {
+  color: #63b3ed;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* contenteditable(.ProseMirror)のブラウザ既定フォーカスアウトラインを消す。
+   armed-focus方式（docs/decisions.md §13）により選択中もエディタにフォーカスが当たるため、
+   このアウトラインが「内側の白い枠」として選択中・編集中の両方で見えてしまっていた。
+   選択/編集状態はコンテナのring（青/緑）で示されるため、アウトライン除去で機能低下はない */
+.ProseMirror:focus,
+.ProseMirror:focus-visible,
+.ProseMirror-focused {
+  outline: none;
 }

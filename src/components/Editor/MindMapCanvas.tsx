@@ -10,10 +10,12 @@ import {
   applyEdgeChanges,
   MarkerType,
   useReactFlow,
+  useStore,
   type NodeChange,
   type EdgeChange,
   type Node,
   type OnConnectEnd,
+  type OnSelectionChangeFunc,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -25,6 +27,7 @@ import { useMapStore, loadDraft } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { isFirstVisit, markAsVisited, createDefaultMap } from '../../data/defaultMap';
 import { EMPTY_NODE_CONTENT } from '../../utils/nodeContent';
+import { getUndirectedShortestPath } from '../../utils/graphTraversal';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -59,8 +62,13 @@ export function MindMapCanvas() {
     addEdge: storeAddEdge,
     saveToHistory,
   } = useMapStore();
-  const { selectedNodeId, selectedNodeIds, selectedEdgeIds, setSelectedNodeId, toggleNodeSelection, clearMultiSelection, clearEdgeSelection, setEditingNodeId, closeContextMenu } = useUIStore();
+  const { selectedNodeId, selectedNodeIds, selectedEdgeIds, setSelectedNodeId, toggleNodeSelection, addNodesToSelection, setMultiSelection, clearMultiSelection, clearEdgeSelection, setEditingNodeId, closeContextMenu } = useUIStore();
   const { screenToFlowPosition, fitView, getViewport } = useReactFlow();
+  // Controls左下の「Toggle interactivity」ロック状態。ロック中はnodesDraggable/elementsSelectableと
+  // 一緒にnodesConnectableもfalseになる。ロック中はエッジ接続だけでなく新規ノード作成の
+  // 全ルート（ダブルクリック/長押し/ハンドルドラッグ/キーボード）も禁止する判定に使う
+  // （docs/decisions.md参照）
+  const nodesConnectable = useStore((s) => s.nodesConnectable);
   const connectingInfo = useRef<{ nodeId: string | null; handleId: string | null }>({
     nodeId: null,
     handleId: null,
@@ -279,6 +287,13 @@ export function MindMapCanvas() {
       const { nodeId, handleId } = connectingInfo.current;
       if (!nodeId) return;
 
+      // Toggle interactivityでロック中は、ハンドルドラッグ経由の新規ノード作成も禁止する
+      // （nodesDraggable=falseだけでは自前実装のこの作成ルートは止まらないための保険）
+      if (!nodesConnectable) {
+        connectingInfo.current = { nodeId: null, handleId: null };
+        return;
+      }
+
       // MouseEventまたはTouchEventから座標を取得
       let clientX: number | undefined;
       let clientY: number | undefined;
@@ -342,21 +357,63 @@ export function MindMapCanvas() {
 
       connectingInfo.current = { nodeId: null, handleId: null };
     },
-    [screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId, currentMap, isNodeInViewport, fitView]
+    [
+      nodesConnectable,
+      screenToFlowPosition,
+      addNode,
+      setSelectedNodeId,
+      setEditingNodeId,
+      currentMap,
+      isNodeInViewport,
+      fitView,
+    ]
   );
 
-  // ノードクリック（Shift+クリックで複数選択）
+  // ノードクリック。修飾キーで挙動を変える（CustomNode.handleClickと同一セマンティクス。
+  // docs/decisions.md参照）: Ctrl/Meta+クリック＝そのノード単体を選択にトグル追加、
+  // Shift+クリック＝アンカー（直近選択ノード）からクリックしたノードまでの無向最短経路上の
+  // ノードをまとめて選択にunion追加、修飾なし＝単一選択
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: Node) => {
       if (event.shiftKey) {
-        // Shift+クリックで複数選択をトグル
+        // 常に最新の選択状態を読む（getState()経由。CustomNode.handleClickと同じ理由）
+        const uiState = useUIStore.getState();
+        const anchor = uiState.selectedNodeId ?? uiState.lastSelectedNodeId;
+        const path =
+          anchor && currentMap ? getUndirectedShortestPath(anchor, node.id, currentMap.edges) : [];
+        if (path.length > 0) {
+          addNodesToSelection(path);
+        } else {
+          // アンカーが無い、または到達不能（別の連結成分）な場合は単体トグル追加にフォールバック
+          toggleNodeSelection(node.id);
+        }
+      } else if (event.ctrlKey || event.metaKey) {
+        // そのノード単体を選択にトグル追加
         toggleNodeSelection(node.id);
       } else {
         // 通常クリックは単一選択
         setSelectedNodeId(node.id);
       }
     },
-    [toggleNodeSelection, setSelectedNodeId]
+    [toggleNodeSelection, addNodesToSelection, setSelectedNodeId, currentMap]
+  );
+
+  // Shift+ドラッグの矩形選択（React Flow標準機能）をuiStoreの複数選択へ橋渡しする。
+  // アプリの選択状態は独自管理（uiStore.selectedNodeIds）で、単一クリック/Ctrl+クリック/
+  // Shift+クリックはonNodeClick/CustomNode.handleClickが個別に反映しているが、矩形選択には
+  // 対応するハンドラが無くuiStoreへ反映されていなかった（Deleteキーがselected NodeIdsを
+  // 見るため、矩形選択したノードをDeleteで削除できない不具合になっていた）。
+  // 2件以上のときだけ反映する（1件以下は単一選択系のクリックハンドラが管理するため、ここで
+  // 触ると単一クリックの選択解除等と競合しうる）。既に同一集合ならno-op（無限ループ防止）
+  const handleSelectionChange = useCallback<OnSelectionChangeFunc>(
+    ({ nodes: selNodes }) => {
+      const ids = selNodes.map((n) => n.id);
+      if (ids.length < 2) return;
+      const cur = useUIStore.getState().selectedNodeIds;
+      const same = ids.length === cur.length && ids.every((id) => cur.includes(id));
+      if (!same) setMultiSelection(ids);
+    },
+    [setMultiSelection]
   );
 
   // キャンバスクリックで選択解除
@@ -378,6 +435,8 @@ export function MindMapCanvas() {
   const createNodeAtPosition = useCallback(
     (clientX: number, clientY: number) => {
       if (!currentMap) return;
+      // Toggle interactivityでロック中は新規ノード作成を禁止する（ダブルクリック・長押し両方をカバー）
+      if (!nodesConnectable) return;
 
       // ノード上にドロップした場合は新規作成しない
       const elementAtPoint = document.elementFromPoint(clientX, clientY);
@@ -406,7 +465,7 @@ export function MindMapCanvas() {
         setEditingNodeId(newNodeId);
       }
     },
-    [currentMap, screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId]
+    [currentMap, nodesConnectable, screenToFlowPosition, addNode, setSelectedNodeId, setEditingNodeId]
   );
 
   // ペインのダブルクリックハンドラ（デスクトップ用）
@@ -598,6 +657,7 @@ export function MindMapCanvas() {
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
       onNodeClick={onNodeClick}
+      onSelectionChange={handleSelectionChange}
       onPaneClick={onPaneClick}
       onNodeDragStart={onNodeDragStart}
       onNodeDrag={onNodeDrag}

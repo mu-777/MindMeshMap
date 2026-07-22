@@ -406,11 +406,11 @@ export const useMapStore = create<MapState>((set, get) => ({
     // 自己ループは禁止
     if (source === target) return null;
 
-    // 既存のエッジがある場合は追加しない
-    const existingEdge = currentMap.edges.find(
+    // 既存の同一source&targetエッジがある場合は、それを削除してから新規エッジを追加する
+    // （後勝ち。新しく引いた接続のハンドル等が有効になる）
+    const existingIndex = currentMap.edges.findIndex(
       (e) => e.source === source && e.target === target
     );
-    if (existingEdge) return null;
 
     saveToHistory();
 
@@ -423,10 +423,19 @@ export const useMapStore = create<MapState>((set, get) => ({
       label,
     };
 
+    const edges =
+      existingIndex >= 0
+        ? [
+            ...currentMap.edges.slice(0, existingIndex),
+            ...currentMap.edges.slice(existingIndex + 1),
+            newEdge,
+          ]
+        : [...currentMap.edges, newEdge];
+
     set({
       currentMap: {
         ...currentMap,
-        edges: [...currentMap.edges, newEdge],
+        edges,
         updatedAt: new Date().toISOString(),
       },
       isDirty: true,

@@ -74,7 +74,7 @@ async function testClickingAnotherNodeEndsEditing() {
   }
 }
 
-// 編集中ノード自身をShift+クリックで選択解除すると、編集も終了する（緑リングが残らない）
+// 編集中ノード自身をCtrl+クリックで選択解除すると、編集も終了する（緑リングが残らない）
 async function testDeselectingEditingNodeEndsEditing() {
   const { browser, page, pageErrors } = await launchPage();
   try {
@@ -85,8 +85,11 @@ async function testDeselectingEditingNodeEndsEditing() {
     await page.waitForTimeout(120);
     await assertTrue(page, await isNodeEditing(page, rootId), '前提: rootが編集中（緑リング）であること');
 
-    // 編集中ノード自身をShift+クリック → toggleNodeSelectionで選択解除される
-    await nodeLocator(page, rootId).click({ modifiers: ['Shift'] });
+    // 編集中ノード自身をCtrl+クリック → toggleNodeSelectionで選択解除される。
+    // Shift+クリックは「アンカーからの無向最短経路をunion追加」の意味に変わっており
+    // （docs/decisions.md §36）、fromId===toId（自分自身）の場合は経路が[自分自身]の1件になり
+    // 常にunion追加（選択解除にはならない）のため、単体トグルの挙動を持つCtrl+クリックを使う
+    await nodeLocator(page, rootId).click({ modifiers: ['Control'] });
     await page.waitForTimeout(200);
 
     // 選択が外れたら編集も終了していること（未選択かつ編集中の状態を作らない）

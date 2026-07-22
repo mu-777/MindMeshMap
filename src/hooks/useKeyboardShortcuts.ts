@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
-import { useReactFlow } from '@xyflow/react';
+import { useReactFlow, useStoreApi } from '@xyflow/react';
 import { useMapStore } from '../stores/mapStore';
 import { useUIStore } from '../stores/uiStore';
 import { useKeybindStore } from '../stores/keybindStore';
@@ -8,13 +8,16 @@ import { useConfirmStore } from '../stores/confirmStore';
 import { useAutoLayout } from './useAutoLayout';
 import { useSaveMap } from './useSaveMap';
 import { useNodeCreation } from './useNodeCreation';
-import { getNearestNodeInDirection } from '../utils/graphTraversal';
+import { getNearestNodeInDirection, getNearestNodeInDirectionFromPoint } from '../utils/graphTraversal';
 import { LayoutDirection } from '../types';
 
 export function useKeyboardShortcuts() {
   const { fitView, zoomIn, zoomOut } = useReactFlow();
+  // Controls左下の「Toggle interactivity」ロック状態を判定するため、React Flowストアに
+  // 直接アクセスする（MindMapCanvas.tsxと同じ判定基準。docs/decisions.md参照）
+  const store = useStoreApi();
   const { currentMap, deleteNodesAndEdges, undo, redo, setLayoutDirection } = useMapStore();
-  const { setSelectedNodeId, setEditingNodeId, setHelpModalOpen, clearMultiSelection, clearEdgeSelection } = useUIStore();
+  const { setSelectedNodeId, setEditingNodeId, setHelpModalOpen, clearMultiSelection, clearEdgeSelection, setDeletedFocusAnchor } = useUIStore();
   const { getActionForKey } = useKeybindStore();
   const { isOpen: isConfirmDialogOpen } = useConfirmStore();
   const { applyLayout } = useAutoLayout();
@@ -34,6 +37,7 @@ export function useKeyboardShortcuts() {
         lastSelectedNodeId,
         editingNodeId,
         isHelpModalOpen,
+        deletedFocusAnchor,
       } = useUIStore.getState();
 
       // ヘルプモーダル表示中（キーバインドキャプチャ含む）・確認ダイアログ表示中は
@@ -104,7 +108,10 @@ export function useKeyboardShortcuts() {
       event.preventDefault();
 
       switch (action) {
+        // ノード新規作成の4アクションは、Controls左下の「Toggle interactivity」ロック中は
+        // 全て禁止する（ダブルクリック/長押し/ハンドルドラッグと同じ判定基準。docs/decisions.md参照）
         case 'createChildNode': {
+          if (!store.getState().nodesConnectable) break;
           if (activeNodeId) {
             createChildNode(activeNodeId);
           }
@@ -112,6 +119,7 @@ export function useKeyboardShortcuts() {
         }
 
         case 'createSiblingNode': {
+          if (!store.getState().nodesConnectable) break;
           if (activeNodeId) {
             createSiblingNode(activeNodeId);
           } else if (currentMap && currentMap.nodes.length > 0) {
@@ -122,6 +130,7 @@ export function useKeyboardShortcuts() {
         }
 
         case 'createOlderSiblingNode': {
+          if (!store.getState().nodesConnectable) break;
           if (activeNodeId) {
             createOlderSiblingNode(activeNodeId);
           }
@@ -129,6 +138,7 @@ export function useKeyboardShortcuts() {
         }
 
         case 'createParentNode': {
+          if (!store.getState().nodesConnectable) break;
           if (activeNodeId) {
             createParentNode(activeNodeId);
           }
@@ -145,6 +155,18 @@ export function useKeyboardShortcuts() {
           const edgeIdsToDelete = selectedEdgeIds;
           if (nodeIdsToDelete.length === 0 && edgeIdsToDelete.length === 0) {
             break;
+          }
+          // ノードを1つ以上削除する場合、削除実行前に代表ノード（selectedNodeIdがあればそれ、
+          // なければselectedNodeIdsの先頭）の位置を矢印キーナビゲーション用アンカーとして退避する。
+          // 削除後はlastSelectedNodeIdが消えたノードIDのまま残りgetNearestNodeInDirectionが
+          // 起点を見失うため、このアンカーが「消したノードの位置から矢印方向へフォーカス」の
+          // フォールバックになる（エッジのみ削除時はセットしない）
+          if (nodeIdsToDelete.length > 0) {
+            const primaryId = selectedNodeId ?? selectedNodeIds[0];
+            const primaryNode = currentMap?.nodes.find((n) => n.id === primaryId);
+            if (primaryNode) {
+              setDeletedFocusAnchor(primaryNode.position);
+            }
           }
           deleteNodesAndEdges(nodeIdsToDelete, edgeIdsToDelete);
           setSelectedNodeId(null);
@@ -177,7 +199,12 @@ export function useKeyboardShortcuts() {
               }
             }
             const nodeId = activeNodeId || currentMap.nodes[0].id;
-            const targetNode = getNearestNodeInDirection(nodeId, 'up', currentMap.nodes);
+            let targetNode = getNearestNodeInDirection(nodeId, 'up', currentMap.nodes);
+            // ノード削除直後は消えたノードがnodeIdに残っており見つからない（null）ため、
+            // 削除直前に退避した位置（deletedFocusAnchor）を起点に方向探索し直す
+            if (!targetNode && deletedFocusAnchor) {
+              targetNode = getNearestNodeInDirectionFromPoint(deletedFocusAnchor, 'up', currentMap.nodes);
+            }
             if (targetNode) {
               setSelectedNodeId(targetNode.id);
             }
@@ -196,7 +223,10 @@ export function useKeyboardShortcuts() {
               }
             }
             const nodeId = activeNodeId || currentMap.nodes[0].id;
-            const targetNode = getNearestNodeInDirection(nodeId, 'down', currentMap.nodes);
+            let targetNode = getNearestNodeInDirection(nodeId, 'down', currentMap.nodes);
+            if (!targetNode && deletedFocusAnchor) {
+              targetNode = getNearestNodeInDirectionFromPoint(deletedFocusAnchor, 'down', currentMap.nodes);
+            }
             if (targetNode) {
               setSelectedNodeId(targetNode.id);
             }
@@ -215,7 +245,10 @@ export function useKeyboardShortcuts() {
               }
             }
             const nodeId = activeNodeId || currentMap.nodes[0].id;
-            const targetNode = getNearestNodeInDirection(nodeId, 'left', currentMap.nodes);
+            let targetNode = getNearestNodeInDirection(nodeId, 'left', currentMap.nodes);
+            if (!targetNode && deletedFocusAnchor) {
+              targetNode = getNearestNodeInDirectionFromPoint(deletedFocusAnchor, 'left', currentMap.nodes);
+            }
             if (targetNode) {
               setSelectedNodeId(targetNode.id);
             }
@@ -234,7 +267,10 @@ export function useKeyboardShortcuts() {
               }
             }
             const nodeId = activeNodeId || currentMap.nodes[0].id;
-            const targetNode = getNearestNodeInDirection(nodeId, 'right', currentMap.nodes);
+            let targetNode = getNearestNodeInDirection(nodeId, 'right', currentMap.nodes);
+            if (!targetNode && deletedFocusAnchor) {
+              targetNode = getNearestNodeInDirectionFromPoint(deletedFocusAnchor, 'right', currentMap.nodes);
+            }
             if (targetNode) {
               setSelectedNodeId(targetNode.id);
             }
@@ -295,6 +331,7 @@ export function useKeyboardShortcuts() {
     [
       currentMap,
       isConfirmDialogOpen,
+      store,
       getActionForKey,
       createChildNode,
       createSiblingNode,
@@ -310,6 +347,7 @@ export function useKeyboardShortcuts() {
       setHelpModalOpen,
       clearMultiSelection,
       clearEdgeSelection,
+      setDeletedFocusAnchor,
       fitView,
       zoomIn,
       zoomOut,

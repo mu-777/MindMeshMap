@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../stores/uiStore';
 import { useMapStore } from '../../stores/mapStore';
 
+// メニューと対象（ノード矩形）/ビューポート端との間に空ける余白（px）
+const CONTEXT_MENU_GAP = 8;
+
 export function ContextMenu() {
   const { t } = useTranslation();
-  const { contextMenu, closeContextMenu, selectedNodeId, selectedNodeIds, selectedEdgeIds, setSelectedNodeId, toggleNodeSelection, toggleEdgeSelection } = useUIStore();
-  const { deleteNode, deleteEdge } = useMapStore();
+  const { contextMenu, closeContextMenu, selectedNodeId, selectedNodeIds, selectedEdgeIds, setSelectedNodeId, toggleNodeSelection, toggleEdgeSelection, setDeletedFocusAnchor } = useUIStore();
+  const { deleteNode, deleteEdge, currentMap } = useMapStore();
   const menuRef = useRef<HTMLDivElement>(null);
+  // 自サイズ計測が済むまでの初期位置（画面外0,0ではなくcontextMenu.x/yを暫定表示に使う）。
+  // 計測後にanchorRect基準の最終位置へ更新する
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
   // メニュー外クリックで閉じる
   useEffect(() => {
@@ -32,6 +38,48 @@ export function ContextMenu() {
     };
   }, [contextMenu, closeContextMenu]);
 
+  // メニューの自サイズ（offsetWidth/Height）を計測し、対象に重ならずビューポート内に収まる
+  // 表示位置を計算する。描画後・ペイント前に同期実行する必要があるためuseLayoutEffectを使う
+  // （useEffectだと一瞬(contextMenu.x, contextMenu.y)位置で描画されてから飛ぶ、という
+  // ちらつきが起きる）
+  useLayoutEffect(() => {
+    if (!contextMenu || !menuRef.current) {
+      setPosition(null);
+      return;
+    }
+    const el = menuRef.current;
+    const menuW = el.offsetWidth;
+    const menuH = el.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let left: number;
+    let top: number;
+
+    if (contextMenu.anchorRect) {
+      // ノードメニュー: 既定は「ノードの左側・上端揃え」。ノードに重ならない位置に出す
+      const { left: anchorLeft, top: anchorTop, right: anchorRight } = contextMenu.anchorRect;
+      left = anchorLeft - menuW - CONTEXT_MENU_GAP;
+      top = anchorTop;
+      // 左に入りきらない場合は右側へ
+      if (left < 0) {
+        left = anchorRight + CONTEXT_MENU_GAP;
+      }
+    } else {
+      // anchorRectが無い場合（エッジ・フォールバック）: 従来通りタップ/クリック座標を左上に
+      left = contextMenu.x;
+      top = contextMenu.y;
+    }
+
+    // ビューポート内にクランプ（画面外に出さない）
+    if (left + menuW > vw) left = vw - menuW;
+    if (left < 0) left = 0;
+    if (top + menuH > vh) top = vh - menuH;
+    if (top < 0) top = 0;
+
+    setPosition({ left, top });
+  }, [contextMenu]);
+
   // 削除処理
   // 削除対象がuiStore側の選択状態（selectedNodeId/selectedNodeIds/selectedEdgeIds）と
   // 一致する場合は選択も一緒にクリアする。クリアしないと、次にDeleteキーを押したときに
@@ -40,6 +88,13 @@ export function ContextMenu() {
   const handleDelete = useCallback(() => {
     if (contextMenu) {
       if (contextMenu.type === 'node') {
+        // useKeyboardShortcutsのDeleteキー削除と同様、削除実行前に対象ノードの位置を
+        // 矢印キーナビゲーション用アンカーとして退避する（右クリック削除後も矢印キーで
+        // 消したノードの位置から最寄りノードへフォーカスできるようにするため）
+        const targetNode = currentMap?.nodes.find((n) => n.id === contextMenu.id);
+        if (targetNode) {
+          setDeletedFocusAnchor(targetNode.position);
+        }
         deleteNode(contextMenu.id);
         if (selectedNodeId === contextMenu.id) {
           setSelectedNodeId(null);
@@ -59,6 +114,7 @@ export function ContextMenu() {
     }
   }, [
     contextMenu,
+    currentMap,
     deleteNode,
     deleteEdge,
     closeContextMenu,
@@ -68,6 +124,7 @@ export function ContextMenu() {
     setSelectedNodeId,
     toggleNodeSelection,
     toggleEdgeSelection,
+    setDeletedFocusAnchor,
   ]);
 
   if (!contextMenu) return null;
@@ -77,8 +134,8 @@ export function ContextMenu() {
       ref={menuRef}
       className="fixed z-50 min-w-[120px] rounded-lg border border-gray-600 bg-gray-800 py-1 shadow-xl"
       style={{
-        left: contextMenu.x,
-        top: contextMenu.y,
+        left: position?.left ?? contextMenu.x,
+        top: position?.top ?? contextMenu.y,
       }}
     >
       <button

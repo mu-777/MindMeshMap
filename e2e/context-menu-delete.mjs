@@ -1,4 +1,6 @@
-// 右クリックのコンテキストメニューからのノード/エッジ削除を検証する。
+// 右クリックのコンテキストメニューからのノード/エッジ削除を検証する。ノード側は、メニューが
+// 対象ノードに重ならずビューポート内に収まって表示されること（anchorRect基準の位置決め。
+// docs/decisions.md §47）も合わせて確認する。
 // エッジ側は、削除時にuiStoreのselectedEdgeIds（複数選択。旧selectedEdgeIdから移行済み。
 // docs/decisions.md参照）をクリアする修正の退行テストを兼ねる:
 // 修正前はContextMenuの削除ハンドラがselectedEdgeIds/selectedNodeIdをクリアしないままだったため、
@@ -56,6 +58,26 @@ async function testNodeDeleteViaContextMenu() {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
     await page.waitForTimeout(200);
 
+    // メニューが対象ノードに重ならない位置に、ビューポート内に収まって表示されること
+    // （長押し/右クリックメニューをanchorRect基準に自己サイズ計測して配置する方式の回帰確認。
+    // docs/decisions.md §47）
+    const menuBox = await page.locator('.fixed.z-50.min-w-\\[120px\\]').boundingBox();
+    const viewport = page.viewportSize();
+    const overlapsNode =
+      menuBox.x < box.x + box.width &&
+      menuBox.x + menuBox.width > box.x &&
+      menuBox.y < box.y + box.height &&
+      menuBox.y + menuBox.height > box.y;
+    await assertTrue(page, !overlapsNode, 'コンテキストメニューが対象ノードに重ならない位置に表示されること');
+    await assertTrue(
+      page,
+      menuBox.x >= 0 &&
+        menuBox.y >= 0 &&
+        menuBox.x + menuBox.width <= viewport.width &&
+        menuBox.y + menuBox.height <= viewport.height,
+      'コンテキストメニューがビューポート内に収まって表示されること'
+    );
+
     await openContextMenuAndDelete(page);
 
     const remaining = await getNodeIds(page);
@@ -82,9 +104,9 @@ async function testEdgeDeleteViaContextMenuClearsSelection() {
     await page.keyboard.up('Shift');
     await page.waitForTimeout(150);
     // 右クリックは座標クリックではなくdispatchEventで直接エッジのDOM要素に発火させる。
-    // デフォルトマップはノード付近で複数のエッジが密集しており、選択後に現れる
-    // "+Label ×" オーバーレイや隣接エッジの当たり判定と座標が重なって、
-    // 意図しない別要素に右クリックが奪われることがあったため（座標依存の脆さを回避する）。
+    // デフォルトマップはノード付近で複数のエッジが密集しており、隣接エッジの当たり判定と
+    // 座標が重なって、意図しない別要素に右クリックが奪われることがあったため
+    // （座標依存の脆さを回避する）。
     // .edge-click-target はCustomEdge.tsx側の自前インタラクションパス専用のクラス
     // （BaseEdgeの可視パスと区別するため。両方ともpath要素なので単純な`path`セレクタでは
     // DOM順序に依存してしまい脆い）

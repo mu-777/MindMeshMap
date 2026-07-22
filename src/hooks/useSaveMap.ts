@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMapStore } from '../stores/mapStore';
 import { useAuthStore } from '../stores/authStore';
+import { useLocalMapStore } from '../stores/localMapStore';
 import { useToastStore } from '../stores/toastStore';
 import { useUIStore } from '../stores/uiStore';
 import { useGoogleDrive } from './useGoogleDrive';
@@ -9,13 +10,14 @@ import { useGoogleAuth } from './useGoogleAuth';
 import { AuthExpiredError } from '../utils/errors';
 
 /**
- * Google Driveへの保存処理を共通化したフック。
- * Toolbarの保存ボタン・Ctrl+Sショートカットの両方から利用する。
+ * 保存処理を共通化したフック。未ログイン時はこの端末（localStorage）へ、ログイン時はGoogle
+ * Driveへ保存する（Toolbarの保存ボタン・Ctrl+Sショートカットの両方から利用する）。
  */
 export function useSaveMap() {
   const { t } = useTranslation();
   const { currentMap, currentFileId, isDirty, setDirty, setCurrentFileId } = useMapStore();
   const { isSignedIn } = useAuthStore();
+  const { saveLocalMap } = useLocalMapStore();
   const { saveMap: saveMapToDrive, isLoading } = useGoogleDrive();
   const { signIn } = useGoogleAuth();
   const { addToast } = useToastStore();
@@ -25,7 +27,10 @@ export function useSaveMap() {
     if (!currentMap) return;
 
     if (!isSignedIn) {
-      addToast({ type: 'info', message: t('toast.localAutoSaved') });
+      // ログインしていない場合はこの端末（localStorage）に保存する
+      saveLocalMap(currentMap);
+      setDirty(false);
+      addToast({ type: 'success', message: t('toast.localSaved') });
       return;
     }
 
@@ -61,6 +66,7 @@ export function useSaveMap() {
     currentFileId,
     isDirty,
     isSignedIn,
+    saveLocalMap,
     saveMapToDrive,
     setDirty,
     setCurrentFileId,

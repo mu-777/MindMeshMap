@@ -18,7 +18,7 @@
     "redo": "Redo (Ctrl+Shift+Z)",
     "clickToEditTitle": "Click to edit title",
     "untitledMap": "Untitled Map",
-    "autoLayout": "Auto Layout",
+    "autoLayout": "Auto Layout (Ctrl+Shift+L)",
     "align": "Align",
     "helpShortcut": "Help (?)",
     "layoutDirection": "Layout Direction",
@@ -41,7 +41,10 @@
     "sortUpdatedDesc": "Updated (newest)",
     "sortUpdatedAsc": "Updated (oldest)",
     "sortCreatedDesc": "Created (newest)",
-    "sortCreatedAsc": "Created (oldest)"
+    "sortCreatedAsc": "Created (oldest)",
+    "sectionLocal": "Local",
+    "sectionDrive": "Google Drive",
+    "migrateToDrive": "Save to Drive"
   },
   "shortcuts": {
     "nodeOperations": "Node Operations",
@@ -54,7 +57,7 @@
     "title": "Help",
     "tabBasic": "Basic Operations",
     "tabFormat": "Formatting",
-    "tabKeyboard": "Keyboard",
+    "tabKeyboard": "Keyboard (PC)",
     "opCreateNode": "Create Node",
     "opCreateNodeDesc": "Double-click empty canvas / Long-press",
     "opEditNode": "Edit Node",
@@ -116,7 +119,6 @@
   },
   "editor": {
     "placeholder": "Enter text...",
-    "addLabel": "+ Label",
     "deleteEdge": "Delete edge",
     "bold": "Bold (Ctrl+B)",
     "italic": "Italic (Ctrl+I)",
@@ -144,7 +146,8 @@
     "deleteFailed": "Failed to delete"
   },
   "toast": {
-    "localAutoSaved": "Changes are auto-saved on this device. Sign in with Google to save to Google Drive.",
+    "localSaved": "Saved to this device",
+    "migratedToDrive": "Saved to Google Drive",
     "alreadySaved": "Already saved",
     "sessionExpired": "Your login session has expired. Please sign in again.",
     "importSuccess": "Map imported successfully",
