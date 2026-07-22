@@ -21,6 +21,25 @@ interface MapState {
 
   // ノード操作
   addNode: (node: Omit<MapNode, 'id'>, parentId?: string, sourceHandle?: string, targetHandle?: string) => string;
+  // ノード追加(+任意の親エッジ) と 既存ノードの位置移動 を1履歴でまとめて適用する。
+  // 兄弟ノードを対象の隣に挿入し、押し出す兄弟（＋そのサブツリー）を平行移動するのに使う。
+  addNodeWithShifts: (
+    node: Omit<MapNode, 'id'>,
+    parentId: string | undefined,
+    sourceHandle: string | undefined,
+    targetHandle: string | undefined,
+    shifts: { id: string; position: { x: number; y: number } }[]
+  ) => string;
+  // 対象ノードの「親」として新ノードを挿入する。対象の既存の親（複数可）は新ノードの親になり、
+  // 対象は新ノードの子になる（対象の子はそのまま）。ノード追加・エッジ張り替えを1履歴でまとめる。
+  insertParentNode: (
+    targetId: string,
+    node: Omit<MapNode, 'id'>,
+    childSourceHandle?: string,   // 新ノード→対象 のsourceHandle（RIGHT:'right' / DOWN:'bottom'）
+    childTargetHandle?: string,   // 対象側のtargetHandle（RIGHT:'left' / DOWN:'top'）
+    parentTargetHandle?: string,  // 既存親→新ノード のtargetHandle（RIGHT:'left' / DOWN:'top'）
+    shifts?: { id: string; position: { x: number; y: number } }[]  // 対象＋子孫を外側レイヤへ移動する
+  ) => string;
   updateNode: (nodeId: string, updates: Partial<MapNode>) => void;
   updateNodeContent: (nodeId: string, content: string, recordHistory: boolean) => void;
   deleteNode: (nodeId: string) => void;
@@ -142,6 +161,77 @@ export const useMapStore = create<MapState>((set, get) => ({
         edges: newEdges,
         updatedAt: new Date().toISOString(),
       },
+      isDirty: true,
+    });
+
+    return newNode.id;
+  },
+
+  addNodeWithShifts: (nodeData, parentId, sourceHandle, targetHandle, shifts) => {
+    const { currentMap, saveToHistory } = get();
+    if (!currentMap) return '';
+
+    saveToHistory();
+
+    const newNode: MapNode = { ...nodeData, id: generateId() };
+    const shiftMap = new Map(shifts.map((s) => [s.id, s.position]));
+
+    const nodes = currentMap.nodes.map((n) =>
+      shiftMap.has(n.id) ? { ...n, position: shiftMap.get(n.id)! } : n
+    );
+    nodes.push(newNode);
+
+    const edges = parentId
+      ? [
+          ...currentMap.edges,
+          { id: generateId(), source: parentId, target: newNode.id, sourceHandle, targetHandle },
+        ]
+      : currentMap.edges;
+
+    set({
+      currentMap: { ...currentMap, nodes, edges, updatedAt: new Date().toISOString() },
+      isDirty: true,
+    });
+
+    return newNode.id;
+  },
+
+  insertParentNode: (targetId, nodeData, childSourceHandle, childTargetHandle, parentTargetHandle, shifts = []) => {
+    const { currentMap, saveToHistory } = get();
+    if (!currentMap) return '';
+    const target = currentMap.nodes.find((n) => n.id === targetId);
+    if (!target) return '';
+
+    saveToHistory();
+
+    const newNode: MapNode = { ...nodeData, id: generateId() };
+    const shiftMap = new Map(shifts.map((s) => [s.id, s.position]));
+
+    // 対象を指している既存エッジ（＝対象の親→対象）を、親→新ノード に張り替える。
+    // 親側のsourceHandleは維持し、targetHandleは新ノードの受け口に更新する。
+    // 対象から出るエッジ（対象の子）は一切触らない。
+    const rewiredEdges = currentMap.edges.map((edge) =>
+      edge.target === targetId
+        ? { ...edge, target: newNode.id, targetHandle: parentTargetHandle }
+        : edge
+    );
+
+    // 対象＋その子孫を外側レイヤへ平行移動する
+    const nodes = currentMap.nodes.map((n) =>
+      shiftMap.has(n.id) ? { ...n, position: shiftMap.get(n.id)! } : n
+    );
+    nodes.push(newNode);
+
+    const newEdge: MapEdge = {
+      id: generateId(),
+      source: newNode.id,
+      target: targetId,
+      sourceHandle: childSourceHandle,
+      targetHandle: childTargetHandle,
+    };
+
+    set({
+      currentMap: { ...currentMap, nodes, edges: [...rewiredEdges, newEdge], updatedAt: new Date().toISOString() },
       isDirty: true,
     });
 

@@ -284,3 +284,28 @@ export function detectCycles(edges: MapEdge[]): string[][] {
 
   return cycles;
 }
+
+/**
+ * 指定ノードの子孫（子・孫…）のIDをすべて取得する（自身は含まない）。
+ * child方向（edge.source→edge.target）にたどる。循環があっても無限ループしない。
+ */
+export function getDescendantIds(nodeId: string, edges: MapEdge[]): Set<string> {
+  const childrenMap = new Map<string, string[]>();
+  for (const e of edges) {
+    const list = childrenMap.get(e.source);
+    if (list) list.push(e.target);
+    else childrenMap.set(e.source, [e.target]);
+  }
+  const result = new Set<string>();
+  const stack = [nodeId];
+  while (stack.length > 0) {
+    const cur = stack.pop()!;
+    for (const child of childrenMap.get(cur) ?? []) {
+      if (child !== nodeId && !result.has(child)) {
+        result.add(child);
+        stack.push(child);
+      }
+    }
+  }
+  return result;
+}

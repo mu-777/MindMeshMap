@@ -44,8 +44,9 @@ const formatShortcuts: { labelKey: string; key: string }[] = [
 // （キーバインド編集の対象外。CustomNode.tsxのeditorProps.handleKeyDownを参照）
 const editingShortcuts: { labelKey: string; key: string }[] = [
   { labelKey: 'help.editingConfirmCreateChild', key: 'Tab' },
+  { labelKey: 'help.editingConfirmCreateParent', key: 'Shift+Tab' },
   { labelKey: 'help.editingConfirmCreateSibling', key: 'Enter' },
-  { labelKey: 'help.editingNewLineTouch', key: 'Enter' },
+  // { labelKey: 'help.editingNewLineTouch', key: 'Enter' }, // 不要
 ];
 
 // タブ3「キーボード」: 既存のショートカット一覧（クリックでキーバインド編集可能）
@@ -54,7 +55,9 @@ const shortcutGroups: { titleKey: string; actions: KeybindAction[] }[] = [
     titleKey: 'shortcuts.nodeOperations',
     actions: [
       'createChildNode',
+      'createParentNode',
       'createSiblingNode',
+      'createOlderSiblingNode',
       'deleteNode',
       'editNode',
       'finishEdit',

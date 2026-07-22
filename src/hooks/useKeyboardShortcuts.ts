@@ -19,7 +19,7 @@ export function useKeyboardShortcuts() {
   const { isOpen: isConfirmDialogOpen } = useConfirmStore();
   const { applyLayout } = useAutoLayout();
   const { save } = useSaveMap();
-  const { createChildNode, createSiblingNode } = useNodeCreation();
+  const { createChildNode, createSiblingNode, createOlderSiblingNode, createParentNode } = useNodeCreation();
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -117,6 +117,20 @@ export function useKeyboardShortcuts() {
           } else if (currentMap && currentMap.nodes.length > 0) {
             // 何も選択されていない場合は、最初のノードを選択
             setSelectedNodeId(currentMap.nodes[0].id);
+          }
+          break;
+        }
+
+        case 'createOlderSiblingNode': {
+          if (activeNodeId) {
+            createOlderSiblingNode(activeNodeId);
+          }
+          break;
+        }
+
+        case 'createParentNode': {
+          if (activeNodeId) {
+            createParentNode(activeNodeId);
           }
           break;
         }
@@ -284,6 +298,8 @@ export function useKeyboardShortcuts() {
       getActionForKey,
       createChildNode,
       createSiblingNode,
+      createOlderSiblingNode,
+      createParentNode,
       deleteNodesAndEdges,
       undo,
       redo,

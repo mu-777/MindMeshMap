@@ -2,7 +2,9 @@ import { KeybindMap } from '../types';
 
 export const defaultKeybinds: KeybindMap = {
   createChildNode: 'Tab',
+  createParentNode: 'Shift+Tab',
   createSiblingNode: 'Enter',
+  createOlderSiblingNode: 'Shift+Enter',
   deleteNode: 'Delete',
   editNode: 'F2',
   finishEdit: 'Escape',
@@ -26,7 +28,9 @@ export const defaultKeybinds: KeybindMap = {
 
 export const keybindDescriptions: Record<keyof KeybindMap, string> = {
   createChildNode: '子ノード作成',
+  createParentNode: '親ノード作成',
   createSiblingNode: '兄弟ノード作成',
+  createOlderSiblingNode: '兄ノード作成',
   deleteNode: 'ノード削除',
   editNode: 'ノード編集',
   finishEdit: '編集終了',

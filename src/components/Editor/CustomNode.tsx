@@ -35,7 +35,7 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
   const { updateNodeContent } = useMapStore();
   const { editingNodeId, setEditingNodeId, setSelectedNodeId, toggleNodeSelection, openContextMenu } = useUIStore();
   const setActiveEditor = useEditorStore((state) => state.setActiveEditor);
-  const { createChildNode, createSiblingNode } = useNodeCreation();
+  const { createChildNode, createSiblingNode, createParentNode } = useNodeCreation();
   const isEditing = editingNodeId === id;
   // armed状態（選択中かつ編集中でない）。この状態ではTiptapエディタをeditable+フォーカス済みに
   // しておく（armed-focus方式）。IMEは打鍵時点でフォーカスされている要素を見てcomposition開始を
@@ -122,13 +122,23 @@ function CustomNodeComponent({ id, data, selected }: NodeProps<CustomNodeType>) 
             });
             return true;
           }
-          // Tabで編集確定＋子ノード作成（新ノードを選択=armedにする。マインドマップ標準の挙動）
-          if (event.key === 'Tab') {
+          // Tabで編集確定＋子ノード作成（新ノードを選択=armed。マインドマップ標準の階層操作）
+          if (event.key === 'Tab' && !event.shiftKey) {
             event.preventDefault();
             event.stopPropagation();
             flushSync(() => {
               setEditingNodeId(null);
               createChildNode(id);
+            });
+            return true;
+          }
+          // Shift+Tabで編集確定＋親ノード作成（対象の既存の親は新ノードの親になり、対象はその子になる）
+          if (event.key === 'Tab' && event.shiftKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            flushSync(() => {
+              setEditingNodeId(null);
+              createParentNode(id);
             });
             return true;
           }

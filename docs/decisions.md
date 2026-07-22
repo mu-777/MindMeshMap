@@ -112,7 +112,7 @@ MindMeshMap における設計判断のうち、選択肢を比較して決め�
 - **英語をデフォルトにした理由**: サイトのメタは元々英語基調（`<html lang="en">`、`fallbackLng: 'en'`、`og:title`/`og:description` が英語）。共有時に必ず表示される1枚を英語に揃えることで、より広いオーディエンスに届く。
 - **なぜロケール自動切替にしないか（重要・逆戻りガード）**: OGP画像は「1URL＝1枚」で静的に固定され、**閲覧者の言語に応じてSNS/Slack側が自動で出し分けることはできない**。クローラはJSを実行しないため、アプリ内の言語切替（i18next）やJSでの`<meta>`書き換えは共有プレビューに反映されない。また GitHub Pages は静的ホスティングでロケール別HTMLの出し分け（サーバサイドのコンテンツネゴシエーション）ができないため、`og:locale:alternate` によるFacebookのロケールURL切替も機能しない。したがって「デフォルト＝英語」を固定し、日本語版はファイルとして同梱（`.../og-image.ja.png`）するに留める。ロケール別に確実に出し分けたい場合は、ロケール別の静的HTML（別URL）を用意して各々の `og:image` を差し替える必要がある（現時点では過剰と判断し不採用）。
 - **画像の内容**: アプリのブランド（ダークテーマ・ブルーのアクセント `#5b9fe6`/`#63b3ed`、`public/logo.svg` のメッシュモチーフ）に合わせ、左にタイトル「Mind Mesh Map」＋タグライン＋機能チップ＋公開URL、右に**循環を含むノードグラフ**（4ノードのループを明色で強調＋横断リンク）を配置。本アプリ最大の特徴である「循環許容」を一目で伝えることを狙った。実アプリのスクリーンショットではなく、縮小表示でも要点が読める専用バナーを採用。ロケール別の差分は文言のみ（英: A graph-structured mind map editor that allows cycles / 日: 循環を許容するグラフ構造のマインドマップエディタ、機能チップ、グラフのノードラベル）。
-- **生成方法**: `docs/assets/og-image.gen.mjs`（devDependency の Playwright + Chromium で HTML をスクリーンショット）。リポジトリルートで `node docs/assets/og-image.gen.mjs` を実行すると **`public/og-image.png`（en）と `public/og-image.ja.png`（ja）を両方再生成**する。文言調整はスクリプト冒頭の `LOCALES`、グラフの見た目は `geometry`/`edges` を編集する。生成物のみ配布（`public/`）、生成スクリプトは `docs/` 配下に置きビルド成果物へは混入させない。
+- **生成方法**: `scripts/og-image.gen.mjs`（devDependency の Playwright + Chromium で HTML をスクリーンショット）。リポジトリルートで `node scripts/og-image.gen.mjs` を実行すると **`public/og-image.png`（en）と `public/og-image.ja.png`（ja）を両方再生成**する。文言調整はスクリプト冒頭の `LOCALES`、グラフの見た目は `geometry`/`edges` を編集する。生成物のみ配布（`public/`）、生成スクリプトは `scripts/` 配下に置きビルド成果物へは混入させない。
 - **不採用案**: (1) og:image なし（タイトル・説明のみのカード）→ SNS流入時の訴求力が弱いため取りやめ。(2) 実アプリのスクリーンショット直撮り→ 縮小表示で文字が潰れ「循環グラフ」という差別化点が伝わりにくいため、要点を絞った専用バナーにした。(3) 閲覧者の言語でのOGP自動切替→ 上記のとおり静的サイトでは技術的に不可のため見送り。
 - **再検討の条件**: タイトル・タグライン・機能・URL・ブランドカラーの変更時、または対応ロケール追加時。文言や配色を変えたら同スクリプトで再生成し `public/og-image*.png` を更新する。ロケール別の共有URL出し分けが必要になったらロケール別HTMLの導入を再検討する。
 
@@ -401,3 +401,29 @@ MindMeshMap における設計判断のうち、選択肢を比較して決め�
   - **被リンク・言及（オフページ）**は最大の権威性要因だがコードでは作れない（公開・共有・登録などの運用施策）。
 - **再検討の条件**: タイトル/description/機能/URL/対応言語/ブランドカラーを変えたとき（`index.html` のメタ・JSON-LD・noscript とog-image §10 を同時に整合）。ページを増やしたら `sitemap.xml` に `<url>` を追加。カスタムドメイン化したら robots.txt をオリジン直下へ。
 - **調整箇所**: メタ/構造化データ/noscript = [index.html](../index.html)、sitemap = [public/sitemap.xml](../public/sitemap.xml)、robots = [public/robots.txt](../public/robots.txt)。Search Console確認タグを入れる場合は `index.html` の `<head>`。
+
+## 29. `Shift+Enter`=兄ノード作成 / `Shift+Tab`=親ノード作成 を追加
+
+- **決定**: 既存の `Enter`（弟ノード作成）・`Tab`（子ノード作成）の対称操作として、`Shift+Enter`=兄ノード作成、`Shift+Tab`=親ノード作成を追加した。兄ノードは弟（`Enter`）の逆方向に配置する（RIGHTレイアウト→上、DOWNレイアウト→左）。親ノード（`Shift+Tab`）も対称に、子（`Tab`）の逆方向に配置する（RIGHT→左、DOWN→上）。
+- **編集中のShift+Enterは改行のまま維持**（デスクトップでノード内改行の手段を残すため。決定#20の「Shift+Enter=改行」を踏襲）。そのため兄ノード作成は非編集（armed・ノード選択中）状態でのみ、`useKeyboardShortcuts`（グローバルキーハンドラ）経由でのみ発火する。`CustomNode` の編集中Enter分岐は変更していない。
+- **親ノード（`Shift+Tab`）は編集中も発火する**（`Tab`=子作成の対称）。`Tab` は改行等の別用途を持たないため、編集中に割り当てても既存capabilityの喪失がない。この対応にあわせて、`CustomNode.tsx` の編集中 `Tab` 分岐が `event.shiftKey` を見ておらず **`Shift+Tab` でも子ノード作成になってしまっていた既存の取りこぼし**も同時に修正した（`!event.shiftKey` の場合のみ子作成、`event.shiftKey` の場合は親作成に分岐）。
+- **多重親の挿入仕様**: 対象ノードTに`Shift+Tab`したとき、新ノードNをTの親として挿入する。Tが複数の親P=[p1,p2,...]を持つ場合、Pはすべて新ノードNの親になり（p→Tエッジをすべてp→Nへ張り替え）、TはNの子になる（N→Tエッジを新規追加）。Tの子ノードはTにつけたまま（Tから出るエッジは一切触らない）。Tが親を持たない（ルート）場合はN→Tを足すだけでNが新ルートになる。これらのグラフ変更（ノード追加・N→T追加・P→Tの張り替え）は専用の`mapStore`アクション`insertParentNode`で1回の履歴エントリにまとめており、`Ctrl+Z`一回ですべて戻る。
+- **既存ユーザーのlocalStorage補完**: `keybindStore`は`persist`（`name: 'mindmap-keybinds'`）で永続化されているため、既存ユーザーの保存済み`keybinds`には新アクション（`createParentNode`/`createOlderSiblingNode`）が存在しない。デフォルトの`merge`は`keybinds`オブジェクトを丸ごと置換してしまい新キーが欠落するため、`persist`のoptionsに`merge`を追加し、`keybinds: { ...defaultKeybinds, ...(persisted.keybinds ?? {}) }`の形で既存カスタマイズを保ちつつ新デフォルトを補完するようにした。
+- **不採用案とその理由**:
+  - **編集中のShift+Enterも兄作成にする（Enterと完全対称）**: デスクトップでノード内改行の手段が失われるため見送り（ユーザー判断）。将来Shift+Enterを兄作成に寄せたくなったら、代替の改行キー割当（例: `Ctrl+Enter`）とセットで再検討する。
+- **検証**: 型チェック（`tsc -b`）・ESLintで確認。実ブラウザでのキー入力（Shift+Enter/Shift+Tabの実際の発火・IME変換への非干渉・複数親ノードでの張り替え挙動）はWSL環境では確認できないため、ユーザーによる実機（Windows/macOS）での手動確認が必要。
+- **関連**: `Enter`=改行という編集中挙動の決定は #20、armed-focus方式・編集中キー処理の全体像は #13 を参照。
+- **調整箇所**: キーバインド既定値・説明文 = [src/config/defaultKeybinds.ts](../src/config/defaultKeybinds.ts)、位置計算（オフセット量 `x±200`/`y±100`/`y-120`）= [src/hooks/useNodeCreation.ts](../src/hooks/useNodeCreation.ts) の `createOlderSiblingNode`/`createParentNode`、多重親の張り替えロジック = [src/stores/mapStore.ts](../src/stores/mapStore.ts) の `insertParentNode`。
+
+## 30. 兄弟作成は対象の隣に局所挿入、親作成は挿入時に対象を1レイヤ外へ自動整列
+
+- **背景**: #29 でのキーバインド追加時点では、兄弟作成（`Enter`/`Shift+Enter`）の配置は `adjustPositionToAvoidOverlap` で空くまでずらす方式だったため、兄弟が複数いると新ノードが兄弟グループの一番端に付いてしまっていた。また親作成（`Shift+Tab`）は新ノードNを対象Tの単純に隣（左/上）へ固定配置するだけで、Nが実際に属する階層（Tの元の親の子レイヤ）に見合った位置にならなかった。本エントリはキーバインドや発火条件は変えず、配置ジオメトリのみを改善する。
+- **決定（兄弟作成）**: 新ノードは対象の「一番端」ではなく「すぐ隣（弟なら1つ後ろ、兄なら1つ前）」のスロットに挿入する。既存の兄弟のうち挿入位置より遠い側（押し出される側）だけを、そのサブツリーごと主軸方向に1スロット分平行移動する。対象ノード自身・挿入位置より近い側の兄弟・無関係なノードは一切動かさない。挿入間隔は隣接する兄弟との実際の間隔を使い、対象が兄弟グループの端（隣接する遠い側の兄弟がいない）の場合のみ既定値（`defaultGap`: RIGHTレイアウト=100/DOWNレイアウト=200）にフォールバックする。親を持たない対象（ルート等、兄弟グループが無い場合）は常に既定値を使う。
+- **決定（親作成）**: 挿入後、新ノードNは対象Tの元のスロット（位置）をそのまま継承する。対象Tとその子孫（サブツリー全体）は、レイヤ軸方向に`layerGap`（RIGHTレイアウト=200/DOWNレイアウト=120、`createChildNode`の子オフセットと同値）だけ外側へ平行移動する。これにより新ノードNが「Tの元の親からTへ」という既存の階層1レイヤ分をそのまま引き継いだ自然な位置に収まる。
+- **サブツリーの平行移動（両方に共通）**: 押し出す兄弟・外側へずらす対象は、いずれも子孫（子・孫…）を含めてサブツリーごと同じ量だけ平行移動する。子孫IDの列挙は新規ヘルパー `getDescendantIds`（[src/utils/graphTraversal.ts](../src/utils/graphTraversal.ts)、循環ガード付きBFS/DFS、対象自身は含まない）を使う。
+- **1履歴エントリ化**: ノード追加・エッジ張り替え・複数ノードの位置移動を同一トランザクションとして扱うため、`mapStore` に新アクション `addNodeWithShifts`（ノード追加+任意の親エッジ+位置移動シフト配列を受け取る）を追加し、既存の `insertParentNode` にも第6引数 `shifts`（省略可、省略時は`[]`で従来どおり位置移動なし）を追加した。どちらも内部で `saveToHistory()` を1回だけ呼ぶため、`Ctrl+Z` 一回でノード追加・エッジ変更・シフトされた全ノードの位置が一括で元に戻る。
+- **不採用案とその理由**:
+  - **作成直後に非同期ELK整列（`useAutoLayout.applyLayout`）を呼んで整列させる**: (1) `applyLayout`はReact Flowの最新nodes/edgesをフックのstale closure越しに参照する可能性があり、直後の状態と食い違うリスクがある。(2) ELK側でも独自に`saveToHistory()`相当の処理が走るため、ノード作成と整列が別々の履歴エントリになり`Ctrl+Z`一回で戻らなくなる。(3) ELKの間隔は固定定数ベースで、ユーザーが手動で作った可変間隔の既存レイアウトを壊してしまう。これらの理由から、直接ジオメトリ計算で同期的に必要最低限の移動だけを行う方式を採用した。
+- **検証**: 型チェック（`tsc -b`）・ESLint・`npm run build`で確認。実ブラウザでの実際のキー入力による兄弟複数時の局所挿入・サブツリー平行移動・親作成時のレイヤ整列・`Ctrl+Z`一回での巻き戻しは、WSL環境では確認できないためユーザーによる実機での手動確認が必要。
+- **関連**: キーバインド自体の追加は #29。
+- **調整箇所**: 兄弟の既定間隔 `defaultGap`（[src/hooks/useNodeCreation.ts](../src/hooks/useNodeCreation.ts) の `computeSiblingInsertion` 内、RIGHT=100/DOWN=200）、レイヤ間隔 `layerGap`（同ファイル `createParentNode` 内、RIGHT=200/DOWN=120）。

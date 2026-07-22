@@ -70,6 +70,18 @@ export const useKeybindStore = create<KeybindState>()(
     }),
     {
       name: 'mindmap-keybinds',
+      // 既存ユーザーの localStorage には後から追加したアクション（createParentNode 等）が
+      // 無いため、デフォルトの浅いマージだと新キーが欠落する。keybinds を
+      // defaultKeybinds で下地にしてから永続値で上書きし、新デフォルトを補完しつつ
+      // ユーザーのカスタマイズを保つ。
+      merge: (persisted, current) => {
+        const p = persisted as Partial<KeybindState> | undefined;
+        return {
+          ...current,
+          ...(p ?? {}),
+          keybinds: { ...defaultKeybinds, ...(p?.keybinds ?? {}) },
+        };
+      },
     }
   )
 );

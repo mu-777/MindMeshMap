@@ -45,7 +45,9 @@ export interface MapMeta {
 // キーバインド設定
 export type KeybindAction =
   | 'createChildNode'
+  | 'createParentNode'
   | 'createSiblingNode'
+  | 'createOlderSiblingNode'
   | 'deleteNode'
   | 'editNode'
   | 'finishEdit'
