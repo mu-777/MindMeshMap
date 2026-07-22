@@ -12,12 +12,12 @@ import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';
 
 const W = 1200, H = 630;
-const TITLE_HTML = 'Mind <span class="mesh">Mesh</span> Map'; // ブランド名（全ロケール共通）
+const TITLE_HTML = 'Mind<span class="mesh">Mesh</span>Map'; // ブランド名（全ロケール共通）
 const URL_TEXT = 'mu-777.github.io/MindMeshMap';
 
 // --- 右側グラフの配置（循環 A→B→C→D→A ＋ メッシュ横断リンク A→M→C）。座標は全ロケール共通 ---
 const geometry = {
-  A: { x: 748, y: 190, w: 142, h: 62 },
+  A: { x: 758, y: 190, w: 142, h: 62 },
   B: { x: 1042, y: 218, w: 142, h: 62 },
   C: { x: 990, y: 452, w: 142, h: 62 },
   D: { x: 702, y: 408, w: 142, h: 62 },
