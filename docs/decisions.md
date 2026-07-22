@@ -373,3 +373,31 @@ MindMeshMap における設計判断のうち、選択肢を比較して決め�
   - **`CustomNode` の blur ハンドラで `setEditingNodeId(null)`**: armed-focus 方式では非編集の選択中ノードもエディタにフォーカスを当てており（§13）、フォーカス移動が頻繁に起きるため blur を編集終了トリガーにすると誤終了しやすい。選択状態の変化を基準にするほうが確実。
 - **検証**: 上記再現手順（編集中に別ノードをクリック／編集中ノードをShift+クリックで解除）で緑リングが残らないことを確認する。既存の選択→編集の各経路（ダブルクリック、印字可能文字での編集開始、ハンドルドラッグでの新規ノード作成 `onConnectEnd`、Tab/Enterでの子・兄弟ノード作成）は「選択してから編集」の順でセッターを呼ぶため、不変条件の下でも従来どおり編集状態に入れる（`setSelectedNodeId` は同一ノードを選択する場合は `editingNodeId` を保つ）。
 - **関連**: 枠色の状態遷移（グレー=未選択／青=選択中・armed／青+緑=編集中）と armed-focus 方式は §13 を参照。
+
+## 28. SEO（検索順位）対策: メタ強化・構造化データ・sitemap/robots・noscriptフォールバック
+
+- **決定**: GitHub Pages 配信のクライアントレンダリングSPA（`https://mu-777.github.io/MindMeshMap/`）に対し、コードで実施可能なオンページSEOを一括で入れた。内訳:
+  - **`<title>` をキーワードを含む記述に変更**: `MindMeshMap` → `MindMeshMap — Free online mind map editor for graphs with cycles`（タイトルは最重要のランキング要素。ブランド名＋主要語 free / online / mind map / editor / graphs / cycles を約60字に収めた）。`og:title`/`twitter:title` はSNSカード向けに短いブランド名（`MindMeshMap`）のまま据え置き（§10のOGP決定を変更しないため）。ページ`<title>`とog:titleが異なるのは一般的で問題ない。
+  - **`<link rel="canonical">`** を追加（`https://mu-777.github.io/MindMeshMap/`）。末尾スラッシュ有無やクエリ付きURLの重複を正規化する。
+  - **`<meta name="robots" content="index, follow">`**（既定と同じだが意図の明示）、**`author`**、**`theme-color`**（OGP背景色 `#0f1830` に合わせたモバイルの見た目）。
+  - **JSON-LD 構造化データ (`WebApplication`)** を `<head>` に追加。`offers.price: "0"` で無料アプリ、`inLanguage: [en, ja, zh]`、`featureList`、`author` を機械可読で提供する。
+  - **`twitter:title` / `twitter:description`** を補完（従来は image と card のみ）。
+  - **`public/robots.txt` / `public/sitemap.xml`** を追加（sitemap は単一URL、`priority 1.0`）。
+  - **`<noscript>` フォールバック**（h1＋説明＋機能リスト）を `<body>` に追加。SPAは `#root` にJSで描画するため**JS非実行のクローラ/エージェント/SNS/AIボットにはDOMへ可読テキストが一切残らない**。noscriptに実アプリと一致する要約を置き、JS無しでも要旨が読める状態にする。
+- **採用理由**: いずれも「事実と一致する・隠しテキストでない・標準的」な手法。タイトル/description/canonical/構造化データ/sitemap はGoogleの標準的な理解・スニペット生成・重複排除・発見に効く。noscriptはJS有効時はブラウザが非表示にするため**クローキング（実表示と別内容を見せる不正）にならず**、UX上のちらつきも出さずに、レンダリングしないクローラへ内容を届けられる。
+- **robots.txt のオリジン直下制約（重要・ハマりどころ）**: robots.txt はクローラが**オリジン直下 `https://mu-777.github.io/robots.txt` しか自動参照しない**。GitHubのプロジェクトページはベースパス配下（`/MindMeshMap/`）配信なので、本リポジトリの `public/robots.txt` は `/MindMeshMap/robots.txt` に置かれ、自動では読まれない見込み。`mu-777.github.io` 直下は別リポジトリ（ユーザーページ）が支配し本リポジトリからは触れない。よって robots.txt 自体の効果は限定的（現状クロールを妨げるものは無いので実害もない。カスタムドメイン化すれば直下に置けて有効化される）。**実効的なのは sitemap で、Search Consoleから直接URL送信すれば robots.txt の場所に依存せず登録できる**。将来カスタムドメインに移すか、ユーザーページ側リポジトリに集約robots.txtを置く場合はここを再検討する。
+- **オーナーのGoogleアカウントが必要な手動タスク（コードでは完結不可・未実施）**:
+  1. **Google Search Console** にプロパティ `https://mu-777.github.io/MindMeshMap/` を登録し所有権確認。GitHub Pagesではファイル設置での確認も可能だが、**`<head>` に `<meta name="google-site-verification" content="...">` を1行追加する方式が最も簡単**（値が発行されたらindex.htmlに追記する。空の仮値は入れない）。
+  2. 確認後、**sitemap `https://mu-777.github.io/MindMeshMap/sitemap.xml` を送信**。
+  3. 必要に応じて **Bing Webmaster Tools** にも同様に登録（任意）。
+- **不採用案とその理由**:
+  - **`<meta name="keywords">`**: Googleは無視し、乱用はスパム判定リスクもあるため入れない。
+  - **`#root` に初期HTML（プリレンダ的な本文）を差し込む**: Reactマウント時に置換されるため**本文がちらつく**（初回訪問で即座に使えるべきというプロダクト方針に反する）。可読テキストは noscript に留めた。
+  - **表示外の隠しテキスト（sr-only等）を常時DOMに置く**: 実表示と異なる文言を隠す手法とみなされ得るため回避。noscript（JS有効時に自然に消える標準要素）で代替。
+  - **ロケール別URL＋hreflang**: 単一URL・クライアント側言語判定（i18next）の現構成では過剰。§10のOGP自動切替を見送った理由と同じく、静的ホスティングでの多言語URL分割は現時点で不採用。多言語で個別に検索流入を取りたくなったら再検討。
+  - **PWA manifest / Service Worker**: インストール性の向上はあるが直接のランキング寄与は小さく、今回のスコープ外（将来の任意拡張）。
+- **未対応で効果の大きい残タスク（今回のコード変更の範囲外）**:
+  - **Core Web Vitals / 表示速度**はランキング要素。バンドルサイズ・LCP等の実測と改善は別作業（`web-perf` 等での監査を推奨）。
+  - **被リンク・言及（オフページ）**は最大の権威性要因だがコードでは作れない（公開・共有・登録などの運用施策）。
+- **再検討の条件**: タイトル/description/機能/URL/対応言語/ブランドカラーを変えたとき（`index.html` のメタ・JSON-LD・noscript とog-image §10 を同時に整合）。ページを増やしたら `sitemap.xml` に `<url>` を追加。カスタムドメイン化したら robots.txt をオリジン直下へ。
+- **調整箇所**: メタ/構造化データ/noscript = [index.html](../index.html)、sitemap = [public/sitemap.xml](../public/sitemap.xml)、robots = [public/robots.txt](../public/robots.txt)。Search Console確認タグを入れる場合は `index.html` の `<head>`。

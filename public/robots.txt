@@ -1,0 +1,12 @@
+# MindMeshMap
+# すべてのクローラに全ページのクロールを許可する。
+User-agent: *
+Allow: /
+
+Sitemap: https://mu-777.github.io/MindMeshMap/sitemap.xml
+
+# 注意: robots.txt は本来オリジン直下 (https://mu-777.github.io/robots.txt) しか
+# クローラに自動参照されない。GitHub のプロジェクトページはベースパス配下
+# (/MindMeshMap/) 配信のため、このファイルは /MindMeshMap/robots.txt に置かれ、
+# 自動では読まれない可能性が高い。sitemap は Google Search Console で
+# 直接 URL を送信すること。詳細は docs/decisions.md の SEO セクションを参照。

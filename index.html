@@ -4,12 +4,19 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
-    <title>MindMeshMap</title>
+    <title>MindMeshMap — Free online mind map editor for graphs with cycles</title>
     <meta
       name="description"
       content="MindMeshMap is a free online mind map editor that supports graph structures with cycles — auto layout, keyboard-first editing, rich text nodes, and Google Drive sync."
     />
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="mu-777" />
+    <!-- Google Search Console 所有権確認 -->
+    <meta name="google-site-verification" content="UX3l83-zHaD-P1nNE7bTm5WSApyyaMdyoCuM__MJzzI" />
+    <meta name="theme-color" content="#0f1830" />
+    <link rel="canonical" href="https://mu-777.github.io/MindMeshMap/" />
     <!-- OGP -->
+    <meta property="og:site_name" content="MindMeshMap" />
     <meta property="og:title" content="MindMeshMap" />
     <meta
       property="og:description"
@@ -20,14 +27,75 @@
     <meta property="og:locale" content="en_US" />
     <!-- og:image はデフォルト（英語）。日本語版 og-image.ja.png も public/ に同梱（ロケール別に共有URLを用意する場合の手動用）。詳細: docs/decisions.md §10 -->
     <meta property="og:image" content="https://mu-777.github.io/MindMeshMap/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Mind Mesh Map — a graph-structured mind map editor that allows cycles" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MindMeshMap" />
+    <meta
+      name="twitter:description"
+      content="A free online mind map editor that supports graph structures with cycles — auto layout, keyboard-first editing, rich text nodes, and Google Drive sync."
+    />
     <meta name="twitter:image" content="https://mu-777.github.io/MindMeshMap/og-image.png" />
+    <!-- 構造化データ (JSON-LD): 無料のWebアプリとして検索エンジンに機械可読で伝える。文言・機能を変えたら description/featureList を同期する。 -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "MindMeshMap",
+        "url": "https://mu-777.github.io/MindMeshMap/",
+        "description": "A free online mind map editor that supports graph structures with cycles (for example A → B → C → A) — automatic layout, keyboard-first editing, rich text nodes, local autosave, and Google Drive sync.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Any (modern web browser)",
+        "browserRequirements": "Requires JavaScript. Requires HTML5.",
+        "inLanguage": ["en", "ja", "zh"],
+        "image": "https://mu-777.github.io/MindMeshMap/og-image.png",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "featureList": [
+          "Graph structures with cycles",
+          "Automatic layout (ELK.js) that stays stable with cycles",
+          "Keyboard-first editing with customizable shortcuts",
+          "Rich text nodes (bold, italic, lists)",
+          "Local autosave",
+          "Google Drive sync",
+          "Export and import as JSON and PNG"
+        ],
+        "author": {
+          "@type": "Person",
+          "name": "mu-777",
+          "url": "https://github.com/mu-777"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <!-- JS非実行のクローラ/エージェント向けの可読フォールバック（アプリ本体は #root にJSで描画され、DOMには文字が残らないため）。JS有効時はブラウザが非表示にする。文言はメタ description と整合させる。 -->
+    <noscript>
+      <h1>MindMeshMap — a free online mind map editor for graphs with cycles</h1>
+      <p>
+        MindMeshMap is a browser-based mind map editor that, unlike traditional tree-only tools, lets
+        you draw graph structures with cycles (for example A → B → C → A). It runs entirely in your
+        browser with no sign-up required.
+      </p>
+      <ul>
+        <li>Cyclic graph support — express mutual and circular relationships between ideas</li>
+        <li>Automatic layout (ELK.js) that stays stable even with cycles</li>
+        <li>Keyboard-first editing with customizable shortcuts</li>
+        <li>Rich text nodes (bold, italic, lists)</li>
+        <li>Local autosave, plus optional Google Drive sync</li>
+        <li>Export and import as JSON and PNG</li>
+      </ul>
+      <p>
+        JavaScript is required to use the editor. Open
+        <a href="https://mu-777.github.io/MindMeshMap/">MindMeshMap</a> in a modern browser.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
