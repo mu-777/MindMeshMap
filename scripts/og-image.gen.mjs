@@ -1,7 +1,7 @@
 // OGP画像の生成スクリプト（ロケール別）。
 //   en → public/og-image.png     （デフォルト。index.html の og:image が参照）
 //   ja → public/og-image.ja.png  （日本語版。共有URLをロケール別に用意する場合の手動用）
-// 実行: リポジトリルートで `node docs/assets/og-image.gen.mjs`
+// 実行: リポジトリルートで `node scripts/og-image.gen.mjs`
 //   （devDependency の playwright + Chromium で HTML をスクリーンショット）
 // 文言の調整は下の LOCALES / 共通の TITLE・URL、グラフの見た目は nodes / edges を編集する。
 //
@@ -53,7 +53,7 @@ const edges = [
 // --- ロケール別の文言 ---
 const LOCALES = {
   en: {
-    out: '../../public/og-image.png',
+    out: '../public/og-image.png',
     tagline: ['A graph-structured mind map editor', 'that allows cycles'],
     taglineFont: 30,
     chips: ['Auto Layout', 'Keyboard-first', 'Rich text', 'Google Drive sync'],
@@ -61,7 +61,7 @@ const LOCALES = {
     nodeFont: 21,
   },
   ja: {
-    out: '../../public/og-image.ja.png',
+    out: '../public/og-image.ja.png',
     tagline: ['循環を含むグラフ構造が描ける', 'マインドマップエディタ'],
     taglineFont: 29,
     chips: ['自動レイアウト', 'キーボード操作', 'リッチテキスト', 'Google Drive同期'],
