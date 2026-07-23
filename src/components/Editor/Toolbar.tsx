@@ -533,15 +533,16 @@ export function Toolbar() {
         <LanguageSwitcher />
       </div>
 
-      {/* モバイル表示：⋮ドロップダウン */}
-      <div className="relative z-10 flex-shrink-0 md:hidden" ref={setRightMobileEl}>
+      {/* モバイル表示：整列（常時表示）＋⋮ドロップダウン */}
+      <div className="z-10 flex flex-shrink-0 items-center gap-1 md:hidden" ref={setRightMobileEl}>
+        {/* 整列：⋮メニューには入れず、常に⋮の左に表示する（アイコンのみ） */}
         <button
-          onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
+          onClick={handleAutoLayout}
           className="rounded p-2 text-gray-400 hover:bg-gray-700 hover:text-white"
-          title={t('common.menu')}
+          title={t('toolbar.align')}
         >
           <svg
-            className="h-5 w-5"
+            className="h-4 w-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -550,134 +551,130 @@ export function Toolbar() {
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+              d="M4 6h16M4 12h16M4 18h7"
             />
           </svg>
         </button>
 
-        {isToolMenuOpen && (
-          <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-md border border-gray-600 bg-gray-800 py-1 shadow-lg">
-            {/* レイアウト方向 */}
-            <div className="px-3 py-2">
-              <label className="mb-1 block text-xs text-gray-400">
-                {t('toolbar.layoutDirection')}
-              </label>
-              <select
-                value={currentMap?.layoutDirection || 'DOWN'}
-                onChange={(e) => {
-                  handleLayoutDirectionChange(e);
+        <div className="relative">
+          <button
+            onClick={() => setIsToolMenuOpen(!isToolMenuOpen)}
+            className="rounded p-2 text-gray-400 hover:bg-gray-700 hover:text-white"
+            title={t('common.menu')}
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+              />
+            </svg>
+          </button>
+
+          {isToolMenuOpen && (
+            <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-md border border-gray-600 bg-gray-800 py-1 shadow-lg">
+              {/* レイアウト方向 */}
+              <div className="px-3 py-2">
+                <label className="mb-1 block text-xs text-gray-400">
+                  {t('toolbar.layoutDirection')}
+                </label>
+                <select
+                  value={currentMap?.layoutDirection || 'DOWN'}
+                  onChange={(e) => {
+                    handleLayoutDirectionChange(e);
+                    setIsToolMenuOpen(false);
+                  }}
+                  className="w-full rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-gray-300 focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="DOWN">↓ {t('toolbar.layoutDown')}</option>
+                  <option value="RIGHT">→ {t('toolbar.layoutRight')}</option>
+                </select>
+              </div>
+
+              <div className="my-1 h-px bg-gray-700" />
+
+              {/* エクスポート */}
+              <div className="px-3 py-1 text-xs text-gray-500">
+                {t('toolbar.sectionExport')}
+              </div>
+              <button
+                onClick={() => {
+                  handleExportJson();
                   setIsToolMenuOpen(false);
                 }}
-                className="w-full rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-gray-300 focus:border-blue-500 focus:outline-none"
+                disabled={!currentMap}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <option value="DOWN">↓ {t('toolbar.layoutDown')}</option>
-                <option value="RIGHT">→ {t('toolbar.layoutRight')}</option>
-              </select>
-            </div>
-
-            <div className="my-1 h-px bg-gray-700" />
-
-            {/* 整列 */}
-            <button
-              onClick={() => {
-                handleAutoLayout();
-                setIsToolMenuOpen(false);
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-700"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+                {t('toolbar.itemJson')}
+              </button>
+              <button
+                onClick={() => {
+                  handleExportPng();
+                  setIsToolMenuOpen(false);
+                }}
+                disabled={!currentMap}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h7"
-                />
-              </svg>
-              {t('toolbar.align')}
-            </button>
+                {t('toolbar.itemPng')}
+              </button>
 
-            <div className="my-1 h-px bg-gray-700" />
+              <div className="my-1 h-px bg-gray-700" />
 
-            {/* エクスポート */}
-            <div className="px-3 py-1 text-xs text-gray-500">
-              {t('toolbar.sectionExport')}
-            </div>
-            <button
-              onClick={() => {
-                handleExportJson();
-                setIsToolMenuOpen(false);
-              }}
-              disabled={!currentMap}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {t('toolbar.itemJson')}
-            </button>
-            <button
-              onClick={() => {
-                handleExportPng();
-                setIsToolMenuOpen(false);
-              }}
-              disabled={!currentMap}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {t('toolbar.itemPng')}
-            </button>
-
-            <div className="my-1 h-px bg-gray-700" />
-
-            {/* インポート */}
-            <div className="px-3 py-1 text-xs text-gray-500">
-              {t('toolbar.sectionImport')}
-            </div>
-            <button
-              onClick={() => {
-                handleImportClick();
-                setIsToolMenuOpen(false);
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
-            >
-              {t('toolbar.itemJson')}
-            </button>
-
-            <div className="my-1 h-px bg-gray-700" />
-
-            {/* ヘルプ */}
-            <button
-              onClick={() => {
-                setHelpModalOpen(true);
-                setIsToolMenuOpen(false);
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-700"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+              {/* インポート */}
+              <div className="px-3 py-1 text-xs text-gray-500">
+                {t('toolbar.sectionImport')}
+              </div>
+              <button
+                onClick={() => {
+                  handleImportClick();
+                  setIsToolMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              {t('common.help')}
-            </button>
+                {t('toolbar.itemJson')}
+              </button>
 
-            <div className="my-1 h-px bg-gray-700" />
+              <div className="my-1 h-px bg-gray-700" />
 
-            {/* 言語切替 */}
-            <div className="px-3 py-2">
-              <LanguageSwitcher />
+              {/* ヘルプ */}
+              <button
+                onClick={() => {
+                  setHelpModalOpen(true);
+                  setIsToolMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-700"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                {t('common.help')}
+              </button>
+
+              <div className="my-1 h-px bg-gray-700" />
+
+              {/* 言語切替 */}
+              <div className="px-3 py-2">
+                <LanguageSwitcher />
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* JSONインポート用の非表示file input（デスクトップ・モバイル共通） */}

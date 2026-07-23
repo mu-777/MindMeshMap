@@ -1,39 +1,93 @@
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useAuthStore } from '../../stores/authStore';
+
+// メニュー外クリックで閉じるためのカスタムフック（Toolbar.tsxのファイルメニューと同じ実装）
+function useClickOutside(
+  ref: React.RefObject<HTMLElement>,
+  handler: () => void
+) {
+  useEffect(() => {
+    const listener = (event: MouseEvent | TouchEvent) => {
+      if (!ref.current || ref.current.contains(event.target as Node)) {
+        return;
+      }
+      handler();
+    };
+    // キャプチャフェーズで登録する。React Flowのパン/ズーム（d3-drag/d3-zoom）は
+    // キャンバス上のmousedownでstopImmediatePropagationを呼ぶため、バブルフェーズの
+    // リスナーだとキャンバスクリックがdocumentまで届かずメニューが閉じない問題への対策。
+    document.addEventListener('mousedown', listener, { capture: true });
+    document.addEventListener('touchstart', listener, { capture: true });
+    return () => {
+      document.removeEventListener('mousedown', listener, { capture: true });
+      document.removeEventListener('touchstart', listener, { capture: true });
+    };
+  }, [ref, handler]);
+}
 
 export function GoogleAuthButton() {
   const { t } = useTranslation();
   const { isSignedIn, signIn, signOut } = useGoogleAuth();
   const { userName, userEmail, userPicture } = useAuthStore();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useClickOutside(menuRef as React.RefObject<HTMLElement>, () =>
+    setIsMenuOpen(false)
+  );
 
   if (isSignedIn) {
     return (
-      <div className="flex items-center gap-3">
-        {userPicture ? (
-          // GoogleのアバターURLはreferrerを送るとサーバー側で拒否される（403）ことがあるためno-referrer必須
-          <img
-            src={userPicture}
-            alt=""
-            referrerPolicy="no-referrer"
-            className="h-8 w-8 flex-shrink-0 rounded-full"
-          />
-        ) : (
-          // pictureが取得できない場合のフォールバック（既存の名前頭文字が無いグレー丸アイコン）
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-600 text-xs text-gray-300">
-            {userName ? userName.charAt(0).toUpperCase() : '?'}
+      <div className="relative" ref={menuRef}>
+        <button
+          type="button"
+          onClick={() => setIsMenuOpen((open) => !open)}
+          title={userEmail || undefined}
+          className="flex w-full items-center gap-3 rounded p-1 text-left hover:bg-gray-700"
+        >
+          {userPicture ? (
+            // GoogleのアバターURLはreferrerを送るとサーバー側で拒否される（403）ことがあるためno-referrer必須
+            <img
+              src={userPicture}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="h-8 w-8 flex-shrink-0 rounded-full"
+            />
+          ) : (
+            // pictureが取得できない場合のフォールバック（既存の名前頭文字が無いグレー丸アイコン）
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-600 text-xs text-gray-300">
+              {userName ? userName.charAt(0).toUpperCase() : '?'}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm text-gray-300">{userName}</div>
+            <div className="truncate text-xs text-gray-500">{userEmail}</div>
+          </div>
+          {/* 上方向に開くメニューであることを示すシェブロン */}
+          <svg
+            className="h-4 w-4 flex-shrink-0 text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+
+        {isMenuOpen && (
+          <div className="absolute bottom-full left-0 right-0 z-50 mb-1 rounded-md border border-gray-600 bg-gray-800 py-1 shadow-lg">
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                signOut();
+              }}
+              className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
+            >
+              {t('auth.signOut')}
+            </button>
           </div>
         )}
-        <div className="text-right">
-          <div className="text-sm text-gray-300">{userName}</div>
-          <div className="text-xs text-gray-500">{userEmail}</div>
-        </div>
-        <button
-          onClick={signOut}
-          className="rounded bg-gray-700 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-600"
-        >
-          {t('auth.signOut')}
-        </button>
       </div>
     );
   }
