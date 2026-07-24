@@ -36,7 +36,8 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 | 保存先 | `localStorage`キー `mindmeshmap-debug-align-algorithm`（`AlignAlgorithm`型の値以外・読み取り失敗時は既定の`'sugiyama-ext'`にフォールバック。本番＝dev既定を揃えている） |
 | アルゴリズム実装 | `src/utils/branchLayout.ts`（`branch`＝再帰的ブランチ合成）、`src/utils/flatAxisLayout.ts`（`flat-axis`＝2パス軸射影）、`src/utils/sugiyamaExtLayout.ts`（`sugiyama-ext`＝スギヤマ拡張。ELK不使用の自前実装）、`src/utils/alignAlgorithm.ts`（`calculateLayoutForAlign`：各アルゴリズムを振り分けるディスパッチャ） |
 | 統合箇所 | `src/hooks/useAutoLayout.ts`の`applyLayout`（部分整列・全体整列の両方） |
-| テスト | `e2e/branch-layout-algorithms.mjs`（ブラウザ不要の純Nodeテスト。branch/flat-axis/sugiyama-ext全てをカバー） |
+| テスト | `e2e/branch-layout-algorithms.mjs`（各アルゴリズム固有の設計意図を手書きの小さなグラフで確認）、`e2e/layout-quality.mjs`（ケースコーパス×全アルゴリズムの総当たりで不変条件を検証）。どちらもブラウザ不要の純Nodeテスト |
+| 評価環境 | `npm run layout:sheet`（`scripts/layout-contact-sheet.mjs`）でコンタクトシート（SVG）と採点表を生成する。定数を変えたときの影響はここで比較する。詳細は [layout-lab.md](./layout-lab.md) |
 
 `sugiyama-ext`のチューニング定数（すべて`src/utils/sugiyamaExtLayout.ts`冒頭）:
 

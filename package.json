@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:e2e": "node e2e/run-all.mjs"
+    "test:e2e": "node e2e/run-all.mjs",
+    "layout:sheet": "node scripts/layout-contact-sheet.mjs"
   },
   "dependencies": {
     "@tiptap/extension-link": "^2.27.2",

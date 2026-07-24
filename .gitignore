@@ -31,3 +31,6 @@ dist-ssr
 # E2Eテストの実行時成果物（失敗時のスクリーンショット・ダウンロード検証ファイル）
 e2e/screenshots/*
 !e2e/screenshots/.gitkeep
+
+# 整列アルゴリズムのコンタクトシート・スコア（scripts/layout-contact-sheet.mjsの出力）
+layout-lab-out/

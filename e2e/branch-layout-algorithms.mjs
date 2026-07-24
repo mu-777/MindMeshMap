@@ -1,64 +1,18 @@
-// dev限定の整列アルゴリズム（branch / flat-axis）の挙動を検証する、ブラウザを起動しない純Nodeテスト。
-// docs/align-branch-layout.md参照。
+// dev限定の整列アルゴリズム（branch / flat-axis / sugiyama-ext）の**個別の設計意図**を検証する、
+// ブラウザを起動しない純Nodeテスト。docs/align-branch-layout.md参照。
+//
+// このファイルは「そのアルゴリズムが狙った配置になっているか」（右子は右へ、上/下子は親に被せて、等）を
+// 手書きの小さなグラフで確認する。アルゴリズム共通の品質（不変条件・スコア指標）を
+// ケースコーパス全体に対して見るのは e2e/layout-quality.mjs の担当（docs/layout-lab.md）。
 //
 // e2e/layout-stability.mjsはlayout.tsのソースを正規表現で読むだけで済んだが、本テストは
 // 実際にcalculateBranchLayout / calculateFlatAxisLayout / calculateLayoutForAlign /
-// calculateLayoutを呼び出して結果を検証する必要がある。素のNode.jsは拡張子省略・
-// ディレクトリindex解決（Vite/tscのbundlerモード解決）に対応しておらず、また型のみの
-// import（例: `import ELK, { ElkNode } from 'elkjs/...'`）も素のNode実行では剥がせないため、
-// 以下でesbuild（vite経由で既にnode_modulesに存在する）を使った最小限のカスタムモジュール
-// ローダーをこのテストファイル内だけに登録する。src側の実装・importの書き方は一切変更しない
-// （ビルド成果物ではなく開発時のソースをそのまま検証するため）
-import { register } from 'node:module';
+// calculateLayoutを呼び出して結果を検証する必要がある。素のNodeでsrc配下の.tsを直接importする
+// ためのローダーは e2e/lib/ts-loader.mjs に集約してある（**動的importが必須**な理由もそちら参照）
+import './lib/ts-loader.mjs';
 import { assertTrue, assertEqual, runStandalone } from './helpers.mjs';
 
 export const name = 'branch-layout-algorithms';
-
-const esbuildUrl = import.meta.resolve('esbuild');
-
-// resolve: 拡張子省略・ディレクトリ import（'../types' → 'types/index.ts'）をesbuild実行前に解決する
-// load: .ts/.tsxファイルをesbuild.transformでESMのJSに変換してから実行エンジンに渡す
-const loaderSource = `
-import { readFileSync, existsSync, statSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import path from 'node:path';
-import * as esbuild from ${JSON.stringify(esbuildUrl)};
-
-export async function resolve(specifier, context, nextResolve) {
-  if (specifier.startsWith('.') || specifier.startsWith('/')) {
-    const baseDir = context.parentURL ? path.dirname(fileURLToPath(context.parentURL)) : process.cwd();
-    let resolved = path.resolve(baseDir, specifier);
-    if (!path.extname(resolved)) {
-      if (existsSync(resolved) && statSync(resolved).isDirectory()) {
-        resolved = path.join(resolved, 'index.ts');
-      } else if (existsSync(resolved + '.ts')) {
-        resolved = resolved + '.ts';
-      } else if (existsSync(resolved + '.tsx')) {
-        resolved = resolved + '.tsx';
-      }
-    }
-    return nextResolve(pathToFileURL(resolved).href, context);
-  }
-  return nextResolve(specifier, context);
-}
-
-export async function load(url, context, nextLoad) {
-  if (url.endsWith('.ts') || url.endsWith('.tsx')) {
-    const filePath = fileURLToPath(url);
-    const source = readFileSync(filePath, 'utf-8');
-    const result = await esbuild.transform(source, {
-      loader: url.endsWith('.tsx') ? 'tsx' : 'ts',
-      format: 'esm',
-      target: 'es2022',
-      sourcefile: filePath,
-    });
-    return { format: 'module', source: result.code, shortCircuit: true };
-  }
-  return nextLoad(url, context);
-}
-`;
-
-register(`data:text/javascript,${encodeURIComponent(loaderSource)}`, import.meta.url);
 
 const { calculateBranchLayout } = await import('../src/utils/branchLayout.ts');
 const { calculateFlatAxisLayout } = await import('../src/utils/flatAxisLayout.ts');
