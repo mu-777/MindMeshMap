@@ -4,12 +4,15 @@
 //   1. 1枚のSVGにグリッドで並べて描画する（＝目視で一望するためのコンタクトシート）
 //   2. スコア指標（e2e/lib/layout-metrics.mjs）を表で出力する
 //   3. scores.json に全数値を書き出す（前後比較・回帰検知用）
+//   4. ベースライン（e2e/fixtures/layout-baseline.json）との差分表示・更新
 // ブラウザもdevサーバも不要（src配下の.tsを直接importして実行する。docs/layout-lab.md参照）。
 //
 // 実行:
 //   node scripts/layout-contact-sheet.mjs
 //   node scripts/layout-contact-sheet.mjs --algorithms=sugiyama-ext,branch --cases=b- --scale
 //   node scripts/layout-contact-sheet.mjs --out=/tmp/lab --no-svg
+//   node scripts/layout-contact-sheet.mjs --scale --compare          # ベースラインとの全指標の差分
+//   node scripts/layout-contact-sheet.mjs --scale --update-baseline  # ベースラインを更新
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,10 +26,10 @@ import {
   METRIC_DEFS,
   INVARIANT_CODES,
 } from '../e2e/lib/layout-metrics.mjs';
+import { ALGORITHMS as ALL_ALGORITHMS } from '../e2e/lib/layout-contracts.mjs';
+import { loadBaseline, saveBaseline, compareToBaseline, formatComparison, BASELINE_PATH } from '../e2e/lib/layout-baseline.mjs';
 
 const { calculateLayoutForAlign } = await import('../src/utils/alignAlgorithm.ts');
-
-const ALL_ALGORITHMS = ['uniform', 'branch', 'flat-axis', 'sugiyama-ext'];
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // --- 引数 ---
@@ -341,6 +344,30 @@ for (const testCase of cases) {
   }
 }
 writeFileSync(path.join(outDir, 'scores.json'), JSON.stringify({ generatedAt: new Date().toISOString(), algorithms, scores }, null, 2));
+
+// --- ベースライン（前回値）との比較・更新 ---
+
+// ベースラインは「全ケース×全アルゴリズム」で作られている前提。絞り込んだ実行で上書きすると
+// 残りのケースがベースラインから消えて、以後の比較が素通りしてしまう
+const isFullRun = !caseFilter && has('scale') && algorithms.length === ALL_ALGORITHMS.length;
+
+if (has('update-baseline')) {
+  if (!isFullRun) {
+    console.error('\nベースラインの更新は全ケース・全アルゴリズムでの実行が必要です: node scripts/layout-contact-sheet.mjs --scale --update-baseline');
+    process.exit(1);
+  }
+  saveBaseline(scores);
+  console.log(`\nベースラインを更新しました: ${BASELINE_PATH}`);
+} else if (has('compare')) {
+  const baseline = loadBaseline();
+  if (!baseline) {
+    console.log(`\nベースラインがまだありません（${BASELINE_PATH}）。--update-baseline で作成できます`);
+  } else {
+    console.log(`\n${'='.repeat(100)}\nベースラインとの差分（${baseline.updatedAt} 時点）\n${'='.repeat(100)}`);
+    for (const line of formatComparison(compareToBaseline(baseline, scores), { limit: 40 })) console.log(line);
+    if (!isFullRun) console.log('（絞り込み実行のため、対象外のケースは「実行されなかった」として表示されます）');
+  }
+}
 
 if (writeSvg) {
   const groups = [...new Set(cases.map((c) => c.group))];

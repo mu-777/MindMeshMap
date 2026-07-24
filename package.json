@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "node e2e/run-all.mjs",
-    "layout:sheet": "node scripts/layout-contact-sheet.mjs"
+    "layout:sheet": "node scripts/layout-contact-sheet.mjs",
+    "layout:fuzz": "node scripts/layout-fuzz.mjs",
+    "layout:baseline": "node scripts/layout-contact-sheet.mjs --scale --no-svg --update-baseline"
   },
   "dependencies": {
     "@tiptap/extension-link": "^2.27.2",

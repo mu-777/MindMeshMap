@@ -37,7 +37,7 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 | アルゴリズム実装 | `src/utils/branchLayout.ts`（`branch`＝再帰的ブランチ合成）、`src/utils/flatAxisLayout.ts`（`flat-axis`＝2パス軸射影）、`src/utils/sugiyamaExtLayout.ts`（`sugiyama-ext`＝スギヤマ拡張。ELK不使用の自前実装）、`src/utils/alignAlgorithm.ts`（`calculateLayoutForAlign`：各アルゴリズムを振り分けるディスパッチャ） |
 | 統合箇所 | `src/hooks/useAutoLayout.ts`の`applyLayout`（部分整列・全体整列の両方） |
 | テスト | `e2e/branch-layout-algorithms.mjs`（各アルゴリズム固有の設計意図を手書きの小さなグラフで確認）、`e2e/layout-quality.mjs`（ケースコーパス×全アルゴリズムの総当たりで不変条件を検証）。どちらもブラウザ不要の純Nodeテスト |
-| 評価環境 | `npm run layout:sheet`（`scripts/layout-contact-sheet.mjs`）でコンタクトシート（SVG）と採点表を生成する。定数を変えたときの影響はここで比較する。詳細は [layout-lab.md](./layout-lab.md) |
+| 評価環境 | `npm run layout:sheet`（`scripts/layout-contact-sheet.mjs`）でコンタクトシート（SVG）と採点表を生成する。**下記の定数を変えたら `node scripts/layout-contact-sheet.mjs --scale --compare` で影響（改善と悪化の両方）を確認し、意図した変更なら `npm run layout:baseline` でベースラインを更新する**（更新しないと回帰テストが失敗する）。広い範囲のランダム検証は `npm run layout:fuzz`。詳細は [layout-lab.md](./layout-lab.md) |
 
 `sugiyama-ext`のチューニング定数（すべて`src/utils/sugiyamaExtLayout.ts`冒頭）:
 

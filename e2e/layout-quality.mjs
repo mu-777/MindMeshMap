@@ -8,7 +8,10 @@
 //      （実際にLiang-Barskyの符号ミスで貫通検出が常に0だった。docs/testing.md「陽性確認」参照）
 //   2. **コーパス整合性** — ケース定義自体が壊れていないこと
 //   3. **全アルゴリズム共通の不変条件** — 全ノードの座標が有限で返る・2回実行で完全一致（決定性）
-//   4. **アルゴリズムごとの契約** — 下記CONTRACTSに宣言した不変条件を破らないこと
+//   4. **アルゴリズムごとの契約** — layout-contracts.mjs に宣言した不変条件を破らないこと
+//   5. **ランダムファズ** — 固定seed範囲のランダムグラフでも契約が守られること（列挙しきれない
+//      組み合わせを機械に探させる。seed固定なのでflakyにならない）
+//   6. **ベースライン比較** — スコアが前回値（e2e/fixtures/layout-baseline.json）より悪化していないこと
 //
 // 契約に入っていない違反（例: flat-axisのノード重なり）は、そのアルゴリズムが保証していない
 // ものなので失敗にはせず、件数を集計して最後に表示する。「どれを契約に入れるか」は
@@ -16,26 +19,20 @@
 import './lib/ts-loader.mjs';
 import { assertTrue, assertEqual, runStandalone } from './helpers.mjs';
 import { buildCases } from './lib/layout-cases.mjs';
+import { generateFuzzCases } from './lib/layout-fuzz.mjs';
 import { checkInvariants, computeMetrics, siblingInversionRatio, INVARIANT_CODES } from './lib/layout-metrics.mjs';
+import { ALGORITHMS, contractViolations } from './lib/layout-contracts.mjs';
+import { loadBaseline, compareToBaseline, formatComparison, BASELINE_PATH } from './lib/layout-baseline.mjs';
 
 const { calculateLayoutForAlign } = await import('../src/utils/alignAlgorithm.ts');
 
 export const name = 'layout-quality';
 
-const ALGORITHMS = ['uniform', 'branch', 'flat-axis', 'sugiyama-ext'];
-
-// アルゴリズムごとに「破ってはいけない」不変条件。ここに無い違反は保証対象外として集計のみ行う。
-// 追加・削除するときは docs/layout-lab.md の対応表も更新すること
-const CONTRACTS = {
-  // ELKに丸投げするため重なりは起きない（ELKのspacing設定の回帰検知になる）
-  uniform: [INVARIANT_CODES.NODE_OVERLAP],
-  // 方針A: クロスバケットの重なりが設計上の既知の制限（docs/align-branch-layout.md）
-  branch: [],
-  // 方針B: x/yを別々の最適化結果から寄せ集めるため、重なり回避も向きも保証しない軽量ベースライン
-  'flat-axis': [],
-  // 方針E（本番の既定）: ハンドルの向きどおりに配置し、ノードを重ねない
-  'sugiyama-ext': [INVARIANT_CODES.NODE_OVERLAP, INVARIANT_CODES.HANDLE_DIRECTION],
-};
+// 回帰テストで毎回まわすファズのseed範囲。ここを変えると守備範囲が変わる（増やすと遅くなる）。
+// より広い範囲の探索は `node scripts/layout-fuzz.mjs --seeds=2000` で行う
+const FUZZ_SEED_START = 1;
+const FUZZ_SEED_COUNT = 40;
+const FUZZ_MAX_NODES = 20;
 
 const W = 180;
 const H = 60;
@@ -175,9 +172,11 @@ async function testCorpusIntegrity(cases) {
 }
 
 // --- 4. コーパス全体のスイープ（共通の不変条件＋アルゴリズムごとの契約）---
+// 返り値はベースライン比較に渡す実行結果（{caseId, algorithm, metrics}の配列）
 async function testCorpusSweep(cases) {
   // 契約外の違反は失敗にせず件数だけ集計し、最後に表示する
   const offContract = new Map(ALGORITHMS.map((a) => [a, new Map()]));
+  const runs = [];
 
   for (const testCase of cases) {
     for (const algorithm of ALGORITHMS) {
@@ -202,14 +201,14 @@ async function testCorpusSweep(cases) {
       for (const [key, value] of Object.entries(metrics)) {
         await assertTrue(null, Number.isFinite(value), `[${label}] スコア ${key} が有限であること（実際: ${value}）`);
       }
+      runs.push({ caseId: testCase.id, algorithm, metrics });
 
       // アルゴリズムごとの契約
       const violations = checkInvariants({ nodes: testCase.nodes, edges: testCase.edges, direction: testCase.direction, positions });
-      const contract = CONTRACTS[algorithm];
+      for (const v of contractViolations(algorithm, violations)) {
+        await assertTrue(null, false, `[${label}] 契約違反(${v.code}): ${v.message}`);
+      }
       for (const v of violations) {
-        if (contract.includes(v.code)) {
-          await assertTrue(null, false, `[${label}] 契約違反(${v.code}): ${v.message}`);
-        }
         const counts = offContract.get(algorithm);
         counts.set(v.code, (counts.get(v.code) || 0) + 1);
       }
@@ -222,6 +221,70 @@ async function testCorpusSweep(cases) {
     const counts = [...offContract.get(algorithm)].map(([code, n]) => `${code}:${n}`);
     console.log(`  ${algorithm.padEnd(14)} ${counts.length === 0 ? 'なし' : counts.join(' ')}`);
   }
+  return runs;
+}
+
+// --- 5. ランダムファズ（固定seed）---
+// コーパスは軸に沿って手で組み立てたものなので、その組み合わせにしか当たらない。
+// ランダム生成で「人が思いつかない組み合わせ」を機械に探させる。seedを固定しているので
+// 結果は毎回同じ＝flakyにならず、失敗したseedはそのまま再現できる
+async function testFuzzContracts() {
+  const cases = generateFuzzCases({ start: FUZZ_SEED_START, count: FUZZ_SEED_COUNT, maxNodes: FUZZ_MAX_NODES });
+  let checked = 0;
+
+  for (const testCase of cases) {
+    for (const algorithm of ALGORITHMS) {
+      const label = `${testCase.id}/${algorithm}`;
+      const result = await calculateLayoutForAlign(testCase.nodes, testCase.edges, testCase.direction, algorithm);
+      await assertEqual(null, result.nodes.length, testCase.nodes.length, `[${label}] 全ノードの位置が返ること（${testCase.note}）`);
+
+      const positions = new Map(result.nodes.map((n) => [n.id, n.position]));
+      const violations = contractViolations(
+        algorithm,
+        checkInvariants({ nodes: testCase.nodes, edges: testCase.edges, direction: testCase.direction, positions })
+      );
+      if (violations.length > 0) {
+        // 再現手順を必ず添える。seedさえ分かれば同じグラフを作り直せる
+        await assertTrue(
+          null,
+          false,
+          `[${label}] 契約違反(${violations[0].code}): ${violations[0].message}\n` +
+            `  他 ${violations.length - 1} 件。${testCase.note}\n` +
+            `  再現: node scripts/layout-fuzz.mjs --start=${testCase.seed} --seeds=1 --algorithms=${algorithm}`
+        );
+      }
+      checked += 1;
+    }
+  }
+  console.log(`  ファズ: seed ${FUZZ_SEED_START}..${FUZZ_SEED_START + FUZZ_SEED_COUNT - 1} × ${ALGORITHMS.length}アルゴリズム = ${checked}件、契約違反なし`);
+}
+
+// --- 6. ベースライン比較（スコアの意図しない悪化の検出）---
+async function testBaselineComparison(runs) {
+  const baseline = loadBaseline();
+  if (!baseline) {
+    console.log(`  ベースライン未作成のため比較をスキップしました（${BASELINE_PATH}）。\`npm run layout:baseline\` で作成できます`);
+    return;
+  }
+
+  const comparison = compareToBaseline(baseline, runs);
+  const lines = formatComparison(comparison);
+
+  if (comparison.regressions.length > 0) {
+    await assertTrue(
+      null,
+      false,
+      `スコアがベースラインより悪化しています（${baseline.updatedAt} 時点との比較）:\n` +
+        lines.map((l) => `  ${l}`).join('\n') +
+        '\n  意図した変更なら `npm run layout:baseline` でベースラインを更新してください。'
+    );
+  }
+  if (comparison.improvements.length > 0 || comparison.added.length > 0 || comparison.missing.length > 0) {
+    console.log('  --- ベースラインとの差分（悪化なし。確認のうえ npm run layout:baseline で更新）---');
+    for (const line of lines) console.log(`  ${line}`);
+  } else {
+    console.log('  ベースライン比較: 変化なし');
+  }
 }
 
 export async function run() {
@@ -230,7 +293,9 @@ export async function run() {
 
   const cases = await buildCases({ includeScale: true });
   await testCorpusIntegrity(cases);
-  await testCorpusSweep(cases);
+  const runs = await testCorpusSweep(cases);
+  await testFuzzContracts();
+  await testBaselineComparison(runs);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
