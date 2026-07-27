@@ -14,6 +14,10 @@ const LONG_PRESS_DURATION = 500; // 長押し判定時間（ミリ秒）
 // 編集中のエッジラベル（input+✕）のz-index。react-flow__edgelabel-rendererはz-index未指定のため、
 // 選択中ノード（z-index≈1000）の下に隠れることがある。編集中だけ確実に上回る値を明示的に付与する
 const EDITING_LABEL_Z_INDEX = 1500;
+// 編集中のエッジラベルinputの幅（px）。width未指定だとinputのブラウザ既定幅
+// （size=20相当。このアプリのフォント設定では実測168px）になりマップ上で広すぎるため明示する。
+// 広げたい/狭めたいときはこの値だけを変える
+const EDGE_LABEL_INPUT_WIDTH = 84;
 
 export type CustomEdgeData = {
   label?: string;
@@ -239,7 +243,7 @@ function CustomEdgeComponent({
                 onKeyDown={handleLabelKeyDown}
                 autoFocus
                 className="rounded border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-white focus:border-blue-500 focus:outline-none"
-                style={{ minWidth: '60px' }}
+                style={{ width: `${EDGE_LABEL_INPUT_WIDTH}px` }}
               />
               <button
                 onMouseDown={handleDeleteMouseDown}

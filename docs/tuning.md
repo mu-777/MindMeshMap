@@ -109,6 +109,7 @@ ELKに渡すレイアウトオプション自体（INTERACTIVE戦略・spacing�
 |---|---|---|---|
 | `TITLE_SIDE_GAP` | `src/components/Editor/Toolbar.tsx` | 16（px） | 中央タイトルのmaxWidthをクランプする際、左右UIグループとの間に追加で確保する余白。詳細は[decisions.md §34](./decisions.md)参照 |
 | `EDITING_LABEL_Z_INDEX` | `src/components/Editor/CustomEdge.tsx` | 1500 | 編集中のエッジラベル（input+✕）のz-index。選択中ノードのz-index（≈1000）を確実に上回る値。詳細は[decisions.md §35](./decisions.md)参照 |
+| `EDGE_LABEL_INPUT_WIDTH` | `src/components/Editor/CustomEdge.tsx` | 84（px） | 編集中のエッジラベルinputの幅。未指定だとブラウザ既定幅（size=20相当、実測168px）で広すぎるため明示している。エッジラベル入力欄の幅を変えたいときはここだけを変える |
 | `CONTEXT_MENU_GAP` | `src/components/Editor/ContextMenu.tsx` | 8（px） | ノードのコンテキストメニューと対象ノード（anchorRect）/ビューポート端との間に空ける余白。詳細は[decisions.md §47](./decisions.md)参照 |
 
 ## リッチテキスト（ノード内Tiptapエディタ）
