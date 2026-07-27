@@ -7,11 +7,27 @@ export interface LayoutResult {
   nodes: { id: string; position: { x: number; y: number } }[];
 }
 
+// ELKのlayoutOptionsのうち、方向（elk.direction）以外の共通部分。INTERACTIVE戦略・spacingは
+// ここに一本化し、内容は変更しないこと（変えるとe2e/layout-stability.mjsがドリフト検出で
+// 意図的にFAILする）。runElkLayoutだけでなく、独自にELKグラフを組み立てる
+// elkPortLayout.ts（方針F: ポート制約版）もこの定数を共有し、§26の差分安定性を引き継ぐ
+export const ELK_BASE_LAYOUT_OPTIONS: Record<string, string> = {
+  'elk.algorithm': 'layered',
+  'elk.spacing.nodeNode': '50',
+  'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+  // 循環エッジの逆転方向を現在座標から決める
+  'elk.layered.cycleBreaking.strategy': 'INTERACTIVE',
+  // レイヤー割り当てを現在位置に寄せる
+  'elk.layered.layering.strategy': 'INTERACTIVE',
+  // ノードの配置
+  'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+  // 兄弟ノードの並び順を現在の左右/上下関係から初期化する
+  'elk.layered.crossingMinimization.strategy': 'INTERACTIVE',
+};
+
 // ELKグラフの構築・layout()呼び出し・結果整形・エラー時フォールバックを行う低レベル関数。
 // calculateLayout（マップ全体・部分整列向けの薄いラッパー）だけでなく、branchLayout.ts /
-// flatAxisLayout.ts（docs/align-branch-layout.md参照）からも共通で使う。ELKのlayoutOptions
-// （INTERACTIVE戦略・spacing等）はここに一本化し、内容は変更しないこと
-// （変えるとe2e/layout-stability.mjsがドリフト検出で意図的にFAILする）
+// flatAxisLayout.ts（docs/align-branch-layout.md参照）からも共通で使う
 export async function runElkLayout(
   nodes: MapNode[],
   edges: MapEdge[],
@@ -27,20 +43,7 @@ export async function runElkLayout(
   // なるべく保つ差分的レイアウトにする（docs/decisions.md §26）
   const graph = {
     id: 'root',
-    layoutOptions: {
-      'elk.algorithm': 'layered',
-      'elk.direction': elkDirection,
-      'elk.spacing.nodeNode': '50',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '80',
-      // 循環エッジの逆転方向を現在座標から決める
-      'elk.layered.cycleBreaking.strategy': 'INTERACTIVE',
-      // レイヤー割り当てを現在位置に寄せる
-      'elk.layered.layering.strategy': 'INTERACTIVE',
-      // ノードの配置
-      'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
-      // 兄弟ノードの並び順を現在の左右/上下関係から初期化する
-      'elk.layered.crossingMinimization.strategy': 'INTERACTIVE',
-    },
+    layoutOptions: { ...ELK_BASE_LAYOUT_OPTIONS, 'elk.direction': elkDirection },
     children: nodes.map((n) => ({
       id: n.id,
       width: n.width || nodeWidth,

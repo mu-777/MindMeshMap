@@ -27,14 +27,14 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 
 ### 整列アルゴリズム（本番=sugiyama-ext・dev限定で切り替え可）
 
-ノードの右側についた子と上/下についた子を別方向でレイアウトする代替アルゴリズム（詳細・設計経緯は [align-branch-layout.md](./align-branch-layout.md) 参照）。**本番ビルドの既定は `sugiyama-ext`**（暫定採用）。`uniform`/`branch`/`flat-axis`/`sugiyama-ext` の比較切り替えUIは引き続きdev限定で残してある（他候補はまだ削除していない）。
+ノードの右側についた子と上/下についた子を別方向でレイアウトする代替アルゴリズム（詳細・設計経緯は [align-branch-layout.md](./align-branch-layout.md) 参照）。**本番ビルドの既定は `sugiyama-ext`**（暫定採用）。`uniform`/`branch`/`flat-axis`/`sugiyama-ext`/`elk-port`/`elk-port-ext` の比較切り替えUIは引き続きdev限定で残してある（他候補はまだ削除していない）。
 
 | 項目 | 内容 |
 |---|---|
 | 切り替えUI | `src/components/Editor/Toolbar.tsx`。デスクトップ表示のみ、`import.meta.env.DEV`が真の場合だけ表示される`<select>`（レイアウト方向selectと整列ボタンの間） |
 | 状態管理フック | `src/hooks/useAlignAlgorithmDebug.ts`。`import.meta.env.DEV`が偽なら常に既定の`'sugiyama-ext'`（`DEFAULT_ALGORITHM`）を返しsetterは何もしない（UIの出し分けとは独立に、フック自体にもガードを入れている） |
 | 保存先 | `localStorage`キー `mindmeshmap-debug-align-algorithm`（`AlignAlgorithm`型の値以外・読み取り失敗時は既定の`'sugiyama-ext'`にフォールバック。本番＝dev既定を揃えている） |
-| アルゴリズム実装 | `src/utils/branchLayout.ts`（`branch`＝再帰的ブランチ合成）、`src/utils/flatAxisLayout.ts`（`flat-axis`＝2パス軸射影）、`src/utils/sugiyamaExtLayout.ts`（`sugiyama-ext`＝スギヤマ拡張。ELK不使用の自前実装）、`src/utils/alignAlgorithm.ts`（`calculateLayoutForAlign`：各アルゴリズムを振り分けるディスパッチャ） |
+| アルゴリズム実装 | `src/utils/branchLayout.ts`（`branch`＝再帰的ブランチ合成）、`src/utils/flatAxisLayout.ts`（`flat-axis`＝2パス軸射影）、`src/utils/sugiyamaExtLayout.ts`（`sugiyama-ext`＝スギヤマ拡張。ELK不使用の自前実装）、`src/utils/elkPortLayout.ts`（`elk-port`＝ELK layeredのポート制約版）、`src/utils/elkPortExtLayout.ts`（`elk-port-ext`＝ポート制約付き階層レイアウトの自前実装。ELK不使用）、`src/utils/alignAlgorithm.ts`（`calculateLayoutForAlign`：各アルゴリズムを振り分けるディスパッチャ） |
 | 統合箇所 | `src/hooks/useAutoLayout.ts`の`applyLayout`（部分整列・全体整列の両方） |
 | テスト | `e2e/branch-layout-algorithms.mjs`（各アルゴリズム固有の設計意図を手書きの小さなグラフで確認）、`e2e/layout-quality.mjs`（ケースコーパス×全アルゴリズムの総当たりで不変条件を検証）。どちらもブラウザ不要の純Nodeテスト |
 | 評価環境 | `npm run layout:sheet`（`scripts/layout-contact-sheet.mjs`）でコンタクトシート（SVG）と採点表を生成する。**下記の定数を変えたら `node scripts/layout-contact-sheet.mjs --scale --compare` で影響（改善と悪化の両方）を確認し、意図した変更なら `npm run layout:baseline` でベースラインを更新する**（更新しないと回帰テストが失敗する）。広い範囲のランダム検証は `npm run layout:fuzz`。詳細は [layout-lab.md](./layout-lab.md) |
@@ -50,6 +50,28 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 | `TREE_MARGIN` | 40 | 複数root（複数ツリー）が重なるとき空けるツリー間の最小マージン（px） |
 | `TREE_SEPARATION_MAX_ITER` | 200 | ツリー分離（押し離し）反復の上限。通常は数回で収束する |
 | `DEFAULT_NODE_WIDTH` / `DEFAULT_NODE_HEIGHT` | 180 / 60 | ノードの実測サイズ（React Flowの`node.measured`）が無い場合のフォールバック既定サイズ（px）。**export済み**。`useNodeCreation.ts`でも実測が取れない場合（新規作成する空ノード等）のフォールバックとして共有する |
+
+`elk-port`のチューニング定数（`src/utils/elkPortLayout.ts`冒頭）:
+
+| 定数 | 現在値 | 意味 |
+|---|---|---|
+| `PORT_SIZE` | 0 | ELKに渡すポート（=React Flowのハンドル）の大きさ（px）。0ならポート位置が辺上の1点になり、実際のハンドル位置および評価環境のアンカー計算（`e2e/lib/layout-metrics.mjs`の`anchorOf`）と一致する。正の値にするとポートがノードの外側に張り出し、そのぶんレイヤー間隔が広がる |
+| `PORT_SIDE` | top→NORTH / bottom→SOUTH / left→WEST / right→EAST | ハンドル面とELKのポート面の対応。`elk.direction`に応じた回転はELK側が吸収するので、描画上の実際の面に1対1で対応させる。取り違えるとコーパス全体のハンドル向き不一致が跳ね上がり、ベースライン回帰テストが検知する |
+
+ELKに渡すレイアウトオプション自体（INTERACTIVE戦略・spacing）は`uniform`と共有している（`src/utils/layout.ts`の`ELK_BASE_LAYOUT_OPTIONS`）。**ここを変えると`uniform`・`branch`・`flat-axis`・`elk-port`のすべてが同時に動く**（かつ`e2e/layout-stability.mjs`がドリフト検出でFAILする）。`elk-port-ext`はELKを使わないので影響を受けない。
+
+`elk-port-ext`のチューニング定数（すべて`src/utils/elkPortExtLayout.ts`冒頭）。**このアルゴリズムは「改善していくための土台」なので、フェーズごとに何を触ると何が変わるかは[align-branch-layout.md](./align-branch-layout.md)「方針G」の「改善の入口」を先に読むこと**:
+
+| 定数 | 現在値 | 意味 |
+|---|---|---|
+| `LAYER_GAP` | 80 | 層と層の間隔（primary方向、px）。ELKの`nodeNodeBetweenLayers`に合わせている |
+| `NODE_GAP` | 50 | 同じ層に並ぶ実ノード同士の最小間隔（cross方向、px）。ELKの`nodeNode`に合わせている |
+| `LANE_GAP` | 16 | 仮想ノード（長いエッジの通り道）に隣接する部分の最小間隔（cross方向、px）。線1本ぶんの幅しか要らないので実ノード同士より狭い。大きくすると長いエッジの通り道が広く取られ、描画面積が増える |
+| `PORT_STUB` | 20 | 直交方向の面（RIGHT時のtop/bottom）に付いたポートの、ノード端からの張り出し量（px）。**大きくすると上/下ハンドルの子が親から強く離れる＝ポート制約の効きが強まる** |
+| `PLACEMENT_SWEEPS` | 4 | 座標割当（PAVA）の掃引回数。1回＝前向き＋後ろ向きの1往復 |
+| `ORDERING_SWEEPS` | 4 | 交差削減の掃引回数。**0にすると交差削減が丸ごと止まり、兄弟順の反転率が0.045→0.006に改善する代わりに交差209→801・貫通52→229に悪化する**（トレードオフの実測値はalign-branch-layout.md「方針G」） |
+| `DUMMY_WEIGHT` | 8 | 仮想ノードの配置優先度（実ノードを1としたときの重み）。大きいほど長いエッジがまっすぐになる |
+| `ORDER_PITCH` | 110（`DEFAULT_NODE_HEIGHT + NODE_GAP`） | 交差削減のバリセンタは順序index空間で計算するため、ポートのcrossオフセット(px)を「およそ何ノードぶんか」へ換算する際の縦ピッチの目安 |
 
 いずれかに決まったら、決定記録を`decisions.md`へ移し、不採用側のファイル・この切り替えUI・関連テストを削除する予定（`align-branch-layout.md`「今後の運び」参照）。
 

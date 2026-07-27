@@ -1,4 +1,4 @@
-// dev限定の整列アルゴリズム（branch / flat-axis / sugiyama-ext）の**個別の設計意図**を検証する、
+// dev限定の整列アルゴリズム（branch / flat-axis / sugiyama-ext / elk-port / elk-port-ext）の**個別の設計意図**を検証する、
 // ブラウザを起動しない純Nodeテスト。docs/align-branch-layout.md参照。
 //
 // このファイルは「そのアルゴリズムが狙った配置になっているか」（右子は右へ、上/下子は親に被せて、等）を
@@ -17,6 +17,8 @@ export const name = 'branch-layout-algorithms';
 const { calculateBranchLayout } = await import('../src/utils/branchLayout.ts');
 const { calculateFlatAxisLayout } = await import('../src/utils/flatAxisLayout.ts');
 const { calculateSugiyamaExtLayout } = await import('../src/utils/sugiyamaExtLayout.ts');
+const { calculateElkPortLayout } = await import('../src/utils/elkPortLayout.ts');
+const { calculateElkPortExtLayout } = await import('../src/utils/elkPortExtLayout.ts');
 const { calculateLayoutForAlign } = await import('../src/utils/alignAlgorithm.ts');
 const { calculateLayout } = await import('../src/utils/layout.ts');
 
@@ -526,6 +528,341 @@ async function testSugiyamaExtTreeSeparation() {
   await assertEqual(null, JSON.stringify(farPos.get('x')), JSON.stringify({ x: 2000, y: 0 }), '[sugiyama-ext] 離れたツリーのrootは動かないこと(x)');
 }
 
+// --- 15. elk-port: ハンドルがポートとしてELKに渡っている（uniformと結果が変わる）---
+async function testElkPortDiffersFromUniform() {
+  // 右ハンドル子2つ＋下ハンドル子1つ。ポートを渡さないuniformは全エッジを同一視するため、
+  // 「下ハンドル子だけ取り付き面が違う」ことが結果に出ていればポートが効いている証拠になる
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'a', content: '', position: { x: 300, y: -80 } },
+    { id: 'b', content: '', position: { x: 300, y: 80 } },
+    { id: 'a1', content: '', position: { x: 600, y: -80 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'p', target: 'a', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'p', target: 'b', sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: 'e3', source: 'a', target: 'a1', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  const viaUniform = await calculateLayoutForAlign(nodes, edges, 'RIGHT', 'uniform');
+  const viaElkPort = await calculateElkPortLayout(nodes, edges, 'RIGHT');
+  await assertTrue(
+    null,
+    JSON.stringify(viaUniform) !== JSON.stringify(viaElkPort),
+    '[elk-port] ハンドル混在グラフでuniformと異なる結果になること（ポート制約が効いていること）'
+  );
+}
+
+// --- 16. elk-port: ポートは「取り付き面」だけを制約し、流れ方向は変えない ---
+async function testElkPortKeepsSingleFlowDirection() {
+  // 仕様上の限界を明示的に固定するテスト（docs/align-branch-layout.md「方針F」）。
+  // 下ハンドルに繋いだ子でもRIGHT方向では右隣のレイヤーに置かれる。ハンドルの向きどおりに
+  // 子を配置するのはsugiyama-ext（方針E）の役割で、elk-portはそれを保証しない
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'bottom', content: '', position: { x: 0, y: 200 } },
+  ];
+  const edges = [{ id: 'e1', source: 'p', target: 'bottom', sourceHandle: 'bottom', targetHandle: 'top' }];
+  const pos = positionsById(await calculateElkPortLayout(nodes, edges, 'RIGHT'));
+  await assertTrue(
+    null,
+    pos.get('bottom').x > pos.get('p').x + 100,
+    '[elk-port] 下ハンドル子でもRIGHT方向では前方(右)の層に置かれること（流れ方向は単一のまま）'
+  );
+}
+
+// --- 17. elk-port: targetHandle無しはソース面の反対面にフォールバックする ---
+async function testElkPortTargetHandleFallback() {
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'c', content: '', position: { x: 300, y: 0 } },
+  ];
+  const withHandle = [{ id: 'e1', source: 'p', target: 'c', sourceHandle: 'right', targetHandle: 'left' }];
+  const withoutHandle = [{ id: 'e1', source: 'p', target: 'c', sourceHandle: 'right' }];
+  const a = await calculateElkPortLayout(nodes, withHandle, 'RIGHT');
+  const b = await calculateElkPortLayout(nodes, withoutHandle, 'RIGHT');
+  await assertEqual(
+    null,
+    JSON.stringify(b),
+    JSON.stringify(a),
+    '[elk-port] targetHandle無し(旧データ)がsourceHandleの反対面(right→left)と同じ結果になること'
+  );
+}
+
+// --- 18. elk-port: 端点が欠けたエッジを除外してレイアウトを続行する ---
+async function testElkPortDanglingEdge() {
+  // ELKは存在しないノード/ポートを参照するエッジでレイアウト実行ごと失敗する。除外し損ねると
+  // catch節のフォールバック（＝入力位置をそのまま返す＝整列が何も起きない）に落ちる
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'a', content: '', position: { x: 300, y: -80 } },
+    { id: 'b', content: '', position: { x: 300, y: 80 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'p', target: 'a', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'p', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  const clean = await calculateElkPortLayout(nodes, edges, 'RIGHT');
+  const withDangling = await calculateElkPortLayout(
+    nodes,
+    [...edges, { id: 'x', source: 'p', target: 'ghost', sourceHandle: 'right' }],
+    'RIGHT'
+  );
+  await assertEqual(
+    null,
+    JSON.stringify(withDangling),
+    JSON.stringify(clean),
+    '[elk-port] 端点が欠けたエッジを除外し、そのエッジが無い場合と同じ結果になること'
+  );
+  await assertTrue(
+    null,
+    JSON.stringify(positionsById(withDangling).get('a')) !== JSON.stringify({ x: 300, y: -80 }),
+    '[elk-port] 端点欠けエッジがあってもフォールバック（入力位置そのまま）に落ちていないこと'
+  );
+}
+
+// --- 19. elk-port: 循環・複数親・孤立ノードでクラッシュせず決定的 ---
+async function testElkPortCycleAndMultiParent() {
+  const nodes = [
+    { id: 'a', content: '', position: { x: 0, y: 0 } },
+    { id: 'b', content: '', position: { x: 200, y: 0 } },
+    { id: 'c', content: '', position: { x: 100, y: 200 } },
+    { id: 'd', content: '', position: { x: 400, y: 100 } },
+    { id: 'iso', content: '', position: { x: 0, y: 400 } }, // ポートを1つも持たない孤立ノード
+  ];
+  const edges = [
+    { id: 'e1', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'b', target: 'c', sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: 'e3', source: 'c', target: 'a', sourceHandle: 'right', targetHandle: 'left' }, // 循環
+    { id: 'e4', source: 'b', target: 'd', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e5', source: 'c', target: 'd', sourceHandle: 'top', targetHandle: 'bottom' }, // 複数親
+    { id: 'e6', source: 'd', target: 'd', sourceHandle: 'right', targetHandle: 'right' }, // 自己ループ
+  ];
+  const r1 = await calculateElkPortLayout(nodes, edges, 'RIGHT');
+  await assertEqual(null, r1.nodes.length, 5, '[elk-port循環] 全ノードの位置が返ること');
+  for (const n of r1.nodes) {
+    await assertTrue(
+      null,
+      Number.isFinite(n.position.x) && Number.isFinite(n.position.y),
+      `[elk-port循環] ${n.id}の座標が有限であること`
+    );
+  }
+  const r2 = await calculateElkPortLayout(nodes, edges, 'RIGHT');
+  await assertEqual(null, JSON.stringify(r1), JSON.stringify(r2), '[elk-port循環] 2回実行で結果が完全一致すること（決定性）');
+}
+
+// --- 20. elk-port: ディスパッチャ経由と直接呼び出しが一致 ---
+async function testElkPortDispatcherParity() {
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'r', content: '', position: { x: 300, y: 0 } },
+    { id: 't', content: '', position: { x: 0, y: -200 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'p', target: 'r', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'p', target: 't', sourceHandle: 'top', targetHandle: 'bottom' },
+  ];
+  const viaDispatcher = await calculateLayoutForAlign(nodes, edges, 'RIGHT', 'elk-port');
+  const viaDirect = await calculateElkPortLayout(nodes, edges, 'RIGHT');
+  await assertEqual(
+    null,
+    JSON.stringify(viaDispatcher),
+    JSON.stringify(viaDirect),
+    '[elk-portディスパッチャ] 経由と直接呼び出しが一致すること'
+  );
+}
+
+// --- 21. elk-port-ext: 直交ポートがcross方向の配置に効く（上ハンドル子は上、下ハンドル子は下）---
+async function testElkPortExtCrossPorts() {
+  // 方針Gの中身そのもの。流れ方向（層）は単一のままだが、cross方向の位置はポート面で決まる
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'r', content: '', position: { x: 300, y: 0 } },
+    { id: 't', content: '', position: { x: 300, y: 0 } },
+    { id: 'b', content: '', position: { x: 300, y: 0 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'p', target: 'r', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'p', target: 't', sourceHandle: 'top', targetHandle: 'bottom' },
+    { id: 'e3', source: 'p', target: 'b', sourceHandle: 'bottom', targetHandle: 'top' },
+  ];
+  const pos = positionsById(calculateElkPortExtLayout(nodes, edges, 'RIGHT'));
+  const p = pos.get('p');
+  await assertTrue(null, pos.get('t').y < p.y, '[elk-port-ext] 上ハンドル子が親より上に置かれること');
+  await assertTrue(null, pos.get('b').y > p.y, '[elk-port-ext] 下ハンドル子が親より下に置かれること');
+  await assertTrue(
+    null,
+    Math.abs(pos.get('r').y - p.y) < Math.abs(pos.get('t').y - p.y),
+    '[elk-port-ext] 右ハンドル子は上ハンドル子より親のcross位置に近いこと（流れ方向の面はオフセット0）'
+  );
+  // 層は単一の流れ方向のまま（上/下ハンドル子も前方の層に置かれる）
+  for (const id of ['r', 't', 'b']) {
+    await assertTrue(null, pos.get(id).x > p.x + 100, `[elk-port-ext] ${id}が前方(右)の層に置かれること`);
+  }
+  const sameLayerX = [pos.get('r').x, pos.get('t').x, pos.get('b').x];
+  await assertTrue(
+    null,
+    Math.max(...sameLayerX) - Math.min(...sameLayerX) < 1,
+    '[elk-port-ext] 3つの子が同じ層（同じprimary座標）に揃うこと'
+  );
+}
+
+// --- 22. elk-port-ext: 長いエッジは仮想ノードで分解され、途中の層に通り道を確保する ---
+async function testElkPortExtLongEdge() {
+  // root→a→b→c の鎖。ここに root→c の3層ぶんをまたぐ直通エッジを足すと、中間の層（a・bの層）に
+  // 通り道ぶんの仮想ノードが入る。その結果レイアウトはcross方向に広がる。
+  // 仮想ノードを作らない実装（＝長いエッジを無視する実装）だと、この広がりが起きない
+  const nodes = [
+    { id: 'root', content: '', position: { x: 0, y: 0 } },
+    { id: 'a', content: '', position: { x: 300, y: 0 } },
+    { id: 'b', content: '', position: { x: 600, y: 0 } },
+    { id: 'c', content: '', position: { x: 900, y: 0 } },
+  ];
+  const chainEdges = [
+    { id: 'e1', source: 'root', target: 'a', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e3', source: 'b', target: 'c', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  const longEdge = { id: 'e4', source: 'root', target: 'c', sourceHandle: 'right', targetHandle: 'left' };
+
+  const crossSpread = (pos) => {
+    const ys = ['root', 'a', 'b', 'c'].map((id) => pos.get(id).y);
+    return Math.max(...ys) - Math.min(...ys);
+  };
+
+  const chainPos = positionsById(calculateElkPortExtLayout(nodes, chainEdges, 'RIGHT'));
+  // 4ノードが4つの層に分かれること（レイヤー割当がエッジ制約を満たしている）
+  const xs = ['root', 'a', 'b', 'c'].map((id) => chainPos.get(id).x);
+  for (let i = 1; i < xs.length; i++) {
+    await assertTrue(null, xs[i] > xs[i - 1], `[elk-port-ext] 層が単調に前進すること (${i})`);
+  }
+  await assertTrue(
+    null,
+    crossSpread(chainPos) < 1,
+    '[elk-port-ext] 直鎖だけならcross方向に広がらないこと（比較の基準）'
+  );
+
+  const withLongPos = positionsById(calculateElkPortExtLayout(nodes, [...chainEdges, longEdge], 'RIGHT'));
+  await assertTrue(
+    null,
+    crossSpread(withLongPos) > 20,
+    `[elk-port-ext] 3層をまたぐエッジを足すと仮想ノードが通り道を確保してcross方向に広がること（実測${crossSpread(withLongPos).toFixed(1)}px）`
+  );
+  // 層の構成そのものは変わらない（仮想ノードは実ノードの層を動かさない）
+  for (const id of ['root', 'a', 'b', 'c']) {
+    await assertEqual(
+      null,
+      withLongPos.get(id).x,
+      chainPos.get(id).x,
+      `[elk-port-ext] 仮想ノードが${id}の層(primary座標)を変えないこと`
+    );
+  }
+}
+
+// --- 23. elk-port-ext: 同じ層のノードが最小間隔を守る（PAVAの重なり回避）---
+async function testElkPortExtNoOverlapInLayer() {
+  // 1つの親に高さの違う子を6つぶら下げ、初期位置は全部同じ場所に潰しておく
+  const nodes = [{ id: 'p', content: '', position: { x: 0, y: 0 }, width: 180, height: 60 }];
+  const edges = [];
+  for (let i = 0; i < 6; i++) {
+    nodes.push({ id: `c${i}`, content: '', position: { x: 300, y: 0 }, width: 180, height: 40 + i * 40 });
+    edges.push({ id: `e${i}`, source: 'p', target: `c${i}`, sourceHandle: 'right', targetHandle: 'left' });
+  }
+  const nodesById = new Map(nodes.map((n) => [n.id, n]));
+  const pos = positionsById(calculateElkPortExtLayout(nodes, edges, 'RIGHT'));
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i].id;
+      const b = nodes[j].id;
+      await assertTrue(
+        null,
+        !rectanglesOverlap(rectOf(pos.get(a), nodesById.get(a)), rectOf(pos.get(b), nodesById.get(b))),
+        `[elk-port-ext] ${a}と${b}が重ならないこと`
+      );
+    }
+  }
+}
+
+// --- 24. elk-port-ext: DOWN方向へ90度回転して同じ扱いになる ---
+async function testElkPortExtDownDirection() {
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'd', content: '', position: { x: 0, y: 300 } }, // 下ハンドル＝DOWN時のforward
+    { id: 'l', content: '', position: { x: 0, y: 300 } }, // 左ハンドル＝DOWN時のcrossNeg
+  ];
+  const edges = [
+    { id: 'e1', source: 'p', target: 'd', sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: 'e2', source: 'p', target: 'l', sourceHandle: 'left', targetHandle: 'right' },
+  ];
+  const pos = positionsById(calculateElkPortExtLayout(nodes, edges, 'DOWN'));
+  const p = pos.get('p');
+  await assertTrue(null, pos.get('d').y > p.y + 50, '[elk-port-ext DOWN] forward(下)の子が親より下の層に置かれること');
+  await assertTrue(null, pos.get('l').x < p.x, '[elk-port-ext DOWN] 左ハンドル(crossNeg)の子が親より左に置かれること');
+  await assertTrue(
+    null,
+    Math.abs(pos.get('d').x - p.x) < Math.abs(pos.get('l').x - p.x),
+    '[elk-port-ext DOWN] forwardの子のほうがcross(左右)方向で親に近いこと'
+  );
+}
+
+// --- 25. elk-port-ext: 循環・複数親・孤立ノード・自己ループで決定的、位置は元の場所に留まる ---
+async function testElkPortExtRobustness() {
+  const nodes = [
+    { id: 'a', content: '', position: { x: 1000, y: 500 } },
+    { id: 'b', content: '', position: { x: 1200, y: 500 } },
+    { id: 'c', content: '', position: { x: 1100, y: 700 } },
+    { id: 'd', content: '', position: { x: 1400, y: 600 } },
+    { id: 'iso', content: '', position: { x: 1000, y: 900 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'b', target: 'c', sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: 'e3', source: 'c', target: 'a', sourceHandle: 'right', targetHandle: 'left' }, // 循環
+    { id: 'e4', source: 'b', target: 'd', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e5', source: 'c', target: 'd', sourceHandle: 'top', targetHandle: 'bottom' }, // 複数親
+    { id: 'e6', source: 'd', target: 'd', sourceHandle: 'right', targetHandle: 'right' }, // 自己ループ
+  ];
+  const r1 = calculateElkPortExtLayout(nodes, edges, 'RIGHT');
+  await assertEqual(null, r1.nodes.length, 5, '[elk-port-ext頑健性] 全ノードの位置が返ること');
+  for (const n of r1.nodes) {
+    await assertTrue(
+      null,
+      Number.isFinite(n.position.x) && Number.isFinite(n.position.y),
+      `[elk-port-ext頑健性] ${n.id}の座標が有限であること`
+    );
+  }
+  const r2 = calculateElkPortExtLayout(nodes, edges, 'RIGHT');
+  await assertEqual(null, JSON.stringify(r1), JSON.stringify(r2), '[elk-port-ext頑健性] 2回実行で結果が完全一致すること（決定性）');
+
+  // ELK版と違い原点付近へ正規化しない: 整列後の外接矩形の左上が元の左上と一致する
+  const pos = positionsById(r1);
+  const minX = Math.min(...r1.nodes.map((n) => n.position.x));
+  const minY = Math.min(...r1.nodes.map((n) => n.position.y));
+  await assertEqual(null, minX, 1000, '[elk-port-ext] 外接矩形の左上xが元の位置に留まること');
+  await assertEqual(null, minY, 500, '[elk-port-ext] 外接矩形の左上yが元の位置に留まること');
+  await assertTrue(null, Number.isFinite(pos.get('iso').x), '[elk-port-ext] 孤立ノードにも座標が付くこと');
+}
+
+// --- 26. elk-port-ext: ディスパッチャ経由と直接呼び出しが一致 ---
+async function testElkPortExtDispatcherParity() {
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'r', content: '', position: { x: 300, y: 0 } },
+    { id: 't', content: '', position: { x: 0, y: -200 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'p', target: 'r', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'p', target: 't', sourceHandle: 'top', targetHandle: 'bottom' },
+  ];
+  const viaDispatcher = await calculateLayoutForAlign(nodes, edges, 'RIGHT', 'elk-port-ext');
+  const viaDirect = calculateElkPortExtLayout(nodes, edges, 'RIGHT');
+  await assertEqual(
+    null,
+    JSON.stringify(viaDispatcher),
+    JSON.stringify(viaDirect),
+    '[elk-port-extディスパッチャ] 経由と直接呼び出しが一致すること'
+  );
+}
+
 export async function run() {
   await testBranchSideSeparation();
   await testBranchRecursion();
@@ -542,6 +879,18 @@ export async function run() {
   await testSugiyamaExtDeepestLayer();
   await testSugiyamaExtCrossForwardNoOverlap();
   await testSugiyamaExtTreeSeparation();
+  await testElkPortDiffersFromUniform();
+  await testElkPortKeepsSingleFlowDirection();
+  await testElkPortTargetHandleFallback();
+  await testElkPortDanglingEdge();
+  await testElkPortCycleAndMultiParent();
+  await testElkPortDispatcherParity();
+  await testElkPortExtCrossPorts();
+  await testElkPortExtLongEdge();
+  await testElkPortExtNoOverlapInLayer();
+  await testElkPortExtDownDirection();
+  await testElkPortExtRobustness();
+  await testElkPortExtDispatcherParity();
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

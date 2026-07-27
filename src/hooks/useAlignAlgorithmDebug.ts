@@ -11,7 +11,7 @@ import { AlignAlgorithm } from '../types';
 // useStateだと各自が独立した状態を持ち、セレクトを変えても整列側に伝わらない（既定値のまま
 // 実行されるバグの原因になっていた）。ストアで単一の状態を共有し、変更が即座に伝わるようにする。
 const STORAGE_KEY = 'mindmeshmap-debug-align-algorithm';
-const VALID_ALGORITHMS: AlignAlgorithm[] = ['uniform', 'branch', 'flat-axis', 'sugiyama-ext'];
+const VALID_ALGORITHMS: AlignAlgorithm[] = ['uniform', 'branch', 'flat-axis', 'sugiyama-ext', 'elk-port', 'elk-port-ext'];
 
 // 既定の整列アルゴリズム。本番ビルドで常に使う値であり、devで保存値が無いときのフォールバックでもある。
 // （本番＝dev既定を揃えることで、devで確認する挙動が本番と一致する。docs/align-branch-layout.md参照）

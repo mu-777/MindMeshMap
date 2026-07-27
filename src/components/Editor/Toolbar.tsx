@@ -497,6 +497,8 @@ export function Toolbar() {
             <option value="branch">branch</option>
             <option value="flat-axis">flat-axis</option>
             <option value="sugiyama-ext">sugiyama-ext</option>
+            <option value="elk-port">elk-port</option>
+            <option value="elk-port-ext">elk-port-ext</option>
           </select>
         )}
 
