@@ -1,5 +1,6 @@
 // 整列アルゴリズム「elk-port-ext」（方針G: ポート制約付き階層レイアウトの自前実装）。
-// 設計の詳細・検討経緯はdocs/align-branch-layout.md「方針G」を参照。
+// フェーズごとの入出力を含む詳細仕様はdocs/align-algorithms.md §6、
+// 採用理由・検討経緯・改善の入口はdocs/align-branch-layout.md「方針G」を参照。
 //
 // 位置づけ: `elk-port`（方針F）はelkjsにポートを渡すだけの薄いラッパーなので、中身を触って
 // 改善することができない（ELKのオプションで表現できることしかできない）。本方式は

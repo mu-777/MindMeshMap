@@ -24,11 +24,12 @@
 | [docs/tuning.md](docs/tuning.md) | 調整パラメータの索引（定数名・ファイル・現在値・意味） | チューニング定数を追加・変更したとき。値を変えたら表の現在値も直す。「既知の未対応事項」に載っている項目に対応したらそこから消す |
 | [docs/testing.md](docs/testing.md) | E2E の実行手順・テストケース一覧・**手動確認チェックリスト**・テストを書く流儀 | テストを追加・変更したとき、自動化できない確認項目が増えたとき |
 | [docs/layout-lab.md](docs/layout-lab.md) | 整列アルゴリズムの評価環境（コンタクトシート・ファズ・ベースライン）の使い方 | 評価環境そのものを変えたとき |
+| [docs/align-algorithms.md](docs/align-algorithms.md) | 整列アルゴリズム6方式の詳細仕様（フェーズ単位の入出力・手順・データ構造。採用理由や評価は書かない） | アルゴリズムの計算内容を変えたとき・方式を追加/削除したとき。**`src/utils/*Layout.ts` を編集したら行番号アンカー（`...ts#L12-L34`）がずれるので、行数が変わる編集をしたら該当リンクを直す**（コメント1行の増減でもずれる） |
 | [docs/align-branch-layout.md](docs/align-branch-layout.md) | 整列アルゴリズム各方式（uniform / branch / flat-axis / sugiyama-ext / elk-port / elk-port-ext）の設計メモと今後の運び | 整列方式の設計を変えたとき |
 | [docs/graph-drawing-primer.md](docs/graph-drawing-primer.md) / [docs/layout-prior-art.md](docs/layout-prior-art.md) | グラフ描画分野の背景知識・先行研究の地図（読み物、めったに変わらない） | 新しい先行事例を調べたとき |
 
 - **決定記録と tuning は相互リンクする**。同じ事実が README・decisions・tuning に分散するときは、片方だけ直さず必ず整合させる。
-- 整列（レイアウト）まわりを触る前に、少なくとも `decisions.md` の §25・§26・§39・§44 と `align-branch-layout.md` に目を通す。過去に一度決めた方針を知らずに戻すのが一番起きやすい事故。
+- 整列（レイアウト）まわりを触る前に、少なくとも `decisions.md` の §25・§26・§39・§44 と `align-branch-layout.md` に目を通す（各方式が実際に何を計算しているかは `align-algorithms.md`）。過去に一度決めた方針を知らずに戻すのが一番起きやすい事故。
 
 ---
 

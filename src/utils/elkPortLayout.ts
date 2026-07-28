@@ -1,5 +1,5 @@
 // 整列アルゴリズム「elk-port」（方針F: ELK layeredのポート制約版）。
-// 設計の詳細・検討経緯はdocs/align-branch-layout.md「方針F」を参照。
+// 手順の詳細仕様はdocs/align-algorithms.md §5、採用理由・検討経緯はdocs/align-branch-layout.md「方針F」を参照。
 //
 // `uniform`（素のELK layered）はノードとエッジしかELKに渡さないため、どのハンドルから出た
 // エッジかという情報は捨てられ、全エッジが単一の流れ方向で一様に流される。本方式は同じ

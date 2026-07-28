@@ -2,7 +2,8 @@
 // 「親ノードの右ハンドルに繋いだ子は右方向の階層に、上/下ハンドルに繋いだ子は親に少し被る形で
 // 上/下に」配置する、方向混在の階層レイアウト。ELKは1実行=1方向・整数レイヤーしか扱えず、
 // 「半レイヤーぶんの重なり配置」を表現できないため、スギヤマの4フェーズを自前実装する
-// （ELK非依存・同期処理）。設計の詳細・検討経緯はdocs/align-branch-layout.md「方針E」を参照。
+// （ELK非依存・同期処理）。フェーズごとの入出力を含む詳細仕様はdocs/align-algorithms.md §4、
+// 採用理由・検討経緯はdocs/align-branch-layout.md「方針E」を参照。
 //
 // 右向き(RIGHT)レイアウトを基準に説明する。下向き(DOWN)は primary/cross 軸を入れ替えるだけで
 // 自然に90度回転して適用される（下記 primarySize/crossSize/currentCenterPC/centerPCtoTopLeft が吸収）。
@@ -123,7 +124,7 @@ function roleDelta(role: Role): number {
  *    描画のみで位置計算に使わない）。
  * 2. DAG上でロンゲストパス（roleDeltaで重み付けした最深レイヤ）を計算し、各ノードの主たる親を
  *    「そのノードのレイヤを最も深くする入辺」に選ぶ。これにより A1→B1→C1→D1 と A1→B2→D1 では、
- *    D1 は（浅い）B2 ではなく（深い）C1 の子として配置される（docs/align-branch-layout.md 方針E参照）。
+ *    D1 は（浅い）B2 ではなく（深い）C1 の子として配置される（docs/align-algorithms.md §4 フェーズ1+2参照）。
  * 決定的（ノード配列順・エッジ配列順のみに依存）。
  */
 function buildLayeredForest(

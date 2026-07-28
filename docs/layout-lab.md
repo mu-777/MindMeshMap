@@ -3,6 +3,7 @@
 整列（Align）アルゴリズムを**測れる状態**にするための道具立て。新しいアルゴリズムを作る／既存を
 改善するときに、「良くなったのか」を毎回「なんとなく」で判断しないための土台。
 
+- 各アルゴリズムが何をどう計算しているか → [align-algorithms.md](./align-algorithms.md)
 - アルゴリズムそのものの設計・検討経緯 → [align-branch-layout.md](./align-branch-layout.md)
 - レイアウトという分野の教科書的な地図 → [graph-drawing-primer.md](./graph-drawing-primer.md)
 - 先行研究・先行事例 → [layout-prior-art.md](./layout-prior-art.md)
@@ -279,6 +280,8 @@ seed 1..3000・最大60ノードまで広げても違反ゼロを確認済み）
      （狙った配置になるか／保証しないことは保証しないままか）
   7. `npm run layout:baseline` でベースラインを更新する（新アルゴリズムぶんの行が増える。
      既存アルゴリズムの値が一緒に動いていないことを `git diff` で確認する）
+  8. [align-algorithms.md](./align-algorithms.md) に手順の詳細仕様を、align-branch-layout.md に
+     採用理由・不採用案を、[tuning.md](./tuning.md) に調整定数を書く
 
 ## 既知の限界・未実装
 

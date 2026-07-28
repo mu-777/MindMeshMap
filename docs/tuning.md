@@ -27,7 +27,7 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 
 ### 整列アルゴリズム（本番=sugiyama-ext・dev限定で切り替え可）
 
-ノードの右側についた子と上/下についた子を別方向でレイアウトする代替アルゴリズム（詳細・設計経緯は [align-branch-layout.md](./align-branch-layout.md) 参照）。**本番ビルドの既定は `sugiyama-ext`**（暫定採用）。`uniform`/`branch`/`flat-axis`/`sugiyama-ext`/`elk-port`/`elk-port-ext` の比較切り替えUIは引き続きdev限定で残してある（他候補はまだ削除していない）。
+ノードの右側についた子と上/下についた子を別方向でレイアウトする代替アルゴリズム（各方式の計算内容は [align-algorithms.md](./align-algorithms.md)、設計経緯は [align-branch-layout.md](./align-branch-layout.md) 参照）。**本番ビルドの既定は `sugiyama-ext`**（暫定採用）。`uniform`/`branch`/`flat-axis`/`sugiyama-ext`/`elk-port`/`elk-port-ext` の比較切り替えUIは引き続きdev限定で残してある（他候補はまだ削除していない）。
 
 | 項目 | 内容 |
 |---|---|

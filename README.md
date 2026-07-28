@@ -199,6 +199,7 @@ Try this: https://mu-777.github.io/MindMeshMap/
 - [docs/decisions.md](docs/decisions.md) — 設計決定の記録（採用理由・不採用案・再検討の条件）
 - [docs/tuning.md](docs/tuning.md) — 調整パラメータ一覧（定数の場所・意味・現在値）とストレージキー、既知の未対応事項
 - [docs/testing.md](docs/testing.md) — E2Eテストの実行方法・テストケース一覧・手動確認チェックリスト
+- [docs/align-algorithms.md](docs/align-algorithms.md) — 整列アルゴリズム6方式の詳細仕様（何をどう計算しているか）
 - [docs/align-branch-layout.md](docs/align-branch-layout.md) — 整列アルゴリズム各方式の設計メモ
 - [docs/layout-lab.md](docs/layout-lab.md) — 整列アルゴリズムの評価環境（コンタクトシート・ファズ・ベースライン）の使い方
 - [docs/graph-drawing-primer.md](docs/graph-drawing-primer.md) / [docs/layout-prior-art.md](docs/layout-prior-art.md) — グラフ描画分野の背景知識・先行研究

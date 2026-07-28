@@ -27,7 +27,7 @@ export const ELK_BASE_LAYOUT_OPTIONS: Record<string, string> = {
 
 // ELKグラフの構築・layout()呼び出し・結果整形・エラー時フォールバックを行う低レベル関数。
 // calculateLayout（マップ全体・部分整列向けの薄いラッパー）だけでなく、branchLayout.ts /
-// flatAxisLayout.ts（docs/align-branch-layout.md参照）からも共通で使う
+// flatAxisLayout.ts（docs/align-algorithms.md参照）からも共通で使う
 export async function runElkLayout(
   nodes: MapNode[],
   edges: MapEdge[],

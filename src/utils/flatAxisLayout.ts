@@ -1,5 +1,5 @@
 // 整列アルゴリズム「flat-axis」（方針B: 2パス軸射影）。
-// docs/align-branch-layout.md「方針B: flat-axis」節の実装。branchLayout.tsより単純な
+// 手順の詳細仕様はdocs/align-algorithms.md §3、採用理由はdocs/align-branch-layout.md「方針B」。branchLayout.tsより単純な
 // 軽量ベースラインで、branch（方針A）との比較用に実装している。
 //
 // 概要:

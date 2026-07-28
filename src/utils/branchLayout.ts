@@ -1,7 +1,6 @@
 // 整列アルゴリズム「branch」（方針A: 再帰的ブランチ合成）。
 // ノードの右側についた子と下側についた子を別方向でレイアウトするための実装。
-// 設計の詳細・検討経緯はdocs/align-branch-layout.mdを参照（このファイルは同メモの
-// 「方針A: branch」節をそのまま実装したもの）。
+// 手順の詳細仕様はdocs/align-algorithms.md §2、採用理由・検討経緯はdocs/align-branch-layout.md「方針A」を参照。
 //
 // 概要:
 //   1. 各エッジをsourceHandle（無ければマップのlayoutDirection）からtop/bottom/left/rightに分類する
@@ -139,7 +138,7 @@ function buildSpanningForest(
 
 /**
  * ノードnodeIdを根とするサブツリーを、子孫を先に再帰でレイアウトした上でボトムアップに合成する
- * （Eades & Feng方式。docs/align-branch-layout.md「実装方針の詳細」参照）
+ * （Eades & Feng方式。docs/align-algorithms.md §2「フェーズ2」参照）
  */
 async function computeSubtreeBox(
   nodeId: string,
