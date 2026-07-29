@@ -1,6 +1,6 @@
 # 整列アルゴリズムの詳細仕様
 
-現在実装されている6つの整列（Align）アルゴリズムが、**各フェーズで何を入力に取り、何を計算し、何を出力するか**だけを
+現在実装されている8つの整列（Align）アルゴリズムが、**各フェーズで何を入力に取り、何を計算し、何を出力するか**だけを
 書いたリファレンス。コードを開かずに手順を追えること、開くときは目的の関数へ直行できることを目的にしている。
 
 - なぜその方式を採ったか・不採用案・今後どれを残すか → [align-branch-layout.md](./align-branch-layout.md)
@@ -17,8 +17,10 @@
 | `branch` | [branchLayout.ts](../src/utils/branchLayout.ts) | `calculateBranchLayout` | バケット数ぶん | 子をハンドル別に4方向へ分け、部分グラフごとにELKを呼んで箱を再帰合成する |
 | `flat-axis` | [flatAxisLayout.ts](../src/utils/flatAxisLayout.ts) | `calculateFlatAxisLayout` | 2回 | 横系エッジだけ・縦系エッジだけでELKを2回まわし、ノードごとにx/yを使い分ける |
 | `sugiyama-ext` | [sugiyamaExtLayout.ts](../src/utils/sugiyamaExtLayout.ts) | `calculateSugiyamaExtLayout` | — | スギヤマの層割当をハンドル役割で変える。上/下ハンドルの子を親に被せて上下に置く |
+| `sugiyama-port` | [sugiyamaPortLayout.ts](../src/utils/sugiyamaPortLayout.ts) | `calculateSugiyamaPortLayout` | — | `sugiyama-ext` 派生。親をハンドルの向きで選び、同列の複数親を許し、cross群を親の隣に置く |
 | `elk-port` | [elkPortLayout.ts](../src/utils/elkPortLayout.ts) | `calculateElkPortLayout` | 1回 | `uniform` と同じELK layeredに、ハンドルをポートとして渡す |
-| `elk-port-ext` | [elkPortExtLayout.ts](../src/utils/elkPortExtLayout.ts) | `calculateElkPortExtLayout` | — | ポート制約付き階層レイアウトを、ELK非依存で5フェーズに書き下したもの |
+| `elk-port-ext` | [elkPortExtLayout.ts](../src/utils/elkPortExtLayout.ts) | `calculateElkPortExtLayout` | — | `elk-port` と同じ結果を出すことを目標に、ELK layeredをELK非依存で再実装したもの |
+| `elk-port-pava` | [elkPortPavaLayout.ts](../src/utils/elkPortPavaLayout.ts) | `calculateElkPortPavaLayout` | — | 同じ枠組みをELKに寄せず最小構成で書いた版。座標割当は等調回帰(PAVA)、現在位置を保つ |
 
 ---
 
@@ -67,7 +69,7 @@ sourceHandle が top/bottom/left/right → そのまま
 
 `targetHandle`（入力側の面）を見るのは `elk-port` と `elk-port-ext` だけ。無効・未設定なら
 **ソース面の反対面**（right↔left, top↔bottom）にフォールバックする
-（[`resolveTargetSide()`](../src/utils/elkPortLayout.ts#L74-L80) / [`targetSideOf()`](../src/utils/elkPortExtLayout.ts#L105-L111)）。
+（[`resolveTargetSide()`](../src/utils/elkPortLayout.ts#L74-L80) / [`targetSideOf()`](../src/utils/elkPortExtLayout.ts#L88-L94)）。
 
 ### 0.3 primary / cross 座標系とハンドル役割
 
@@ -80,7 +82,7 @@ sourceHandle が top/bottom/left/right → そのまま
 
 サイズも同様（RIGHT なら primarySize=width / crossSize=height、DOWN なら逆）。実装は各ファイルの
 `primarySize` / `crossSize` / `currentCenterPC` / `centerPCtoTopLeft`
-（[sugiyama-ext](../src/utils/sugiyamaExtLayout.ts#L74-L104) / [elk-port-ext](../src/utils/elkPortExtLayout.ts#L114-L128)）。
+（[sugiyama-ext](../src/utils/sugiyamaExtLayout.ts#L74-L104) / [elk-port-ext](../src/utils/elkPortExtLayout.ts#L96-L110)）。
 **この読み替えだけで DOWN が「90度回転した RIGHT」として処理される**ので、方向分岐は座標変換関数の中にしか無い。
 
 ハンドルも方向を基準にした**役割**へ写像する:
@@ -92,10 +94,12 @@ sourceHandle が top/bottom/left/right → そのまま
 | `crossNeg`（直交・負側） | top | left |
 | `crossPos`（直交・正側） | bottom | right |
 
-同じ写像を [`handleRole()`](../src/utils/sugiyamaExtLayout.ts#L47-L71) と
-[`portRole()`](../src/utils/elkPortExtLayout.ts#L79-L102) が**それぞれ独立に持っている**。用途が違う
-（前者は「役割で層を変える」、後者は「役割で取り付き位置を変える」）ため、どちらかを削除するときに
-巻き込まれないよう意図的に共有していない。
+同じ写像を [`handleRole()`](../src/utils/sugiyamaExtLayout.ts#L47-L71) /
+[`portRole()`（elk-port-ext）](../src/utils/elkPortExtLayout.ts#L62-L85) /
+[`portRole()`（elk-port-pava）](../src/utils/elkPortPavaLayout.ts#L85-L108) の**3つが独立に持っている**。
+用途が違う（`handleRole` は「役割で層を変える」、`elk-port-ext` は「役割でダミーを作る」、
+`elk-port-pava` は「役割で取り付き位置をずらす」）ため、どれかを削除するときに巻き込まれないよう
+意図的に共有していない。
 
 ### 0.4 ELKへ渡す共通オプション
 
@@ -571,11 +575,210 @@ ports: [{ id: `${nodeId}::${side}`, width: 0, height: 0,
 
 ---
 
-## 6. `elk-port-ext` — ポート制約付き階層レイアウトの自前実装
+## 6. `elk-port-ext` — ELK layered の自前再実装
+
+5（`elk-port`）が elkjs にやらせている計算を、**同じ結果になることを目標に**ELK非依存で書き直したもの
+（**完全同期**）。座標は 0.3 の primary/cross で扱う。エントリは
+[`calculateElkPortExtLayout()` elkPortExtLayout.ts](../src/utils/elkPortExtLayout.ts)。
+
+**ELK 0.9.1 のソース（EPL-2.0）を読んで書いている**が、移植ではない。「どのクラスが何をしているか」を
+読み取ったうえで、このアプリに要る部分だけをベタ書きしてある（ELKの関数・データ型はimportせず、
+他アルゴリズムとの共通化のための抽象も持ち込まない）。elkjs 0.9.3 が同梱するのは ELK 0.9.x なので、
+参照したのは近いバージョンだが完全に同一のリビジョンではない。
+
+7（`elk-port-pava`）と枠組みは同じだが目標が違う。7は「同じ考え方を素直に書くとどうなるか」、
+6は「ELKと同じ答えを出すこと」。したがって6は、素直に書けば選ばないような処理（原点への正規化・
+ノード数順の成分パッキング・**交差削減をしないこと**など）もELKに合わせてある。
+
+```
+MapNode[] + MapEdge[] + direction
+      ↓  フェーズ0: 端点欠け・自己ループの分離、各エッジの取り付き面 → PortRole
+prepared: PreparedEdge[] / selfLoops: SelfLoop[]
+      ↓  連結成分の分離（Union-Find）
+成分ごとに以下を実行:
+      ↓  フェーズ1: breakCycles()          … 現在のprimary順で逆行辺を反転
+dagEdges: PreparedEdge[]                    ← 必ずDAG
+      ↓  フェーズ2: assignLayers()         … 現在のprimary区間で層にまとめ、辺制約で押し出す
+layerOf: Map<nodeId, number>
+      ↓  フェーズ3a: north/southポートのダミー化
+      ↓  フェーズ3b: 長いエッジをダミーの鎖に分解
+lnodes: LNode[] / ledges: LEdge[]（すべてちょうど1層をまたぐ）
+      ↓  フェーズ4: orderLayersInteractive() … 現在座標で層内を並べ替えるだけ（交差削減はしない）
+layers: number[][]
+      ↓  フェーズ5: placeBrandesKoepf()    … 4パス＋実行可能で最小幅のパスを採用
+各LNodeの cross
+      ↓  層のprimary積み上げ（左揃え・LAYER_GAP）
+成分ごとの (p,c) 中心座標 + ダミー込みのcross範囲
+      ↓  成分パッキング（ノード数順・COMPONENT_GAP）→ (p,c)→(x,y) → 原点+PADDING → 整数丸め
+LayoutResult
+```
+
+### 6.0 ELKのどの実装に対応しているか
+
+`ELK_BASE_LAYOUT_OPTIONS` が選ぶ実装クラスは次のとおり。**ここを取り違えると「よかれと思った改善」で
+ELKから離れる**ので、フェーズを触る前に必ず確認する。
+
+| オプション | ELKが選ぶ実装 | このファイルの対応 |
+|---|---|---|
+| `cycleBreaking.strategy=INTERACTIVE` | `InteractiveCycleBreaker` | `breakCycles()` |
+| `layering.strategy=INTERACTIVE` | `InteractiveLayerer` | `assignLayers()` |
+| `crossingMinimization.strategy=INTERACTIVE` | **`InteractiveCrossingMinimizer`** | `orderLayersInteractive()` |
+| `nodePlacement.strategy=BRANDES_KOEPF` | `BKNodePlacer` / `BKAligner` / `BKCompactor` | `placeBrandesKoepf()` / `bkPass()` |
+
+**最重要**: `crossingMinimization.strategy=INTERACTIVE` のとき、ELKはバリセンタ掃引を行う
+`LayerSweepCrossingMinimizer` を**使わない**。`InteractiveCrossingMinimizer` は
+**各層を現在の座標で並べ替えるだけで、交差削減を一切しない**（詳細は 6.6）。
+
+### 6.0.1 実挙動から確定した定数
+
+定数はソースを読むだけでは決まらない（既定値がオプションの組み合わせで変わるため）ので、
+**小さなグラフをelkjsに食わせて出力から逆算**して裏を取った
+（すべて `elk.direction=RIGHT`、ノード180×60、[layout.ts](../src/utils/layout.ts) の
+`ELK_BASE_LAYOUT_OPTIONS` を使用）。
+
+| 観測 | 入力 | ELKの出力 | 読み取れること |
+|---|---|---|---|
+| 正規化 | 孤立ノード1つを (1000,500) に置く | `(12,12)` | 出力は原点＋`PADDING=12`へ飛ぶ。現在位置は保たれない |
+| 層間隔 | `p -right-> c` | `p=(12,12) c=(272,12)` | 272-12-180 = 80 ＝ `LAYER_GAP`。層は左揃え |
+| 層内間隔 | 右子2つ | `c1=(272,12) c2=(272,122)` | 122-12-60 = 50 ＝ `NODE_GAP` |
+| north/southポート | `p -bottom-> c` | `c=(272,92)` | 子の上端が親の下端＋20。親子の高さを20〜200に振っても常に20 |
+| 〃 の内訳 | `elk.spacing.edgeNode` を 40 にする | 20 → 80 | 20 = 2×`EDGE_NODE_GAP`。「大きさ0のダミーを挟み、両側に`edgeNode`ずつ空ける」形 |
+| 長いエッジの通り道 | 直鎖＋直通エッジ、`edgeNode` を 0/1/10/100 | 隣接ノードが 43/44/53/143 | 通り道の半幅が0.5＝`EDGE_THICKNESS=1`。出力は整数に丸められている |
+| 連結成分 | 2成分 | 成分間の隙間が20 | `COMPONENT_GAP=20`。`elk.separateConnectedComponents` が既定で有効 |
+| 成分の順序 | 3ノード木×3＋孤立ノード1（孤立を配列の最後に置く） | 孤立ノードが先頭 | 現在位置でも入力順でもなく**ノード数の少ない順** |
+| 座標割当 | 右子2つを持つ親 | 親が下の子と完全に一致 | 4パスの平均（balanced）ではなく**単一パスの値**がそのまま出る |
+| 位置の基準 | 高さ200と20のノードを同じ層に置く | 中心の順に並ぶ | `interactiveReferencePoint` の既定は **CENTER**（左上ではない） |
+
+### 6.1 フェーズ0: 前処理とポート面
+
+エッジごとに `classifyEdgeSide()`（source側）と `targetSideOf()`（target側。`targetHandle` が
+無効ならsource面の反対面）で取り付き面を決め、`portRole()` で方向基準の役割に変換する
+（`forward` / `backward` / `crossNeg` / `crossPos`。対応表は 0.3）。
+
+**自己ループはエッジにはしないが捨てもしない**。ELKは自己ループの両端のポートについてもダミーを作り、
+そのぶんノードが押されるため、`SelfLoop` として持ち回ってフェーズ3aでダミーだけ作る。
+これを落とすと自己ループを含むケースが一律10pxずれる。
+
+### 6.2 連結成分の分離
+
+Union-Findで成分に分け、**成分ごとに独立にレイアウトしてから積む**（`elk.separateConnectedComponents`
+既定=trueに相当）。積む順は**ノード数の少ない順、同数なら入力配列の初出順**で、現在位置は見ない。
+成分の外接矩形は**ダミーを含めて**測る（通り道が上端に来ると実ノードがそのぶん内側に入るため）。
+
+### 6.3 フェーズ1: 循環除去 / フェーズ2: レイヤー割当
+
+どちらも現在のprimary座標を基準にするので、「今の階層を保つ」差分性はここで担保される。
+
+**循環除去**（`breakCycles()` / `InteractiveCycleBreaker`）は2段構え:
+
+1. 相手が**厳密に手前**にあるエッジ（targetの中心primary < sourceの中心primary）だけを反転する。
+2. それでも残る循環（primaryが同値のノード同士など）を、ノード配列順のDFSで見つけて後退辺を反転する。
+
+7（`elk-port-pava`）のように「全順序を作って逆行辺を全部反転する」ほうが短く書けるが、
+それだと**同値のときにも反転してしまう**ためELKと結果が変わる。
+
+**レイヤー割当**（`assignLayers()` / `InteractiveLayerer`）は、現在のprimary区間
+`[左端, 右端]` が重なるノードを同じ層にまとめ（＝区間の連結成分）、そのあとエッジが必ず1層以上
+前進するように押し出して、空いた層番号を詰める。
+
+### 6.4 フェーズ3a: north/southポートのダミー化
+
+**この方式の中心**。ELKのポート制約は「エッジが上下面に取り付く」ことを、
+**そのノード自身の層に大きさ0のダミーを置き、エッジをダミー同士で結ぶ**という形で表現する。
+
+- ダミーは「実ノード＋面」につき**1つ**。同じ面から出る複数のエッジは共有する
+  （[elkPortLayout.ts](../src/utils/elkPortLayout.ts) が面ごとに1ポートしか作らないのと同じモデル）。
+- `crossNeg`（RIGHT時のtop）なら実ノードの負側、`crossPos`（bottom）なら正側に隣接して置く。
+- 実ノードとダミーの最小間隔は `EDGE_NODE_GAP`（10）なので、
+  「上下ハンドルの子は親の外側20px（=10×2）から始まる」という観測どおりの結果になる。
+
+`forward` / `backward` のポートはノードのcross中心に付くため、ダミーを作らず実ノードをそのまま端点にする。
+結果として**ダミー展開後のエッジはすべて中心同士を結ぶ**ので、フェーズ5は素直な形で書ける。
+
+### 6.5 フェーズ3b: 長いエッジの分解
+
+2層以上をまたぐエッジを、中間層の `longEdge` ダミーの鎖に分解する（`LongEdgeSplitter`）。
+ダミーのcrossサイズは `EDGE_THICKNESS`(=1)で、これが「通り道」として層内に場所を取る。
+
+並べ替えキーは後段（6.6）で決まるので、ここでは**元エッジ両端のアンカー位置**をダミーに持たせておく。
+アンカーは**ノードの左上**を使う。ELKはここで `LPort.getAbsoluteAnchor()`（= ノード位置 + ポート位置 +
+ポートアンカー）を見るが、`FIXED_SIDE` のポート座標が決まるのはフェーズ4の直前なので、
+この時点ではポート位置もアンカーも0＝実質ノードの左上になる。面ごとの位置（右端・下端など）を使うと
+通り道の上下が入れ替わってELKと結果が変わる。
+
+### 6.6 フェーズ4: 層内の順序決め
+
+**交差削減は一切しない**。`InteractiveCrossingMinimizer` は各層を「現在の座標」で並べ替えるだけで、
+バリセンタ掃引も交差カウントも行わない（`LayerSweepCrossingMinimizer` は
+`crossingMinimization.strategy=LAYER_SWEEP` のときの実装であって、INTERACTIVEでは選ばれない）。
+
+並べ替えキーは種類ごとに違う:
+
+| 種類 | キー |
+|---|---|
+| 実ノード | 現在位置の**中心cross**（`interactiveReferencePoint` の既定が CENTER のため） |
+| nsPortダミー | 元ノードの**cross方向の端**（負側ダミー＝始端 / 正側ダミー＝終端） |
+| longEdgeダミー | 元エッジを、その層の代表primary位置 `pivot` で**線形補間**したcross |
+
+`pivot` は「その層の実ノードのうち、primary始端が**正のもの**だけの中心の平均」。0以下を除くのは
+ELKの `if (node.getPosition().x > 0)` をそのまま写したもの（ダミーは入力位置を持たない＝0扱いなので
+自然に除外される）。補間は、`pivot` が元エッジの両端より外側なら端の値をそのまま使う。
+
+キーが同値のときは「負側ダミー → 実ノード → 正側ダミー」の順序制約で解く
+（ELKの `IN_LAYER_SUCCESSOR_CONSTRAINTS` に相当）。それ以外の同値は元の並び順を保つ。
+
+**ここをバリセンタ掃引にすると交差が 799 → 563 に減ってしまい、ELKから離れる。**
+この方式に限り「スコアが良くなる」ことは再現失敗を意味する。
+
+### 6.7 フェーズ5: 座標割当（Brandes–Köpf）
+
+[Brandes & Köpf (2002)](./layout-prior-art.md) を、ELKの `BKNodePlacer` が採っている選択に合わせて実装する。
+
+1. **type-1 conflictのマーキング**（`markType1Conflicts()`）: 内部セグメント（ダミー同士のエッジ）と
+   それを跨ぐ非内部セグメントの交差を検出し、後者に印を付ける。印の付いたエッジは整列に使わない
+   ＝長いエッジがまっすぐ保たれる。
+2. **4パス**（`bkPass()`）: ELKの (hdir, vdir) = (RIGHT,DOWN) (RIGHT,UP) (LEFT,DOWN) (LEFT,UP) の順。
+   **hdirが層をなめる向き**（RIGHT=前から/先行ノードに揃える、LEFT=後ろから/後続に揃える）、
+   **vdirが層内をなめる向き**。各パスは**垂直整列**（隣接層の中央値の相手に揃えてブロックを作る）→
+   **水平圧縮**（ブロック単位に詰める）。4通りは層順・層内順を反転した「見え方」を作って1つの実装で
+   回し、層内反転したパスは最後に符号を戻す。
+3. **クラス間の圧縮**: 連結していないブロック群（クラス）同士の距離は、原論文の単一 `shift` ではなく
+   **クラスグラフの辺**として溜め、入次数0から伝播させて決める（ELKの `placeClasses`）。
+   原論文の単純なshiftはノードサイズが一様で連結なグラフを前提にしているため、
+   大きさの違うノードや非連結成分があると詰めきれない。
+4. **採用**: 4つを平均する「バランス化」は**この構成では使われない**。ELKの条件は
+   `produceBalancedLayout = (fixedAlignment==NONE && !favorStraightEdges) || fixedAlignment==BALANCED`
+   で、`favorStraightEdges` は `edgeRouting=ORTHOGONAL`（layeredの既定）のとき true になるため。
+   したがって**層内の順序・間隔を破っていないパスのうち、広がりが最小のもの**を採る（同値なら先頭優先）。
+   広がりは**ブロック単位の外接**で測る（ELKの `layoutSize()`）。座標だけで測るとノードの大きさが
+   効かず、別のパスが選ばれてしまう。実測でも、バランス化を有効にすると一致率が 72% → 66% に落ちる。
+5. 最後の保険として、層ごとに順序どおりの間隔を復元する（採用した配置が実行可能なら何も動かない）。
+
+### 6.8 primary軸と最終変換
+
+層ごとに「その層の最大primaryサイズ ＋ `LAYER_GAP`」で積み、層内は左揃え。
+成分パッキング後、(primary, cross) を (x, y) に戻し、**原点＋`PADDING`(12) へ正規化**して
+**整数に丸める**（どちらもELKの挙動に合わせたもので、7とはここが決定的に違う）。
+
+### この手順から言えること
+
+- **ノードの重なりは起きない**（フェーズ5の最後に間隔を復元するため）。
+- **整列するとマップ全体が原点付近へ飛ぶ**。ELK本体（`uniform` / `elk-port`）と同じ挙動で、
+  現在位置を保つ7（`elk-port-pava`）や `sugiyama-ext` とは対照的。
+- `elk-port` と同じく**流れ方向は単一のまま**。上/下ハンドルの子は cross方向で親の外へ押されるが、
+  層は前方に進む。
+- ELKと**完全一致するのは43ケース中25件・ノード単位で73%**（測定は `npm run layout:parity`、
+  読み方は [layout-lab.md](./layout-lab.md)「ELK再現度」）。残差の主因は Brandes–Köpf の
+  圧縮まわりの細部で、既知の未実装差分は逆向きポート（`InvertedPortProcessor`）。
+- **スコアが `elk-port` より良くなったら、それは再現の失敗**。この方式だけは指標を「近さ」で読む。
+
+---
+
+## 7. `elk-port-pava` — ポート制約付き階層レイアウトの最小構成実装
 
 5と同じ枠組み（単一の流れ方向＋ポートで取り付き面を制約）を、ELKに依存せず5フェーズに書き下したもの
 （**完全同期**）。座標は 0.3 の primary/cross で扱う。エントリは
-[`calculateElkPortExtLayout()` elkPortExtLayout.ts#L337-L562](../src/utils/elkPortExtLayout.ts#L338-L563)。
+[`calculateElkPortPavaLayout()` elkPortPavaLayout.ts#L343-L568](../src/utils/elkPortPavaLayout.ts#L344-L569)。
 
 ```
 MapNode[] + MapEdge[] + direction
@@ -597,9 +800,9 @@ layers（交差最小の順序） / 各LNodeの order
 LayoutResult
 ```
 
-### 6.0 中間データ構造とポートオフセット
+### 7.0 中間データ構造とポートオフセット
 
-[elkPortExtLayout.ts#L132-L149](../src/utils/elkPortExtLayout.ts#L133-L150)
+[elkPortPavaLayout.ts#L138-L155](../src/utils/elkPortPavaLayout.ts#L139-L156)
 
 ```ts
 interface LNode {
@@ -618,7 +821,7 @@ interface LEdge {
 }
 ```
 
-**ポートのcrossオフセット**（[`portCrossOffset()`](../src/utils/elkPortExtLayout.ts#L153-L164)）:
+**ポートのcrossオフセット**（[`portCrossOffset()`](../src/utils/elkPortPavaLayout.ts#L159-L170)）:
 
 | 役割 | crossオフセット |
 |---|---|
@@ -630,13 +833,13 @@ interface LEdge {
 確保する空間を、ダミーを実体化せずオフセットで表現している。以降のフェーズ4・5はこのオフセットを
 バリセンタ／希望位置の計算に混ぜるだけ。
 
-### 6.1 フェーズ1: 循環除去
+### 7.1 フェーズ1: 循環除去
 
 | | |
 |---|---|
 | 入力 | `nodes: MapNode[]`, `edges: MapEdge[]`, `direction` |
 | 出力 | `{ source, target, edge, reversed }[]`（`source`→`target` は必ず前進向き） |
-| 実装 | [`breakCycles()` elkPortExtLayout.ts#L171-L195](../src/utils/elkPortExtLayout.ts#L172-L196) |
+| 実装 | [`breakCycles()` elkPortPavaLayout.ts#L177-L201](../src/utils/elkPortPavaLayout.ts#L178-L202) |
 
 1. 全ノードを**現在のprimary中心**でソートし、同値は `nodes` 配列順で割って**全順序 `rank`** を与える。
 2. 各エッジについて `rank[source] > rank[target]` なら向きを反転する（`reversed: true` で記録）。
@@ -646,44 +849,44 @@ interface LEdge {
 `edge`（元の `MapEdge`）を持ち回すのは、フェーズ3で `sourceHandle`/`targetHandle` を読むため。
 **反転したエッジではレイアウト上の from 側が元の target 面になる**ので、面の入れ替えもフェーズ3で行う。
 
-### 6.2 フェーズ2: レイヤー割当
+### 7.2 フェーズ2: レイヤー割当
 
 | | |
 |---|---|
 | 入力 | `nodes`, `dagEdges`, `direction` |
 | 出力 | `Map<nodeId, number>`（0始まりの連番。空き番号なし） |
-| 実装 | [`assignLayers()` elkPortExtLayout.ts#L203-L244](../src/utils/elkPortExtLayout.ts#L204-L245) |
+| 実装 | [`assignLayers()` elkPortPavaLayout.ts#L209-L250](../src/utils/elkPortPavaLayout.ts#L210-L251) |
 
-1. **現在位置から層を作る**（[L208-L228](../src/utils/elkPortExtLayout.ts#L209-L229)）:
+1. **現在位置から層を作る**（[L208-L228](../src/utils/elkPortPavaLayout.ts#L215-L235)）:
    各ノードの現在のprimary区間 `[中心 - primarySize/2, 中心 + primarySize/2]` を求めて左端でソートし、
    順に走査して「直前までの層のprimary範囲と重なっている間は同じ層」に入れる。重ならなくなったら次の層へ。
    **現在の見た目の階層をそのまま層にする＝差分性はここが担保する。**
-2. **エッジ制約で押し出す**（[L230-L237](../src/utils/elkPortExtLayout.ts#L231-L238)）:
-   [`topoOrder()`](../src/utils/elkPortExtLayout.ts#L248-L272)（決定的Kahn法）の順に走査し、
+2. **エッジ制約で押し出す**（[L230-L237](../src/utils/elkPortPavaLayout.ts#L237-L244)）:
+   [`topoOrder()`](../src/utils/elkPortPavaLayout.ts#L254-L278)（決定的Kahn法）の順に走査し、
    `layer[target] = max(layer[target], layer[source] + 1)`。DAGなので1回なめれば収束する。
-3. **空き番号を詰める**（[L239-L243](../src/utils/elkPortExtLayout.ts#L240-L244)）。
+3. **空き番号を詰める**（[L239-L243](../src/utils/elkPortPavaLayout.ts#L246-L250)）。
 
-### 6.3 実ノードのLNode化
+### 7.3 実ノードのLNode化
 
 | | |
 |---|---|
 | 入力 | `nodes`, `layerOf`, `direction` |
 | 出力 | `lnodes: LNode[]`（`real=true` のみ）, `indexOf: Map<nodeId, index>` |
-| 実装 | [elkPortExtLayout.ts#L353-L368](../src/utils/elkPortExtLayout.ts#L354-L369) |
+| 実装 | [elkPortPavaLayout.ts#L359-L374](../src/utils/elkPortPavaLayout.ts#L360-L375) |
 
 `cross` の初期値は**現在のcross中心**、`weight` は 1。以降フェーズ5までこの `cross` を書き換えていく。
 
-### 6.4 フェーズ3: 仮想ノードで長いエッジを分解
+### 7.4 フェーズ3: 仮想ノードで長いエッジを分解
 
 | | |
 |---|---|
 | 入力 | `dagEdges`, `lnodes`, `indexOf`, `direction` |
 | 出力 | `lnodes`（仮想ノード追加済み）, `ledges: LEdge[]`（**すべてちょうど1層をまたぐ**） |
-| 実装 | [elkPortExtLayout.ts#L370-L415](../src/utils/elkPortExtLayout.ts#L371-L416) |
+| 実装 | [elkPortPavaLayout.ts#L376-L421](../src/utils/elkPortPavaLayout.ts#L377-L422) |
 
 エッジごとに:
 
-1. 元の `sourceHandle`/`targetHandle` から面を取り、**反転していれば入れ替える**（[L378-L381](../src/utils/elkPortExtLayout.ts#L379-L382)）。
+1. 元の `sourceHandle`/`targetHandle` から面を取り、**反転していれば入れ替える**（[L378-L381](../src/utils/elkPortPavaLayout.ts#L385-L388)）。
 2. `portRole` → `portCrossOffset` で `fromOffset` / `toOffset` を求める。
 3. `span = layer[to] - layer[from]` が 1 以下なら、そのまま1本の `LEdge` にする。
 4. `span >= 2` なら**中間層ごとに仮想ノードを1つ挿し、鎖状につなぐ**:
@@ -695,13 +898,13 @@ interface LEdge {
 
 これ以降のフェーズは「すべてのエッジがちょうど1層をまたぐ」前提で書ける。
 
-### 6.5 索引構築と初期順序
+### 7.5 索引構築と初期順序
 
 | | |
 |---|---|
 | 入力 | `lnodes`, `ledges` |
 | 出力 | `layers: number[][]`（層 → LNode index の並び）, `edgesIntoLayer: LEdge[][]`, 各 `LNode.order` |
-| 実装 | [elkPortExtLayout.ts#L417-L442](../src/utils/elkPortExtLayout.ts#L418-L443) |
+| 実装 | [elkPortPavaLayout.ts#L423-L448](../src/utils/elkPortPavaLayout.ts#L424-L449) |
 
 - `edgesIntoLayer[l]` = 層 `l-1` と層 `l` をつなぐエッジ。
 - **初期順序**は `現在のcross座標 + ポートによる偏り` の昇順（同値は LNode 追加順で決定的）。
@@ -710,19 +913,19 @@ interface LEdge {
   **同じ面に繋がった兄弟同士は偏りが等しいので、現在の並び順はそのまま保たれる**
   （差分性を壊さずにポート制約だけを順序へ持ち込む）。
 
-### 6.6 フェーズ4: 交差削減
+### 7.6 フェーズ4: 交差削減
 
 | | |
 |---|---|
 | 入力 | `layers`（初期順序）, `edgesIntoLayer`, 各 `LNode.order` |
 | 出力 | `layers`（総交差数が最小だった順序）, 各 `LNode.order` |
-| 実装 | [elkPortExtLayout.ts#L444-L478](../src/utils/elkPortExtLayout.ts#L445-L479) |
+| 実装 | [elkPortPavaLayout.ts#L450-L484](../src/utils/elkPortPavaLayout.ts#L451-L485) |
 
 1. 初期順序での総交差数を「最良」として記録する。
-   交差数は [`countCrossings()`](../src/utils/elkPortExtLayout.ts#L275-L287) が隣接層ごとに、
+   交差数は [`countCrossings()`](../src/utils/elkPortPavaLayout.ts#L281-L293) が隣接層ごとに、
    2辺 `a`,`b` について `(order[a.from]-order[b.from]) * (order[a.to]-order[b.to]) < 0` を数える。
 2. `ORDERING_SWEEPS` 回、**下向き掃引（層1→末尾）と上向き掃引（末尾-2→0）**を交互に行う。
-   各層を [`sortByBarycenter(layerIndex, fromPrev)`](../src/utils/elkPortExtLayout.ts#L452-L467) で並べ替える:
+   各層を [`sortByBarycenter(layerIndex, fromPrev)`](../src/utils/elkPortPavaLayout.ts#L458-L473) で並べ替える:
 
    ```
    下向き（fromPrev=true） : bary = mean( order[le.from] + le.fromOffset / ORDER_PITCH )
@@ -735,13 +938,13 @@ interface LEdge {
 3. 1往復ごとに総交差数を測り、**それまでの最良より小さいときだけ**その順序を控える。
 4. 最後に最良の順序を復元する。**初期順序も候補に入っているので、交差が減らないなら現在の並びが保たれる。**
 
-### 6.7 フェーズ5: 座標割当（cross軸）
+### 7.7 フェーズ5: 座標割当（cross軸）
 
 | | |
 |---|---|
 | 入力 | `layers`（確定した順序）, `edgesIntoLayer`, 各 `LNode.cross`（現在位置） |
 | 出力 | 各 `LNode.cross`（確定した cross座標） |
-| 実装 | [elkPortExtLayout.ts#L480-L522](../src/utils/elkPortExtLayout.ts#L481-L523) |
+| 実装 | [elkPortPavaLayout.ts#L486-L528](../src/utils/elkPortPavaLayout.ts#L487-L529) |
 
 各層の配置を、次の問題として解く。
 
@@ -750,18 +953,18 @@ interface LEdge {
 
 | 記号 | 中身 | 実装 |
 |---|---|---|
-| `gap[i]` | `crossSizeᵢ/2 + crossSizeᵢ₊₁/2 +`（両方が実ノードなら `NODE_GAP`、片方でも仮想なら `LANE_GAP`） | [`gapsFor()`](../src/utils/elkPortExtLayout.ts#L484-L490) |
+| `gap[i]` | `crossSizeᵢ/2 + crossSizeᵢ₊₁/2 +`（両方が実ノードなら `NODE_GAP`、片方でも仮想なら `LANE_GAP`） | [`gapsFor()`](../src/utils/elkPortPavaLayout.ts#L490-L496) |
 | `wᵢ` | `LNode.weight`（実=1 / 仮想=`DUMMY_WEIGHT`） | |
-| `dᵢ` | 希望位置（下記） | [`placeLayer()`](../src/utils/elkPortExtLayout.ts#L492-L508) |
+| `dᵢ` | 希望位置（下記） | [`placeLayer()`](../src/utils/elkPortPavaLayout.ts#L498-L514) |
 
 制約 `cᵢ₊₁ - cᵢ ≥ gap[i]` は `tᵢ = cᵢ -（gapの累積）` と置くと単なる単調非減少になるので、
 **等調回帰＝PAVA（pool adjacent violators）で厳密に解ける**
-（[`solveOrderedPlacement(desired, weights, gaps)`](../src/utils/elkPortExtLayout.ts#L297-L332)。
+（[`solveOrderedPlacement(desired, weights, gaps)`](../src/utils/elkPortPavaLayout.ts#L303-L338)。
 入力3配列 → 出力は中心座標の配列）。局所解が無く、掃引回数以外に隠れたパラメータが無いのが利点。
 
-1. **初期配置**（[L507-L516](../src/utils/elkPortExtLayout.ts#L510-L519)）: 希望位置＝現在のcross座標として
+1. **初期配置**（[L507-L516](../src/utils/elkPortPavaLayout.ts#L516-L525)）: 希望位置＝現在のcross座標として
    PAVAを1回かけ、**重なりだけ解消する**。
-2. **掃引**（[L519-L522](../src/utils/elkPortExtLayout.ts#L520-L523)）: `PLACEMENT_SWEEPS` 回、**前向き掃引（層1→末尾。希望位置を前の層から取る）と
+2. **掃引**（[L519-L522](../src/utils/elkPortPavaLayout.ts#L526-L529)）: `PLACEMENT_SWEEPS` 回、**前向き掃引（層1→末尾。希望位置を前の層から取る）と
    後ろ向き掃引（末尾-2→0。次の層から取る）**を交互に行う。希望位置は
    **相手側のポート位置に、自分のポートオフセットを打ち消す形で合わせた値**の平均:
 
@@ -772,13 +975,13 @@ interface LEdge {
 
    つながりが無いノードは現在位置を希望位置にする（動かない）。
 
-### 6.8 primary軸と最終変換
+### 7.8 primary軸と最終変換
 
 | | |
 |---|---|
 | 入力 | `layers`, 各 `LNode.layer` / `cross` / `primarySize` |
 | 出力 | `LayoutResult` |
-| 実装 | [elkPortExtLayout.ts#L524-L561](../src/utils/elkPortExtLayout.ts#L525-L562) |
+| 実装 | [elkPortPavaLayout.ts#L530-L567](../src/utils/elkPortPavaLayout.ts#L531-L568) |
 
 1. **層の積み上げ**: `layerStart[l] = layerStart[l-1] + (層 l-1 の最大primaryサイズ) + LAYER_GAP`。
    層内は**左揃え**（ELKと同じ）＝同じ層のノードは同じ `layerStart` を使う。
@@ -794,7 +997,165 @@ interface LEdge {
   層は前方に進む。
 - 仮想ノードが層内で場所を取るので、長いエッジの通り道が確保される。
 - フェーズが独立していて入出力も切れているので差し替えやすい（改善の入口は
-  [align-branch-layout.md](./align-branch-layout.md)「方針G」）。
+  [align-branch-layout.md](./align-branch-layout.md)「方針G'」）。
+
+---
+
+## 8. `sugiyama-port` — 親子関係をハンドルの向きから決める（方針Hの `sugiyama-ext` 派生）
+
+`sugiyama-ext`（§4）と**フェーズの骨格は同じ**（循環除去 → 親の選択 → 箱のボトムアップ再帰合成 →
+rootアンカー＋ツリー分離、ELK非依存の同期実装）。違うのは次の3点だけで、他は§4を読めばよい。
+
+| | `sugiyama-ext`（§4） | `sugiyama-port`（本節） |
+|---|---|---|
+| 主たる親の選び方 | ロンゲストパス（最も深い層になる入辺） | **ハンドルの向き**が第一基準（下記 8.1） |
+| 同点の親が複数 | 先着1本に決め打ち | **同列の複数親として全部採用**（下記 8.3） |
+| バケットの配置順 | forward群 → cross群を常に**その外側**へ | **現在位置から読み取ったパターンで切り替える**（下記 8.2）。親の隣に置く場合はforward群を**primary方向へ逃がす** |
+
+```
+MapNode[] + MapEdge[] + direction
+      ↓  フェーズ1+2: buildHierarchy()
+{ rootIds, ownChildren, sharedChildren, parentsOf, forwardChildIds }
+      ↓  フェーズ3+4: layoutSubtree()（root ごとにボトムアップ再帰）
+Box（§4と同一の構造）
+      ↓  フェーズ5: §4と同一（rootの現在中心をアンカーに変換 → separateTrees）
+LayoutResult
+```
+
+### 8.1 フェーズ1+2: 循環除去と親の選択
+
+| | |
+|---|---|
+| 入力 | `nodes`, `edges`, `direction` |
+| 出力 | `Hierarchy`（下記） |
+| 実装 | [`buildHierarchy()` sugiyamaPortLayout.ts#L174-L318](../src/utils/sugiyamaPortLayout.ts#L174-L318) |
+
+循環除去（DFSで後退辺を除外）とトポロジカル順は§4と同じ。違うのは**入辺の採点**
+（[L254-L315](../src/utils/sugiyamaPortLayout.ts#L254-L315)）。トポロジカル順に各ノードを見て、
+その**入辺すべてを3要素の辞書式キーで採点し、最大キーの入辺を全部**親にする。
+
+| 順位 | キー | 意味 |
+|---|---|---|
+| 1 | `inbound` = ターゲット面が `backward` か（RIGHT時: 左ハンドルに入っている） | エッジは「相手の**入り口**の面」に入っているのが正規 |
+| 2 | `outbound` = ソース面が `forward` か（RIGHT時: 右ハンドルから出ている） | エッジは「自分の**出口**の面」から出ているのが正規 |
+| 3 | `depth` = `layer[source] + layerDelta(...)` | ここまで同点なら§4と同じロンゲストパス |
+
+`layerDelta`（[L136-L146](../src/utils/sugiyamaPortLayout.ts#L136-L146)）は§4の `roleDelta` の拡張で、
+**ソース面だけでなくターゲット面も見る**:
+
+| ソース面の役割 | ターゲット面 | 増分 | 意味 |
+|---|---|---|---|
+| `forward` | 問わず | +1 | 通常の1層前進 |
+| `backward` | 問わず | -1 | 1層後退 |
+| `crossNeg`/`crossPos` | `backward` | +0.5 | 上/下から出て相手の入り口に入る＝半層ぶん前進（§4と同じ） |
+| `crossNeg`/`crossPos` | それ以外 | 0 | 上下に並べただけ＝**同じ層**として扱う |
+
+つまり「右ハンドル → 左ハンドル」が正規の親子関係であるという前提を、キー1・2で明示的に効かせる。
+**深さ（キー3）は同点を崩すためだけに使う**ので、「浅いが左ハンドルに入っている親」が
+「深いが上ハンドルに入っている親」に勝つ。ここが§4との最大の違い。
+
+出力 `Hierarchy` は次の5つ:
+
+| フィールド | 中身 |
+|---|---|
+| `rootIds` | 入辺を持たないノード |
+| `ownChildren` | 親ID → 単一の親を持つ子の `ParentLink[]`（親のバケットへ入る） |
+| `sharedChildren` | ノードID → **そこをLCAとする複数親の子ID[]** |
+| `parentsOf` | 子ID → 採用した `ParentLink[]`（1本以上） |
+| `forwardChildIds` | 親ID → forward役割で採用された子ID[]（バリセンタ計算用。木の所有関係とは独立） |
+
+`ParentLink = { edge, parentId, childId, role }` で、`role`（ソース面の役割）がそのまま配置バケットになる
+（＝ハンドル向きの保証は§4と同じ仕組みで担保される）。
+
+複数親の子の取り付け先は**木の上での最小共通祖先（LCA）**
+（[`lcaOf()` L235-L247](../src/utils/sugiyamaPortLayout.ts#L235-L247)）。トポロジカル順に処理するので
+子を見る時点で親の木上の位置は確定しており、1パスで決まる。親が別ツリーに散っていてLCAが無い場合は、
+先頭の親の普通の子として扱う（＝§4と同じ挙動へフォールバック）。
+
+### 8.2 フェーズ3+4: サブツリー箱の再帰合成
+
+| | |
+|---|---|
+| 入力 | `nodeId`, `nodesById`, `Hierarchy`, `direction` |
+| 出力 | `Box`（§4と同一） |
+| 実装 | [`layoutSubtree()` sugiyamaPortLayout.ts#L365-L640](../src/utils/sugiyamaPortLayout.ts#L365-L640) |
+
+**確定させる順番が§4と違う**。自分を `(0,0)` に置いたあと:
+
+0. **cross群（crossNeg / crossPos）ごとに配置パターンを決める**
+   （[`crossPlacementMode()` L416-L432](../src/utils/sugiyamaPortLayout.ts#L416-L432)）。判定材料は
+   **Align実行時点の現在位置だけ**で、構造は見ない。
+
+   | パターン | 意味 | 扱い |
+   |---|---|---|
+   | `hug` | 親の補足情報 | 親のすぐ隣を確保し、forward群をprimary方向へ逃がす（1.） |
+   | `outside` | 親と並ぶ別の情報 | forward群の外側へ積む（§4と同じ扱い。3.） |
+
+   判定は「そのバケットのうち**親にいちばん近い子**の親側の端」が、
+   「親自身の端」と「forward/backward群の**直接の子**の端」のうち外側（＝内側の枠）より
+   **外にあるか**。外にあれば `outside`。バケット単位・面ごと（上と下で独立）に決める。
+   - **なぜ「いちばん近い子」だけを見るか**: 2番目以降の子は1番目の外側に積まれるので、全員を見ると
+     整列後の位置が別パターンに分類され、**Alignを押すたびに2つの配置を往復する**。
+   - **なぜ「直接の子」だけか**: 孫まで含めると、深いforward群を持つ親でほぼ常に `hug` になり、
+     パターン分けが効かなくなる。
+1. **`hug` のcross群（[`placeCrossBucket()` L442-L464](../src/utils/sugiyamaPortLayout.ts#L442-L464)）を最初に置く**。
+   親のcross方向の端から `CROSS_GAP` だけ外へ、現在のcross座標の順を保って積む（crossNegは反転して
+   親側から積む）。primary方向は§4と同じ「親の帯に被せる」揃えだが、**被り量は2択**:
+   その子がforward群の帯（±`fanHalf`）に入り込むなら `CROSS_OVERLAP_RATIO_INSIDE`(0.2)、
+   入り込まないなら `CROSS_OVERLAP_RATIO`(0.8)。
+   **被りを深くする目的は「forward群を前へ押し出す量を減らすこと」だけ**なので、押し出しが起きない子には
+   効かせない。これは同時に、**パターン判定が揺れうるケース（forward群が親より小さいとき）で
+   `hug` と `outside` の出力を一致させる**役目も持つ（＝Alignを繰り返しても見た目が変わらない）。
+   置いた箱の外接範囲は `crossExtents` に控える。
+2. **forward / backward群（[`placeForwardLike()` L481-L524](../src/utils/sugiyamaPortLayout.ts#L481-L524)）**:
+   並び順（バリセンタ）とcross方向の積み方・中央寄せは§4と同じ。違いは primary の基準線で、
+   **`crossExtents` のどれかと cross方向で重なる子は、その箱の前(後)へ `PRIMARY_GAP` 空けて逃がす**。
+   逃がす単位は `ESCAPE_FORWARD_AS_GROUP` で切り替わる: `true` なら**いちばん遠くまで逃げる子に
+   合わせて群全員を同じ線へ**（同じ層の兄弟のprimaryが揃う）、`false` なら**実際に重なった子だけ**。
+   どちらでも重なりは起きない（同じバケットの兄弟はcross方向で既に分離しているため）。
+3. **`outside` のcross群を、親＋forward群の外側へ積む**（§4のcross群と同じ扱い。
+   `box.cMax + CROSS_GAP` / `box.cMin - CROSS_GAP` から積む）。forward群の外に出るので、
+   **forward群をprimary方向へ押し出さない**＝primary方向に伸びない。
+4. **複数親の子（[L534-L637](../src/utils/sugiyamaPortLayout.ts#L534-L637)）を最後に置く**。すべての親が
+   同じ箱の中に置き終わっているので、親たちの確定位置から決められる。
+   **まず親IDの集合でグループ分けし、集合が同じ子どうしは「同列の兄弟」として1つの群にまとめる**
+   （`A→B,A→C` / `B→D,C→D` / `B→E,C→E` の `D`・`E` のように、同じ親を共有する子は兄弟だから）。
+   群ごとに:
+   - 各子について、親たちが望む「箱の中心位置」と「後端の最小位置」を求める
+     （[`sharedAnchor()` L552-L586](../src/utils/sugiyamaPortLayout.ts#L552-L586)）。望む中心は `role` ごとに決まる
+     （forward/backward = 親のcross中心、crossNeg/crossPos = 親の端から `CROSS_GAP` 外）。
+   - **cross方向**: 群の子を（forward群と同じバリセンタ順で）`SIBLING_GAP` を空けて積み、
+     **群全体の中心を「親たちが望む中心」の平均へ合わせる**。
+   - **primary方向**: 各子の「後端の最小位置」の最大を基準線にし、そこから
+     **cross方向に重なる既配置ノードすべての前へ出るまで押し出す**（2. と同じ「逃がす向きはprimary」の
+     原則。逃がす単位も `ESCAPE_FORWARD_AS_GROUP` に従う）。**押し出しの相手は群の外側だけ**で、
+     群の中の兄弟同士はcross方向で既に分離しているため相手にしない。
+
+   > **群にまとめずに1つずつ置くと壊れる**: 同じ親を持つ子は同じバリセンタを望むので、
+   > 後から置く子が「cross方向で重なるものの前へ逃がす」規則に引っかかり、
+   > **並ぶべき兄弟がprimary方向に1層ずつずれていく**（実際に一度そうなった。回帰テストは
+   > `e2e/branch-layout-algorithms.mjs` の31b）。
+   >
+   > **この手順が最後でなければならない**: 親の確定位置を使うので、この箱に属するノードは
+   > 3. までに全部置き終わっている必要がある。3. と順序を逆にすると、`outside` のcross群の中に
+   > 親がいる子がアンカーを見つけられず、**座標が返らないまま初期位置に取り残されて他のノードと
+   > 重なる**（ファズ seed=48 で検出。回帰テストは同ファイルの32c）。
+
+### この手順から言えること
+
+- **ノードの重なりは起きない**（箱どうしの分離は§4と同じ。cross群とforward群、複数親の子は
+  「cross方向で重なるならprimary方向へ逃がす」で必ず解消される）。
+- **上/下ハンドルの子が親の隣に来るか、forward群の外側に来るかは、Align実行時点の現在位置で決まる**
+  （同じグラフでも初期位置が違えば別の配置になる。[layout-lab.md](./layout-lab.md) のケース軸Eと同じ考え方）。
+- **判定は整列後の位置でも同じ結果になる**ように作ってあるので、Alignを繰り返しても配置は変わらない。
+- **同列の複数親を持つ子は親たちの中間に来る**（どちらか一方の真横に寄らない）。
+  **同じ親の集合を共有する子どうしは同じ層に並ぶ**（兄弟として扱われる）。
+- 逃がす向きがprimaryなので、**cross方向には広がらない代わりにprimary方向に伸びる**。
+  実測の差（面積・貫通・交差）は [layout-lab.md](./layout-lab.md)、判断の経緯は
+  [align-branch-layout.md](./align-branch-layout.md)「方針H」。
+- cross群のサブツリーが大きいほどforward群が前方へ押し出されるので、
+  **cross群は「補足的な小さい情報」である前提**の設計になっている。
+
 
 ---
 
@@ -806,8 +1167,10 @@ interface LEdge {
 | `branch` | ✅ | — | ヒント・基準 | ✅ | バケット数ぶん |
 | `flat-axis` | ✅ | — | ヒント | ✅ | 2回 |
 | `sugiyama-ext` | ✅ | — | 並び順・親選択・基準 | ✅ | — |
+| `sugiyama-port` | ✅ | ✅ | 並び順・基準 | ✅ | — |
 | `elk-port` | ✅ | ✅ | ヒント | ✅ | 1回 |
-| `elk-port-ext` | ✅ | ✅ | 循環除去・層・並び順・基準 | ✅ | — |
+| `elk-port-ext` | ✅ | ✅ | 循環除去・層・並び順 | ✅ | — |
+| `elk-port-pava` | ✅ | ✅ | 循環除去・層・並び順・基準 | ✅ | — |
 
 「基準」＝結果の絶対位置がその値を基準に決まる（＝原点付近へ正規化しない）。
 
@@ -821,8 +1184,9 @@ interface LEdge {
 | `uniform` / `flat-axis` | ELK の `cycleBreaking: INTERACTIVE`（現在座標から向きを決める） | ELK任せ |
 | `branch` | BFS で最初に到達した経路だけを木辺にする | **ホップ数が短い側**のroot |
 | `sugiyama-ext` | DFS の後退辺を除去 | **層が最も深くなる入辺**（ロンゲストパス） |
+| `sugiyama-port` | DFS の後退辺を除去 | **ハンドルの向きが正規に近い入辺**（同点なら深さ、それでも同点なら**両方採る**＝複数親を許す） |
 | `elk-port` | ELK の `cycleBreaking: INTERACTIVE` | ELK任せ |
-| `elk-port-ext` | 現在のprimary順の全順序に対して逆行する辺を**反転**（除外ではない） | 除外しない（全入辺が層と座標に効く） |
+| `elk-port-ext` / `elk-port-pava` | 現在のprimary順の全順序に対して逆行する辺を**反転**（除外ではない） | 除外しない（全入辺が層と座標に効く） |
 
 評価環境がハンドルの向きを採点するとき、この違いのせいで不公平にならないよう
 「targetの入次数が1、かつDFSの後退辺でない」エッジだけを対象にしている

@@ -8,8 +8,10 @@ import { LayoutResult, calculateLayout } from './layout';
 import { calculateBranchLayout } from './branchLayout';
 import { calculateFlatAxisLayout } from './flatAxisLayout';
 import { calculateSugiyamaExtLayout } from './sugiyamaExtLayout';
+import { calculateSugiyamaPortLayout } from './sugiyamaPortLayout';
 import { calculateElkPortLayout } from './elkPortLayout';
 import { calculateElkPortExtLayout } from './elkPortExtLayout';
+import { calculateElkPortPavaLayout } from './elkPortPavaLayout';
 
 export async function calculateLayoutForAlign(
   nodes: MapNode[],
@@ -24,10 +26,14 @@ export async function calculateLayoutForAlign(
       return calculateFlatAxisLayout(nodes, edges, direction);
     case 'sugiyama-ext':
       return calculateSugiyamaExtLayout(nodes, edges, direction);
+    case 'sugiyama-port':
+      return calculateSugiyamaPortLayout(nodes, edges, direction);
     case 'elk-port':
       return calculateElkPortLayout(nodes, edges, direction);
     case 'elk-port-ext':
       return calculateElkPortExtLayout(nodes, edges, direction);
+    case 'elk-port-pava':
+      return calculateElkPortPavaLayout(nodes, edges, direction);
     case 'uniform':
     default:
       return calculateLayout(nodes, edges, direction);

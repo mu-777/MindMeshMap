@@ -13,7 +13,15 @@ export interface MindMap {
 export type LayoutDirection = 'DOWN' | 'RIGHT';
 
 // 整列アルゴリズム（dev限定の切り替え。docs/align-branch-layout.md参照）
-export type AlignAlgorithm = 'uniform' | 'branch' | 'flat-axis' | 'sugiyama-ext' | 'elk-port' | 'elk-port-ext';
+export type AlignAlgorithm =
+  | 'uniform'
+  | 'branch'
+  | 'flat-axis'
+  | 'sugiyama-ext'
+  | 'sugiyama-port'
+  | 'elk-port'
+  | 'elk-port-ext'
+  | 'elk-port-pava';
 
 // ノード
 export interface MapNode {

@@ -1,79 +1,77 @@
-// 整列アルゴリズム「elk-port-ext」（方針G: ポート制約付き階層レイアウトの自前実装）。
+// 整列アルゴリズム「elk-port-ext」（方針G: ELK layered のポート制約版を、elkjsに依存せず再実装）。
 // フェーズごとの入出力を含む詳細仕様はdocs/align-algorithms.md §6、
-// 採用理由・検討経緯・改善の入口はdocs/align-branch-layout.md「方針G」を参照。
+// 採用理由・検討経緯はdocs/align-branch-layout.md「方針G」を参照。
 //
-// 位置づけ: `elk-port`（方針F）はelkjsにポートを渡すだけの薄いラッパーなので、中身を触って
+// **位置づけ**: `elk-port`（方針F）は elkjs にポートを渡すだけの薄いラッパーなので、中身を触って
 // 改善することができない（ELKのオプションで表現できることしかできない）。本方式は
-// **同じ枠組み（単一の流れ方向＋ポートで取り付き面を制約する階層レイアウト）を、
-// ELKに依存せず必要最小限だけ自前で書いたもの**。ELKの実装を移植したのではなく、
-// スギヤマ4フェーズ＋ポート制約という「考え方」を最小構成で実装している。
-// これにより各フェーズを独立に差し替えて改善していける（＝`elk-port`の改善用の土台）。
+// **`elk-port` と同じアルゴリズムを、同じ結果になることを狙って自前で書き直したもの**。
+// elkjsのコンポーネントを使わないぶん、フェーズ単位で自由に差し替えて改善していける。
+//
+// **ELK 0.9.1 のソース（EPL-2.0）を読んで書いた**が、コードの移植ではなく、
+// 「どのクラスが何をしているか」を読み取ったうえで**このアプリに要る部分だけをベタ書き**している。
+// ELKの関数・データ型はimportせず、他アルゴリズムとの共通化のための抽象（ILayoutPhase・
+// IGraphImporter・spacings プロバイダ・thresholdStrategy など）も持ち込んでいない。
+//
+// `elk-port` の実行時オプション（layout.ts の `ELK_BASE_LAYOUT_OPTIONS`）が選ぶ実装:
+//   cycleBreaking=INTERACTIVE     → InteractiveCycleBreaker
+//   layering=INTERACTIVE          → InteractiveLayerer
+//   crossingMinimization=INTERACTIVE → **InteractiveCrossingMinimizer**
+//   nodePlacement=BRANDES_KOEPF   → BKNodePlacer（+ BKAligner / BKCompactor）
+//
+// **いちばん効く事実**: `crossingMinimization=INTERACTIVE` のとき、ELKはバリセンタ掃引を行う
+// `LayerSweepCrossingMinimizer` を**使わない**。`InteractiveCrossingMinimizer` は
+// **各層を現在の座標で並べ替えるだけで、交差削減を一切しない**。
+// ここを「よかれと思って」バリセンタ掃引にすると交差が 799 → 563 まで減ってしまい、
+// ELKとは別物になる（＝この方式では改善が失敗を意味する）。
+//
+// **ソースと実測から確定した、素直に書くと外す点**:
+//   - 出力は原点＋padding(12) へ正規化され、座標は整数に丸められる
+//   - 層は左揃えで積まれ、層間は nodeNodeBetweenLayers=80、層内の実ノード同士は nodeNode=50、
+//     ダミーが絡むと edgeNode/edgeEdge=10
+//   - north/south面のポートは「そのノード自身の層に置かれる大きさ0のダミー」になる
+//     （NorthSouthPortPreprocessor）。**ポート1つにつきダミー1つ**で、入力と出力を兼ねる
+//     ポートも1つで済ませる（同じ面の複数エッジは共有）
+//   - 連結成分は別々にレイアウトされ componentComponent=20 で積まれる。順序は現在位置でも
+//     入力順でもなく**ノード数の少ない順**（同数なら入力配列の初出順。孤立ノードが先頭に来る）
+//   - 位置の基準は `interactiveReferencePoint` の既定 CENTER（＝ノード中心。左上ではない）
+//   - Brandes–Köpfの4パスは**平均せず、実行可能なもののうち広がり最小の1つを採る**
+//     （balancedは fixedAlignment=NONE かつ favorStraightEdges=false のときだけで、
+//      favorStraightEdges は edgeRouting=ORTHOGONAL（layeredの既定）なら true になる）
+//
+// **この方式の限界（`elk-port` と同じ。ポートは「取り付き面」であって「伸びる向き」ではない）**:
+// 流れ方向は単一のまま。RIGHT方向では下ハンドルに繋いだ子も右隣の層に置かれ、cross方向に
+// ずれるだけ。ハンドルの向きどおりに層を変えるのは `sugiyama-ext`（方針E）の役割。
+//
+// **未実装の既知の差分**: 逆向きポート（`InvertedPortProcessor`。RIGHT時に左面から出るエッジを
+// 前後の層のダミーで回り込ませる処理）は入れておらず、流れ方向の面と同じ扱いにしている。
 //
 // 右向き(RIGHT)を基準に説明する。下向き(DOWN)は primary/cross 軸を入れ替えるだけで
-// 自然に90度回転して適用される（primarySize/crossSize/centerPC系が吸収する）。
-//
-// フェーズ（括弧内はELK layeredの対応する処理）:
-//   1. 循環除去      (cycleBreaking: INTERACTIVE)
-//        現在のprimary座標で全ノードを一列に並べ、その順に逆行するエッジを反転してDAG化する。
-//   2. レイヤー割当  (layering: INTERACTIVE)
-//        現在のprimary区間が重なるノードを同じ層にまとめ、そのあとエッジが必ず1層以上
-//        前進するように押し出す。「現在の階層を保つ」差分性はここで担保する。
-//   3. 仮想ノード    (hierarchy/long edge splitting)
-//        2層以上をまたぐエッジを中間層のダミーで1層ずつに分解する。交差削減と
-//        「エッジが無関係なノードを貫通する」対策の両方に効く、スギヤマ枠組みの必須要素。
-//   4. 交差削減      (crossingMinimization: INTERACTIVE + バリセンタ掃引)
-//        層内の初期順序は現在のcross座標。以後、隣接層のバリセンタで並べ替え、
-//        交差数が最小だった順序を採用する。
-//   5. 座標割当      (nodePlacement: BRANDES_KOEPFの代わりに重み付きPAVA)
-//        「層内の順序と最小間隔を守った上で、希望位置との二乗誤差を最小化する」問題を
-//        PAVA（pool adjacent violators）で厳密に解く掃引を数回まわす。
-//
-// **ポート制約がどこに効くか（この方式の中身そのもの）**:
-// エッジの端点は「ノードの中心」ではなく「ハンドル（ポート）の位置」である、という一点を
-// 4・5フェーズのバリセンタ計算に入れる。流れ方向の面（RIGHT時のright/left）に付いたポートは
-// cross方向のオフセット0だが、直交方向の面（RIGHT時のtop/bottom）に付いたポートは
-// ノードのcross方向の端＋スタブぶんだけずれる。結果として下ハンドルに繋いだ子は「親の下」へ
-// 引っぱられる。ELKが北/南ポートのために同じ層へダミーノードを挿入して確保する空間を、
-// ダミーを実体化せずオフセットで表現したもの。
-//
-// なお `elk-port`（ELK本体）と違い、**流れ方向そのものはやはり単一のまま**（下ハンドル子も
-// 前方の層に置かれる）。ハンドルの向きどおりに層を変えるのは `sugiyama-ext`（方針E）の役割。
+// 自然に90度回転して適用される（ELKも GraphTransformer で同じことをする）。
 import { MapNode, MapEdge, LayoutDirection } from '../types';
 import { LayoutResult } from './layout';
 import { classifyEdgeSide, HandleSide } from './branchLayout';
 
-// --- チューニング定数（意味・調整箇所は docs/tuning.md「整列アルゴリズム」参照）---
+// --- ELKのレイアウトオプションに対応する定数（意味・調整箇所は docs/tuning.md「整列アルゴリズム」）---
 const DEFAULT_NODE_WIDTH = 180;
 const DEFAULT_NODE_HEIGHT = 60;
-// 層と層の間隔（primary方向、px）。ELKの nodeNodeBetweenLayers=80 に合わせている
+// elk.layered.spacing.nodeNodeBetweenLayers（ELK_BASE_LAYOUT_OPTIONSで明示指定している値）
 const LAYER_GAP = 80;
-// 同じ層に並ぶ実ノード同士の最小間隔（cross方向、px）。ELKの nodeNode=50 に合わせている
+// elk.spacing.nodeNode（同上）。同じ層の実ノード同士の最小間隔
 const NODE_GAP = 50;
-// 仮想ノード（長いエッジの通り道）に隣接する部分の最小間隔（cross方向、px）。
-// 実ノード同士より狭くてよい（通り道は線1本ぶんの幅しか要らない）
-const LANE_GAP = 16;
-// 直交方向の面（RIGHT時のtop/bottom）に付いたポートの、ノード端からの張り出し量（px）。
-// 大きくすると上/下ハンドルの子が親からより強く離れる。0にするとポートの効果はノードの
-// 半分のサイズぶんだけになる
-const PORT_STUB = 20;
-// 座標割当の掃引回数。1回 = 前方向き＋後方向きの1往復
-const PLACEMENT_SWEEPS = 4;
-// 交差削減の掃引回数。1回 = 下向き＋上向きの1往復
-const ORDERING_SWEEPS = 4;
-// 仮想ノードの配置優先度（実ノードを1としたときの重み）。大きいほど長いエッジがまっすぐになる
-const DUMMY_WEIGHT = 8;
-// 交差削減のバリセンタは「層内の順序index」空間で計算するので、ポートのcrossオフセット(px)を
-// 「およそ何ノードぶんか」に換算して足す。その換算に使う1ノードぶんの縦ピッチの目安(px)
-const ORDER_PITCH = DEFAULT_NODE_HEIGHT + NODE_GAP;
+// elk.spacing.edgeNode のELK既定値。実ノードとダミーの最小間隔
+const EDGE_NODE_GAP = 10;
+// elk.spacing.edgeEdge のELK既定値。ダミー同士の最小間隔
+const EDGE_EDGE_GAP = 10;
+// elk.spacing.componentComponent のELK既定値。連結成分同士の最小間隔
+const COMPONENT_GAP = 20;
+// elk.padding のELK既定値。正規化後、内容の左上がこの位置に来る
+const PADDING = 12;
+// elk.edgeThickness のELK既定値。長いエッジのダミーがcross方向に確保する通り道の幅。
+// 通り道の隣に来るノードは「通り道の中心 ± 0.5 + EDGE_NODE_GAP」に置かれるので座標が .5 になる
+// （ELKはそれを整数に丸めて返す。最終出力のMath.round参照）。edgeNodeを0/1/10/100と振って確認した
+const EDGE_THICKNESS = 1;
 
-// ポートの役割。レイアウト方向を基準にした相対的な向き
-//   forward  : 流れ方向の面（RIGHT:right / DOWN:bottom）。エッジが自然に出ていく面
-//   backward : 流れの逆の面（RIGHT:left / DOWN:top）。ELKでいう「反転ポート」
-//   crossNeg : 直交方向の負側の面（RIGHT:top / DOWN:left）
-//   crossPos : 直交方向の正側の面（RIGHT:bottom / DOWN:right）
-// sugiyamaExtLayout.ts にも同名の概念があるが、あちらは「役割で層を変える」ために使い、
-// こちらは「役割でcross方向の取り付き位置を変える」ために使う。用途が違うので独立に持つ
-// （どちらかのアルゴリズムを削除するときに巻き込まれないようにするため）
+/** ポートの面（描画上の実際の面）→ レイアウト方向を基準にした役割 */
 type PortRole = 'forward' | 'backward' | 'crossNeg' | 'crossPos';
 
 function portRole(side: HandleSide, direction: LayoutDirection): PortRole {
@@ -117,8 +115,7 @@ function primarySize(node: MapNode, direction: LayoutDirection): number {
 function crossSize(node: MapNode, direction: LayoutDirection): number {
   return direction === 'RIGHT' ? node.height || DEFAULT_NODE_HEIGHT : node.width || DEFAULT_NODE_WIDTH;
 }
-
-// ノードの現在位置(top-left)を、中心の (primary, cross) 座標へ変換する
+/** ノードの現在位置(top-left)を、中心の (primary, cross) 座標へ変換する */
 function currentCenterPC(node: MapNode, direction: LayoutDirection): { p: number; c: number } {
   const w = node.width || DEFAULT_NODE_WIDTH;
   const h = node.height || DEFAULT_NODE_HEIGHT;
@@ -129,81 +126,142 @@ function currentCenterPC(node: MapNode, direction: LayoutDirection): { p: number
 
 // --- レイアウト用の内部グラフ表現 ---
 
-// 実ノードと仮想ノード（長いエッジの通り道）を同じ型で扱う
+// 実ノードとダミー（長いエッジの通り道 / north-southポート）を同じ型で扱う。
+// ELKが内部で作るダミーノードに1対1で対応する
+type LKind = 'real' | 'longEdge' | 'nsPort';
+
 interface LNode {
-  id: string; // 実ノードは元のID、仮想ノードは `~dummy~<n>`
-  real: boolean;
+  index: number;
+  id: string | null; // 実ノードは元のID、ダミーはnull
+  kind: LKind;
   layer: number;
-  order: number; // 層内の位置（0始まり）
-  cross: number; // cross座標（中心）
+  pos: number; // 層内の順序（0始まり）
   crossSize: number;
   primarySize: number;
-  weight: number; // 座標割当での優先度
+  cross: number; // 結果のcross座標（中心）
+  /** 層内の並べ替えキー（フェーズ4）。longEdgeダミーだけは層の代表位置が要るので後から決まる */
+  orderKey: number;
+  /** 入力位置でのprimary始端。層の代表primary位置（pivot）の算出にだけ使う */
+  inputPrimaryStart: number;
+  /** nsPortダミーが属する実ノードのindex。順序の同値解決に使う */
+  originIndex: number;
+  /** nsPortダミーが実ノードのどちら側に付くか */
+  nsSide: 'neg' | 'pos' | null;
+  /** longEdgeダミーが通っている元エッジの端点アンカー（入力座標。orderKeyの補間に使う） */
+  edgeSource: { p: number; c: number } | null;
+  edgeTarget: { p: number; c: number } | null;
 }
 
-// 1層ぶんだけをまたぐ、内部表現でのエッジ。crossOffsetは端点のポート位置（中心からのずれ）
+/** 1層ぶんだけをまたぐ、内部表現でのエッジ（ダミー展開後なので端点は必ず中心同士で揃う） */
 interface LEdge {
-  from: number; // LNodeのindex
+  from: number;
   to: number;
-  fromOffset: number;
-  toOffset: number;
+  marked: boolean; // Brandes–Köpfのtype-1 conflictマーキング用
 }
 
-/** ポート役割から、cross方向の取り付き位置（ノード中心からのずれ）を求める */
-function portCrossOffset(role: PortRole, nodeCrossSize: number): number {
-  switch (role) {
-    case 'forward':
-    case 'backward':
-      // 流れ方向の面は、その面のcross方向の中央に付く（＝ずれなし）
-      return 0;
-    case 'crossNeg':
-      return -(nodeCrossSize / 2 + PORT_STUB);
-    case 'crossPos':
-      return nodeCrossSize / 2 + PORT_STUB;
-  }
+/** 内部グラフ（連結成分1つぶん） */
+interface LGraph {
+  lnodes: LNode[];
+  ledges: LEdge[];
+  layers: number[][];
+}
+
+/** 前処理済みのエッジ（端点が両方存在するもの） */
+interface PreparedEdge {
+  source: string;
+  target: string;
+  sourceRole: PortRole;
+  targetRole: PortRole;
 }
 
 /**
- * フェーズ1: 循環除去（ELKのINTERACTIVE cycleBreakingに相当）。
- * 現在のprimary座標（同値はノード配列順）で全ノードに全順序を与え、その順に逆行するエッジを
- * 反転する。全順序に沿って向き付けするので、結果は必ずDAGになる（追加の循環判定は不要）。
- * 反転したエッジは「向きだけ逆にして」レイアウトに使う（描画側は元のまま）。
+ * 自己ループ。層やエッジには寄与しないが、**ポートのダミーは作られる**ので
+ * そのぶんの場所を取る（ELKも同じ。自己ループだけを持つノードの位置がずれるのはこれが理由）
+ */
+interface SelfLoop {
+  node: string;
+  roles: PortRole[];
+}
+
+/** 層内で隣り合う2ノードに必要な最小の中心間距離 */
+function minCenterDistance(a: LNode, b: LNode): number {
+  const spacing =
+    a.kind === 'real' && b.kind === 'real'
+      ? NODE_GAP
+      : a.kind !== 'real' && b.kind !== 'real'
+        ? EDGE_EDGE_GAP
+        : EDGE_NODE_GAP;
+  return a.crossSize / 2 + b.crossSize / 2 + spacing;
+}
+
+/**
+ * フェーズ1: 循環除去（ELKの `InteractiveCycleBreaker` と同じ手順）。
+ * 1. 相手が**厳密に手前**にあるエッジ（targetの中心primary < sourceの中心primary）を反転する。
+ * 2. それでも残る循環（primaryが同値のノード同士など）を、ノード配列順のDFSで見つけて後退辺を反転。
+ *
+ * 「全順序を作って逆行辺を全部反転する」ほうが実装は短いが、それだと**同値のときにも反転して
+ * しまう**ためELKと結果が変わる。ELKは同値をそのまま通し、循環になった場合だけDFSで断つ。
  */
 function breakCycles(
   nodes: MapNode[],
-  edges: MapEdge[],
+  edges: PreparedEdge[],
   direction: LayoutDirection
-): { source: string; target: string; edge: MapEdge; reversed: boolean }[] {
-  const rank = new Map<string, number>();
-  const sorted = nodes
-    .map((n, i) => ({ id: n.id, p: currentCenterPC(n, direction).p, i }))
-    .sort((a, b) => a.p - b.p || a.i - b.i);
-  sorted.forEach((n, i) => rank.set(n.id, i));
+): PreparedEdge[] {
+  const centerP = new Map(nodes.map((n) => [n.id, currentCenterPC(n, direction).p]));
+  const result = edges.map((e) =>
+    centerP.get(e.target)! < centerP.get(e.source)!
+      ? { source: e.target, target: e.source, sourceRole: e.targetRole, targetRole: e.sourceRole }
+      : e
+  );
 
-  const nodeIds = new Set(nodes.map((n) => n.id));
-  const result: { source: string; target: string; edge: MapEdge; reversed: boolean }[] = [];
-  for (const e of edges) {
-    if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) continue;
-    if (e.source === e.target) continue; // 自己ループは位置計算に寄与しない
-    const reversed = rank.get(e.source)! > rank.get(e.target)!;
-    result.push(
-      reversed
-        ? { source: e.target, target: e.source, edge: e, reversed: true }
-        : { source: e.source, target: e.target, edge: e, reversed: false }
-    );
-  }
-  return result;
+  // 残った循環をDFSで断つ。state: 1=未訪問 / -1=現在の経路上 / 0=探索済み
+  const outgoing = new Map<string, number[]>(nodes.map((n) => [n.id, []]));
+  result.forEach((e, i) => outgoing.get(e.source)!.push(i));
+  const state = new Map<string, number>(nodes.map((n) => [n.id, 1]));
+  const backEdges = new Set<number>();
+
+  const visit = (start: string) => {
+    // 明示スタックで再帰を回避する（大きなマップでのスタック溢れ対策）
+    const stack: { id: string; next: number }[] = [{ id: start, next: 0 }];
+    state.set(start, -1);
+    while (stack.length > 0) {
+      const top = stack[stack.length - 1];
+      const edgeIndices = outgoing.get(top.id)!;
+      if (top.next >= edgeIndices.length) {
+        state.set(top.id, 0);
+        stack.pop();
+        continue;
+      }
+      const ei = edgeIndices[top.next++];
+      if (backEdges.has(ei)) continue;
+      const target = result[ei].target;
+      if (target === top.id) continue;
+      const s = state.get(target)!;
+      if (s < 0) backEdges.add(ei); // 現在の経路上に戻った＝循環
+      else if (s > 0) {
+        state.set(target, -1);
+        stack.push({ id: target, next: 0 });
+      }
+    }
+  };
+  for (const n of nodes) if (state.get(n.id)! > 0) visit(n.id);
+
+  return result.map((e, i) =>
+    backEdges.has(i)
+      ? { source: e.target, target: e.source, sourceRole: e.targetRole, targetRole: e.sourceRole }
+      : e
+  );
 }
 
 /**
  * フェーズ2: レイヤー割当（ELKのINTERACTIVE layeringに相当）。
  * 1. 現在のprimary区間（左端〜右端）が重なるノードを同じ層にまとめる（＝見た目の階層を保つ）。
- * 2. 全エッジが1層以上前進するよう、トポロジ順に押し出す（layer[t] = max(layer[t], layer[s]+1)）。
+ * 2. 全エッジが1層以上前進するよう、トポロジ順に押し出す。
  * 3. 空いた層番号を詰める。
  */
 function assignLayers(
   nodes: MapNode[],
-  dagEdges: { source: string; target: string }[],
+  dagEdges: PreparedEdge[],
   direction: LayoutDirection
 ): Map<string, number> {
   const sorted = nodes
@@ -218,7 +276,6 @@ function assignLayers(
   let current = 0;
   let currentEnd = -Infinity;
   for (const n of sorted) {
-    // 直前までの層のprimary範囲と重ならなくなったら次の層へ
     if (n.start >= currentEnd && layer.size > 0) {
       current += 1;
       currentEnd = n.end;
@@ -237,7 +294,6 @@ function assignLayers(
     }
   }
 
-  // 使われていない層番号を詰める
   const used = [...new Set([...layer.values()])].sort((a, b) => a - b);
   const remap = new Map(used.map((l, i) => [l, i]));
   for (const [id, l] of layer) layer.set(id, remap.get(l)!);
@@ -245,7 +301,7 @@ function assignLayers(
 }
 
 /** DAGのトポロジカル順（ノード配列順で決定的にKahn法。循環が残っていても必ず全件返す） */
-function topoOrder(nodes: MapNode[], dagEdges: { source: string; target: string }[]): string[] {
+function topoOrder(nodes: MapNode[], dagEdges: PreparedEdge[]): string[] {
   const inDeg = new Map<string, number>(nodes.map((n) => [n.id, 0]));
   const out = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
   for (const e of dagEdges) {
@@ -262,7 +318,6 @@ function topoOrder(nodes: MapNode[], dagEdges: { source: string; target: string 
         break;
       }
     }
-    // 入次数0が見つからない＝想定外の循環。配列順で先頭を採って前へ進める（無限ループ防止）
     if (picked === null) for (const n of nodes) if (remaining.has(n.id)) { picked = n.id; break; }
     remaining.delete(picked!);
     order.push(picked!);
@@ -271,69 +326,443 @@ function topoOrder(nodes: MapNode[], dagEdges: { source: string; target: string 
   return order;
 }
 
-/** 隣接2層の交差数を数える（順序indexで判定する標準的な数え方。O(E^2)だがこの規模なら十分） */
-function countCrossings(edges: LEdge[], lnodes: LNode[]): number {
-  let count = 0;
-  for (let i = 0; i < edges.length; i++) {
-    for (let j = i + 1; j < edges.length; j++) {
-      const a = edges[i];
-      const b = edges[j];
-      const da = lnodes[a.from].order - lnodes[b.from].order;
-      const db = lnodes[a.to].order - lnodes[b.to].order;
-      if (da * db < 0) count += 1;
+/**
+ * フェーズ4: 層内の順序決め（ELKの `InteractiveCrossingMinimizer` と同じ手順）。
+ *
+ * **交差削減は一切行わない**。`crossingMinimization.strategy=INTERACTIVE` のとき、ELKは
+ * バリセンタ掃引を使う `LayerSweepCrossingMinimizer` ではなく本クラスを選び、
+ * **各層を「現在のcross座標」で並べ替えるだけ**で終わる（＝ユーザーが動かした位置を尊重する）。
+ * ここをバリセンタ掃引にすると交差は減るがELKとは別物になる（実測で交差 799 → 563）。
+ *
+ * 並べ替えのキーは種類ごとに違う:
+ *   - 実ノード      : 現在位置の中心cross（`interactiveReferencePoint` の既定が CENTER のため）
+ *   - nsPortダミー  : 元ノードの**cross方向の端**（負側ダミー＝始端 / 正側ダミー＝終端）
+ *   - longEdgeダミー: 元エッジを、その層の代表primary位置 `pivot` で線形補間したcross
+ * キーが同値のときは「負側ダミー → 実ノード → 正側ダミー」の順序制約で解く
+ * （ELKの `IN_LAYER_SUCCESSOR_CONSTRAINTS` に相当。ダミーが親の反対側へ回り込むのを防ぐ）。
+ */
+function orderLayersInteractive(graph: LGraph): void {
+  const { lnodes, layers } = graph;
+
+  for (const layer of layers) {
+    // 代表primary位置: その層の実ノードのうち **primary始端が正のものだけ** の中心の平均。
+    // 0以下を除くのはELKの `if (node.getPosition().x > 0)` をそのまま写したもの
+    // （ダミーは入力位置を持たない＝0扱いなので自然に除外される）
+    let sum = 0;
+    let count = 0;
+    for (const i of layer) {
+      const n = lnodes[i];
+      if (n.kind === 'real' && n.inputPrimaryStart > 0) {
+        sum += n.inputPrimaryStart + n.primarySize / 2;
+        count += 1;
+      }
     }
+    const pivot = count > 0 ? sum / count : 0;
+
+    for (const i of layer) {
+      const n = lnodes[i];
+      if (n.kind === 'longEdge') {
+        const s = n.edgeSource!;
+        const t = n.edgeTarget!;
+        // 元エッジの端点アンカーを pivot の位置で補間する（両端の外側なら端の値をそのまま使う）
+        if (pivot <= s.p) n.orderKey = s.c;
+        else if (t.p <= pivot) n.orderKey = t.c;
+        else if (t.p === s.p) n.orderKey = s.c;
+        else n.orderKey = s.c + ((pivot - s.p) / (t.p - s.p)) * (t.c - s.c);
+      }
+      // real / nsPort の orderKey はLNode生成時に確定済み
+    }
+
+    // 同値のときは「負側ダミー → 実ノード → 正側ダミー」。それ以外の同値は元の並び順を保つ
+    const rank = (n: LNode) => (n.kind === 'nsPort' ? (n.nsSide === 'neg' ? -1 : 1) : 0);
+    const origin = (n: LNode) => (n.kind === 'nsPort' ? n.originIndex : n.index);
+    const initial = new Map(layer.map((idx, k) => [idx, k]));
+    layer.sort((a, b) => {
+      const na = lnodes[a];
+      const nb = lnodes[b];
+      if (na.orderKey !== nb.orderKey) return na.orderKey - nb.orderKey;
+      if (origin(na) === origin(nb)) return rank(na) - rank(nb);
+      return initial.get(a)! - initial.get(b)!;
+    });
   }
-  return count;
+
+  layers.forEach((layer) => layer.forEach((idx, i) => (lnodes[idx].pos = i)));
 }
 
 /**
- * 重み付きPAVA（pool adjacent violators）。
- * 「並び順を保ち、隣り合う要素が gaps[i] 以上離れている」制約のもとで、
- * sum w_i * (c_i - desired_i)^2 を最小にする中心座標 c を厳密に求める。
- *
- * 制約 c_{i+1} - c_i >= gaps[i] は、t_i = c_i - (gapsの累積) と置くと単なる単調非減少
- * （t_i <= t_{i+1}）になるので、等調回帰＝PAVAで解ける。座標割当の掃引1回ぶんに相当する。
+ * type-1 conflict（内部セグメント＝ダミー同士のエッジと、それを跨ぐ非内部セグメントの交差）を
+ * マークする。マークされたエッジは整列に使わない＝長いエッジがまっすぐ保たれる。
  */
-function solveOrderedPlacement(desired: number[], weights: number[], gaps: number[]): number[] {
-  const n = desired.length;
-  if (n === 0) return [];
-  const offset: number[] = new Array(n).fill(0);
-  for (let i = 1; i < n; i++) offset[i] = offset[i - 1] + gaps[i - 1];
+function markType1Conflicts(graph: LGraph, predEdges: number[][]): void {
+  const { lnodes, ledges, layers } = graph;
+  const isInner = (ei: number) =>
+    lnodes[ledges[ei].from].kind !== 'real' && lnodes[ledges[ei].to].kind !== 'real';
 
-  // ブロック単位でプールしていく（値はブロック内の重み付き平均）
-  const blockStart: number[] = [];
-  const blockW: number[] = [];
-  const blockWV: number[] = [];
-  for (let i = 0; i < n; i++) {
-    blockStart.push(i);
-    blockW.push(weights[i]);
-    blockWV.push(weights[i] * (desired[i] - offset[i]));
-    // 直前ブロックの平均のほうが大きい＝単調性が破れているのでマージ
-    while (
-      blockStart.length >= 2 &&
-      blockWV[blockWV.length - 2] / blockW[blockW.length - 2] >= blockWV[blockWV.length - 1] / blockW[blockW.length - 1]
-    ) {
-      const w = blockW.pop()!;
-      const wv = blockWV.pop()!;
-      blockW[blockW.length - 1] += w;
-      blockWV[blockWV.length - 1] += wv;
-      blockStart.pop();
+  for (let i = 0; i + 1 < layers.length; i++) {
+    const upper = layers[i];
+    const lower = layers[i + 1];
+    let k0 = 0;
+    let l = 0;
+    for (let l1 = 0; l1 < lower.length; l1++) {
+      const innerEdge = predEdges[lower[l1]].find(isInner);
+      if (l1 === lower.length - 1 || innerEdge !== undefined) {
+        const k1 = innerEdge !== undefined ? lnodes[ledges[innerEdge].from].pos : upper.length - 1;
+        while (l <= l1) {
+          for (const ei of predEdges[lower[l]]) {
+            const k = lnodes[ledges[ei].from].pos;
+            if (k < k0 || k > k1) ledges[ei].marked = true;
+          }
+          l += 1;
+        }
+        k0 = k1;
+      }
+    }
+  }
+}
+
+/**
+ * フェーズ5: 座標割当（Brandes & Köpf 2002 / ELKのBRANDES_KOEPFに相当）。
+ * type-1 conflictをマークしたうえで (上下)×(左右) の4通りに整列＋圧縮し、
+ * **cross方向の広がりが最小だったものをそのまま採用する**。
+ *
+ * 原論文は4つを「幅最小のものに揃えてから中央2値を平均する」バランス化で合成するが、ELKの
+ * 既定は `nodePlacement.bk.fixedAlignment=NONE`＝4通りから最小のものを選ぶ方（BALANCEDは
+ * 別の選択肢で既定ではない）。実測でも、平均ではなく単一パスの値がそのまま出ている
+ * （43ケースでの一致: 平均合成 19/43 → 最小選択 22/43）ためこちらを採る。
+ */
+function placeBrandesKoepf(graph: LGraph): void {
+  const { lnodes, ledges, layers } = graph;
+  const n = lnodes.length;
+
+  const predEdges: number[][] = lnodes.map(() => []);
+  const succEdges: number[][] = lnodes.map(() => []);
+  ledges.forEach((e, i) => {
+    succEdges[e.from].push(i);
+    predEdges[e.to].push(i);
+  });
+  // 隣接層側の順序でソート（medianを取るため）
+  for (const list of predEdges) list.sort((a, b) => lnodes[ledges[a].from].pos - lnodes[ledges[b].from].pos);
+  for (const list of succEdges) list.sort((a, b) => lnodes[ledges[a].to].pos - lnodes[ledges[b].to].pos);
+
+  markType1Conflicts(graph, predEdges);
+
+  // index順に (RIGHT,DOWN) (RIGHT,UP) (LEFT,DOWN) (LEFT,UP)（ELKのlayoutsの並びと同じ）
+  const passes = [];
+  for (const vertDown of [true, false]) {
+    for (const horLeft of [true, false]) {
+      passes.push(bkPass(graph, predEdges, succEdges, vertDown, horLeft));
+    }
+  }
+  const results = passes.map((p) => p.cross);
+
+  // --- 4パスから1つを選ぶ（ELKの `BKNodePlacer` の選び方をそのまま写す）---
+  // ELKは「4パスを平均するバランス化」も持っているが、**この構成では使われない**:
+  // `produceBalancedLayout = (fixedAlignment==NONE && !favorStraightEdges) || fixedAlignment==BALANCED`
+  // で、`favorStraightEdges` は edgeRouting が ORTHOGONAL（layeredの既定）のとき true になるため。
+  // したがって「層内の順序・間隔を破っていないパスのうち、cross方向の広がりが最小のもの」を採る。
+  // 同値なら先に来たパスを優先（＝(RIGHT,DOWN) 優先）。どれも破っていたら先頭パス。
+  // ※バランス化を有効にすると一致率が 72% → 66% に落ちることを実測で確認している
+  const feasible = (xs: number[]) =>
+    layers.every((layer) =>
+      layer.every((idx, i) => {
+        if (i === 0) return true;
+        const prev = lnodes[layer[i - 1]];
+        const cur = lnodes[idx];
+        return xs[idx] - xs[prev.index] >= minCenterDistance(prev, cur) - EPSILON;
+      })
+    );
+
+  // 広がりは**ブロック単位の外接**で測る（ELKの `layoutSize()`）。ブロック内の各ノードは中心が
+  // 揃うので、ブロックの厚みはそこに含まれる最大ノードのサイズになる。座標だけで測ると
+  // ノードの大きさが効かず、別のパスが選ばれてしまう
+  const widths = passes.map(({ cross, root }) => {
+    const half = new Map<number, number>();
+    for (const ln of lnodes) {
+      const r = root[ln.index];
+      half.set(r, Math.max(half.get(r) ?? 0, ln.crossSize / 2));
+    }
+    let min = Infinity;
+    let max = -Infinity;
+    for (const ln of lnodes) {
+      const r = root[ln.index];
+      min = Math.min(min, cross[r] - half.get(r)!);
+      max = Math.max(max, cross[r] + half.get(r)!);
+    }
+    return max - min;
+  });
+  let best = -1;
+  for (let i = 0; i < results.length; i++) {
+    if (!feasible(results[i])) continue;
+    if (best < 0 || widths[i] < widths[best]) best = i;
+  }
+  const pick = results[best < 0 ? 0 : best];
+  for (let v = 0; v < n; v++) lnodes[v].cross = pick[v];
+
+  // 最後の保険: 上のどれも取れなかった場合に備えて順序どおりの間隔を復元する
+  // （契約「ノードが重ならない」を満たすため。採用した配置がfeasibleなら何も動かない）
+  for (const layer of layers) {
+    for (let i = 1; i < layer.length; i++) {
+      const prev = lnodes[layer[i - 1]];
+      const cur = lnodes[layer[i]];
+      const need = prev.cross + minCenterDistance(prev, cur);
+      if (cur.cross < need) cur.cross = need;
+    }
+  }
+}
+
+/** 浮動小数の比較誤差の許容幅（間隔の充足判定に使う） */
+const EPSILON = 1e-6;
+
+
+/** Brandes–Köpfの1パス（垂直整列＋水平圧縮）。cross座標の配列を返す */
+function bkPass(
+  graph: LGraph,
+  predEdges: number[][],
+  succEdges: number[][],
+  vertDown: boolean,
+  horLeft: boolean
+): { cross: number[]; root: number[] } {
+  const { lnodes, ledges, layers } = graph;
+  const n = lnodes.length;
+
+  // 4通りを1つの実装で扱うため、層順・層内順を反転した「見え方」を作る。
+  // 層内を反転したパスは最後に符号を反転して元の向きへ戻す
+  const layersT = (vertDown ? layers : [...layers].reverse()).map((l) => [...l]);
+  if (!horLeft) layersT.forEach((l) => l.reverse());
+  const posT = new Array<number>(n).fill(0);
+  const layerT = new Array<number>(n).fill(0);
+  layersT.forEach((l, li) => l.forEach((v, k) => { posT[v] = k; layerT[v] = li; }));
+
+  const neighborEdges = vertDown ? predEdges : succEdges;
+  const otherEnd = (ei: number, v: number) => (ledges[ei].from === v ? ledges[ei].to : ledges[ei].from);
+
+  // --- 垂直整列: 各ノードを隣接層の中央値の相手に揃えてブロックを作る ---
+  const root = [...Array(n).keys()];
+  const align = [...Array(n).keys()];
+  for (let i = 1; i < layersT.length; i++) {
+    let r = -1;
+    for (const v of layersT[i]) {
+      const nb = neighborEdges[v]
+        .map((ei) => ({ ei, u: otherEnd(ei, v) }))
+        .sort((a, b) => posT[a.u] - posT[b.u]);
+      if (nb.length === 0) continue;
+      // 中央値が2つある場合、左揃えパスは下位・右揃えパスは上位を優先する
+      const lo = Math.floor((nb.length - 1) / 2);
+      const hi = Math.ceil((nb.length - 1) / 2);
+      for (const m of horLeft ? [lo, hi] : [hi, lo]) {
+        if (align[v] !== v) break;
+        const { ei, u } = nb[m];
+        if (!ledges[ei].marked && r < posT[u]) {
+          align[u] = v;
+          root[v] = root[u];
+          align[v] = root[v];
+          r = posT[u];
+        }
+      }
     }
   }
 
-  const result: number[] = new Array(n).fill(0);
-  for (let b = 0; b < blockStart.length; b++) {
-    const from = blockStart[b];
-    const to = b + 1 < blockStart.length ? blockStart[b + 1] : n;
-    const value = blockWV[b] / blockW[b];
-    for (let i = from; i < to; i++) result[i] = value + offset[i];
+  // --- 水平圧縮: ブロック単位に詰める ---
+  // 別クラス（連結していないブロック群）同士の距離は、原論文のように単一のshiftで持たず、
+  // **クラスグラフの辺**として溜めておき、あとでロンゲストパス的に伝播させる（ELKの `placeClasses`）。
+  // 原論文の単純なshiftはノードサイズが一様で連結なグラフを前提にしており、
+  // 大きさの違うノードや非連結成分があると詰めきれない
+  const sink = [...Array(n).keys()];
+  const x = new Array<number | undefined>(n).fill(undefined);
+  const classEdges = new Map<number, { target: number; separation: number }[]>();
+  const indegree = new Map<number, number>();
+
+  const placeBlock = (v: number) => {
+    if (x[v] !== undefined) return;
+    x[v] = 0;
+    let w = v;
+    do {
+      if (posT[w] > 0) {
+        const pred = layersT[layerT[w]][posT[w] - 1];
+        const u = root[pred];
+        placeBlock(u);
+        if (sink[v] === v) sink[v] = sink[u];
+        const sep = minCenterDistance(lnodes[pred], lnodes[w]);
+        if (sink[v] !== sink[u]) {
+          // クラスをまたぐ隣接: 「この2クラスは最低これだけ離れている必要がある」を辺として記録
+          const from = sink[v];
+          const to = sink[u];
+          const separation = x[v]! - x[u]! - sep;
+          if (!classEdges.has(from)) classEdges.set(from, []);
+          classEdges.get(from)!.push({ target: to, separation });
+          indegree.set(to, (indegree.get(to) ?? 0) + 1);
+          if (!indegree.has(from)) indegree.set(from, indegree.get(from) ?? 0);
+        } else {
+          x[v] = Math.max(x[v]!, x[u]! + sep);
+        }
+      }
+      w = align[w];
+    } while (w !== v);
+  };
+
+  for (let v = 0; v < n; v++) if (root[v] === v) placeBlock(v);
+
+  // クラスグラフ上で入次数0から伝播させ、各クラスのずらし量を決める
+  const classShift = new Map<number, number>();
+  const queue: number[] = [];
+  for (const [c, deg] of indegree) if (deg === 0) queue.push(c);
+  while (queue.length > 0) {
+    const c = queue.shift()!;
+    if (!classShift.has(c)) classShift.set(c, 0);
+    for (const e of classEdges.get(c) ?? []) {
+      const candidate = classShift.get(c)! + e.separation;
+      classShift.set(
+        e.target,
+        classShift.has(e.target) ? Math.min(classShift.get(e.target)!, candidate) : candidate
+      );
+      const deg = indegree.get(e.target)! - 1;
+      indegree.set(e.target, deg);
+      if (deg === 0) queue.push(e.target);
+    }
   }
-  return result;
+
+  const result = new Array<number>(n).fill(0);
+  for (let v = 0; v < n; v++) {
+    result[v] = x[root[v]]! + (classShift.get(sink[root[v]]) ?? 0);
+  }
+  return { cross: horLeft ? result : result.map((c) => -c), root };
+}
+
+/**
+ * 連結成分1つぶんをレイアウトする。
+ * 実ノードの (primary, cross) 中心座標に加えて、**ダミーを含む** cross方向の範囲を返す。
+ * ELKの外接矩形はダミーノードも含む（＝長いエッジの通り道やnorth/southダミーが上端に来ると、
+ * そのぶん実ノードが内側に入る）ため、正規化と成分パッキングにはこの範囲を使う
+ */
+function layoutComponent(
+  nodes: MapNode[],
+  prepared: PreparedEdge[],
+  selfLoops: SelfLoop[],
+  direction: LayoutDirection
+): { centers: Map<string, { p: number; c: number }>; crossMin: number; crossMax: number } {
+  const dagEdges = breakCycles(nodes, prepared, direction);
+  const layerOf = assignLayers(nodes, dagEdges, direction);
+  const layerCount = Math.max(...[...layerOf.values()]) + 1;
+
+  const lnodes: LNode[] = [];
+  const ledges: LEdge[] = [];
+  const layers: number[][] = Array.from({ length: layerCount }, () => []);
+
+  const addNode = (
+    id: string | null, kind: LKind, layer: number, cs: number, ps: number,
+    orderKey: number, inputPrimaryStart: number,
+    originIndex: number, nsSide: 'neg' | 'pos' | null
+  ): number => {
+    const index = lnodes.length;
+    lnodes.push({
+      index, id, kind, layer, pos: 0, crossSize: cs, primarySize: ps,
+      cross: orderKey, orderKey, inputPrimaryStart,
+      originIndex: originIndex < 0 ? index : originIndex, nsSide,
+      edgeSource: null, edgeTarget: null,
+    });
+    layers[layer].push(index);
+    return index;
+  };
+
+  // 実ノードの並べ替えキーは現在位置の中心cross（ELKの interactiveReferencePoint 既定=CENTER）
+  const realIndex = new Map<string, number>();
+  for (const node of nodes) {
+    const center = currentCenterPC(node, direction);
+    const ps = primarySize(node, direction);
+    realIndex.set(
+      node.id,
+      addNode(node.id, 'real', layerOf.get(node.id)!, crossSize(node, direction), ps,
+        center.c, center.p - ps / 2, -1, null)
+    );
+  }
+
+  /**
+   * longEdgeダミーの並べ替えキーを補間するための、元エッジ端点のアンカー位置（入力座標）。
+   * **ノードの左上**を使う。ELKはここで `LPort.getAbsoluteAnchor()`（= ノード位置 + ポート位置 +
+   * ポートアンカー）を見るが、FIXED_SIDEのポート座標が決まるのはフェーズ4の直前なので、
+   * この時点ではポート位置もアンカーも0＝実質ノードの左上になる。
+   * 面ごとの位置（右端・下端など）を使うと通り道の上下が入れ替わってELKと結果が変わる
+   */
+  const anchorOf = (nodeId: string): { p: number; c: number } => {
+    const n = nodes.find((x) => x.id === nodeId)!;
+    const center = currentCenterPC(n, direction);
+    return { p: center.p - primarySize(n, direction) / 2, c: center.c - crossSize(n, direction) / 2 };
+  };
+
+  // --- フェーズ3a: north/southポートのダミー（ELKのNorthSouthPortPreprocessorに相当）---
+  // 「実ノード＋面」につき1つだけ作り、同じ面から出る複数のエッジは共有する
+  // （elkPortLayout.tsが面ごとに1ポートしか作らないのと同じモデル）
+  const nsDummy = new Map<string, number>();
+  const endpointOf = (nodeId: string, role: PortRole): number => {
+    if (role !== 'crossNeg' && role !== 'crossPos') return realIndex.get(nodeId)!;
+    const key = `${nodeId}/${role}`;
+    const existing = nsDummy.get(key);
+    if (existing !== undefined) return existing;
+    const owner = lnodes[realIndex.get(nodeId)!];
+    const side = role === 'crossNeg' ? 'neg' : 'pos';
+    // 並べ替えキーは元ノードの**cross方向の端**（ELKは北ダミーにノード上端、南ダミーに下端を使う）。
+    // 元ノードのキー（中心）と必ず前後するので、同値解決に頼らず自然に上/下へ並ぶ
+    const edge = owner.orderKey + (side === 'neg' ? -1 : 1) * (owner.crossSize / 2);
+    const idx = addNode(null, 'nsPort', owner.layer, 0, 0, edge, 0, owner.index, side);
+    nsDummy.set(key, idx);
+    return idx;
+  };
+
+  // 自己ループはエッジにはならないが、ポートのダミーだけは作られて場所を取る
+  for (const loop of selfLoops) for (const role of loop.roles) endpointOf(loop.node, role);
+
+  // --- フェーズ3b: 長いエッジの分解（ELKのLongEdgeSplitterに相当）---
+  for (const e of dagEdges) {
+    const from = endpointOf(e.source, e.sourceRole);
+    const to = endpointOf(e.target, e.targetRole);
+    const fromLayer = lnodes[from].layer;
+    const toLayer = lnodes[to].layer;
+    if (toLayer - fromLayer <= 1) {
+      ledges.push({ from, to, marked: false });
+      continue;
+    }
+    // 通り道の並べ替えキーは、元エッジを層の代表primary位置で補間して後から決まる（フェーズ4）。
+    // そのため両端のポートアンカー（入力座標）をダミーに持たせておく
+    const srcAnchor = anchorOf(e.source);
+    const tgtAnchor = anchorOf(e.target);
+    let prev = from;
+    for (let l = fromLayer + 1; l < toLayer; l++) {
+      const d = addNode(null, 'longEdge', l, EDGE_THICKNESS, 0, 0, 0, -1, null);
+      lnodes[d].edgeSource = srcAnchor;
+      lnodes[d].edgeTarget = tgtAnchor;
+      ledges.push({ from: prev, to: d, marked: false });
+      prev = d;
+    }
+    ledges.push({ from: prev, to, marked: false });
+  }
+
+  const graph: LGraph = { lnodes, ledges, layers };
+  orderLayersInteractive(graph);
+  placeBrandesKoepf(graph);
+
+  // --- 層のprimary座標: 層ごとに最大primaryサイズを積む（ELKと同じ左揃え）---
+  const layerStart: number[] = [];
+  let cursor = 0;
+  for (let l = 0; l < layerCount; l++) {
+    layerStart.push(cursor);
+    cursor += Math.max(0, ...layers[l].map((i) => lnodes[i].primarySize)) + LAYER_GAP;
+  }
+
+  const centers = new Map<string, { p: number; c: number }>();
+  for (const ln of lnodes) {
+    if (ln.kind !== 'real') continue;
+    centers.set(ln.id!, { p: layerStart[ln.layer] + ln.primarySize / 2, c: ln.cross });
+  }
+  return {
+    centers,
+    crossMin: Math.min(...lnodes.map((ln) => ln.cross - ln.crossSize / 2)),
+    crossMax: Math.max(...lnodes.map((ln) => ln.cross + ln.crossSize / 2)),
+  };
 }
 
 /**
  * 「elk-port-ext」アルゴリズムのエントリポイント。
- * ポート制約付き階層レイアウトを、ELKに依存せず自前で計算する（同期処理）
+ * ELK layered（ポート制約付き）と同じパイプラインを、elkjsに依存せず同期処理で計算する
  */
 export function calculateElkPortExtLayout(
   nodes: MapNode[],
@@ -342,222 +771,93 @@ export function calculateElkPortExtLayout(
 ): LayoutResult {
   if (nodes.length === 0) return { nodes: [] };
 
-  const nodesById = new Map(nodes.map((n) => [n.id, n]));
-
-  // --- フェーズ1: 循環除去 ---
-  const dagEdges = breakCycles(nodes, edges, direction);
-
-  // --- フェーズ2: レイヤー割当 ---
-  const layerOf = assignLayers(nodes, dagEdges, direction);
-  const layerCount = Math.max(...[...layerOf.values()]) + 1;
-
-  // --- 実ノードをLNodeにする ---
-  const lnodes: LNode[] = [];
-  const indexOf = new Map<string, number>();
-  for (const n of nodes) {
-    indexOf.set(n.id, lnodes.length);
-    lnodes.push({
-      id: n.id,
-      real: true,
-      layer: layerOf.get(n.id)!,
-      order: 0,
-      cross: currentCenterPC(n, direction).c,
-      crossSize: crossSize(n, direction),
-      primarySize: primarySize(n, direction),
-      weight: 1,
-    });
-  }
-
-  // --- フェーズ3: 仮想ノードで長いエッジを1層ずつに分解する ---
-  // 端点のポートオフセットは、実ノード側の端だけに効かせる（間の仮想ノードは点として扱う）
-  const ledges: LEdge[] = [];
-  let dummySeq = 0;
-  for (const e of dagEdges) {
-    const srcNode = nodesById.get(e.source)!;
-    const tgtNode = nodesById.get(e.target)!;
-    // 反転したエッジは、レイアウト上のsource/targetと元のsourceHandle/targetHandleが入れ替わる
-    const origSourceSide = classifyEdgeSide(e.edge, direction);
-    const origTargetSide = targetSideOf(e.edge, origSourceSide);
-    const fromSide = e.reversed ? origTargetSide : origSourceSide;
-    const toSide = e.reversed ? origSourceSide : origTargetSide;
-    const fromOffset = portCrossOffset(portRole(fromSide, direction), crossSize(srcNode, direction));
-    const toOffset = portCrossOffset(portRole(toSide, direction), crossSize(tgtNode, direction));
-
-    const fromIdx = indexOf.get(e.source)!;
-    const toIdx = indexOf.get(e.target)!;
-    const span = lnodes[toIdx].layer - lnodes[fromIdx].layer;
-
-    if (span <= 1) {
-      ledges.push({ from: fromIdx, to: toIdx, fromOffset, toOffset });
+  // --- フェーズ0: 前処理（端点欠け・自己ループの除外、ポート面の決定）---
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const prepared: PreparedEdge[] = [];
+  const selfLoops: SelfLoop[] = [];
+  for (const e of edges) {
+    if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) continue;
+    const sourceSide = classifyEdgeSide(e, direction);
+    const sourceRole = portRole(sourceSide, direction);
+    const targetRole = portRole(targetSideOf(e, sourceSide), direction);
+    // 自己ループは層・順序・整列には寄与しないが、ポートのダミーは作られて場所を取る
+    if (e.source === e.target) {
+      selfLoops.push({ node: e.source, roles: [sourceRole, targetRole] });
       continue;
     }
-    // 中間層ごとに仮想ノードを1つ挿し、鎖状につなぐ。初期cross座標は両端のポート位置の線形補間
-    const fromCross = lnodes[fromIdx].cross + fromOffset;
-    const toCross = lnodes[toIdx].cross + toOffset;
-    let prev = fromIdx;
-    let prevOffset = fromOffset;
-    for (let l = lnodes[fromIdx].layer + 1; l < lnodes[toIdx].layer; l++) {
-      const dummyIdx = lnodes.length;
-      lnodes.push({
-        id: `~dummy~${dummySeq++}`,
-        real: false,
-        layer: l,
-        order: 0,
-        cross: fromCross + ((toCross - fromCross) * (l - lnodes[fromIdx].layer)) / span,
-        crossSize: 0,
-        primarySize: 0,
-        weight: DUMMY_WEIGHT,
-      });
-      ledges.push({ from: prev, to: dummyIdx, fromOffset: prevOffset, toOffset: 0 });
-      prev = dummyIdx;
-      prevOffset = 0;
+    prepared.push({ source: e.source, target: e.target, sourceRole, targetRole });
+  }
+
+  // --- 連結成分の分離（ELKのseparateConnectedComponents=trueに相当）---
+  // 成分の順序は入力配列での初出順。ELKも現在位置では並べ替えない（観測で確認済み）
+  const parent = new Map<string, string>(nodes.map((n) => [n.id, n.id]));
+  const find = (a: string): string => {
+    let r = a;
+    while (parent.get(r) !== r) r = parent.get(r)!;
+    while (parent.get(a) !== r) {
+      const next = parent.get(a)!;
+      parent.set(a, r);
+      a = next;
     }
-    ledges.push({ from: prev, to: toIdx, fromOffset: prevOffset, toOffset });
-  }
-
-  // --- 層ごとのノード一覧と、隣接層をつなぐエッジの索引 ---
-  const layers: number[][] = Array.from({ length: layerCount }, () => []);
-  lnodes.forEach((n, i) => layers[n.layer].push(i));
-  // edgesIntoLayer[l] = 層l-1 と 層l をつなぐエッジ
-  const edgesIntoLayer: LEdge[][] = Array.from({ length: layerCount }, () => []);
-  for (const le of ledges) {
-    const l = lnodes[le.to].layer;
-    if (l > 0 && lnodes[le.from].layer === l - 1) edgesIntoLayer[l].push(le);
-  }
-
-  // 初期順序（フェーズ4の入力）: 現在のcross座標に「ポートによる偏り」を足した値の昇順。
-  // 偏り = 入辺ごとの (相手側ポートのずれ - 自分側ポートのずれ) の平均。下ハンドルで繋がれた子は
-  // 正（下寄り）、上ハンドルなら負（上寄り）になる。**同じ面に繋がった兄弟同士は偏りが等しいので、
-  // 現在の並び順はそのまま保たれる**（差分性を壊さずにポート制約だけを順序へ持ち込む）。
-  // 同値はLNode追加順で決定的
-  const orderBias = new Map<number, number>();
-  for (let i = 0; i < lnodes.length; i++) {
-    const values: number[] = [];
-    for (const le of ledges) if (le.to === i) values.push(le.fromOffset - le.toOffset);
-    orderBias.set(i, values.length === 0 ? 0 : values.reduce((a, b) => a + b, 0) / values.length);
-  }
-  const applyOrder = () => layers.forEach((ids) => ids.forEach((id, i) => (lnodes[id].order = i)));
-  for (const ids of layers) {
-    ids.sort((a, b) => lnodes[a].cross + orderBias.get(a)! - (lnodes[b].cross + orderBias.get(b)!) || a - b);
-  }
-  applyOrder();
-
-  // --- フェーズ4: 交差削減（バリセンタ掃引。最良の順序を採用する）---
-  const totalCrossings = () => edgesIntoLayer.reduce((sum, es) => sum + countCrossings(es, lnodes), 0);
-  let bestCrossings = totalCrossings();
-  let bestOrder = layers.map((ids) => [...ids]);
-
-  // ある層のノードを、隣接層の接続先バリセンタで並べ替える。
-  // バリセンタにはポートのcrossオフセットを含める（＝ポート制約が順序に効く箇所）
-  const sortByBarycenter = (layerIndex: number, fromPrev: boolean) => {
-    const ids = layers[layerIndex];
-    const bary = new Map<number, number>();
-    for (const id of ids) {
-      const related = fromPrev ? edgesIntoLayer[layerIndex] : edgesIntoLayer[layerIndex + 1] || [];
-      const values: number[] = [];
-      for (const le of related) {
-        if (fromPrev && le.to === id) values.push(lnodes[le.from].order + le.fromOffset / ORDER_PITCH);
-        if (!fromPrev && le.from === id) values.push(lnodes[le.to].order + le.toOffset / ORDER_PITCH);
-      }
-      // つながりが無いノードは動かさない（現在の順序を維持する）
-      bary.set(id, values.length === 0 ? lnodes[id].order : values.reduce((a, b) => a + b, 0) / values.length);
-    }
-    ids.sort((a, b) => bary.get(a)! - bary.get(b)! || lnodes[a].order - lnodes[b].order);
-    ids.forEach((id, i) => (lnodes[id].order = i));
+    return r;
   };
-
-  for (let sweep = 0; sweep < ORDERING_SWEEPS; sweep++) {
-    for (let l = 1; l < layerCount; l++) sortByBarycenter(l, true);
-    for (let l = layerCount - 2; l >= 0; l--) sortByBarycenter(l, false);
-    const c = totalCrossings();
-    if (c < bestCrossings) {
-      bestCrossings = c;
-      bestOrder = layers.map((ids) => [...ids]);
+  for (const e of prepared) {
+    const ra = find(e.source);
+    const rb = find(e.target);
+    if (ra !== rb) parent.set(ra, rb);
+  }
+  const componentOrder: string[] = [];
+  const componentNodes = new Map<string, MapNode[]>();
+  for (const n of nodes) {
+    const r = find(n.id);
+    if (!componentNodes.has(r)) {
+      componentNodes.set(r, []);
+      componentOrder.push(r);
     }
+    componentNodes.get(r)!.push(n);
   }
-  bestOrder.forEach((ids, l) => (layers[l] = ids));
-  applyOrder();
+  const componentEdges = new Map<string, PreparedEdge[]>(componentOrder.map((r) => [r, []]));
+  for (const e of prepared) componentEdges.get(find(e.source))!.push(e);
+  const componentLoops = new Map<string, SelfLoop[]>(componentOrder.map((r) => [r, []]));
+  for (const l of selfLoops) componentLoops.get(find(l.node))!.push(l);
 
-  // --- フェーズ5: 座標割当（cross軸）---
-  // 各層について「隣接層の接続点に合わせたい位置」を希望値とし、順序と最小間隔を守る中で
-  // 二乗誤差最小の配置をPAVAで求める。前向き・後ろ向きに交互に掃引する
-  const gapsFor = (ids: number[]) =>
-    ids.slice(0, -1).map((id, i) => {
-      const a = lnodes[id];
-      const b = lnodes[ids[i + 1]];
-      const gap = a.real && b.real ? NODE_GAP : LANE_GAP;
-      return a.crossSize / 2 + b.crossSize / 2 + gap;
-    });
+  // 成分を積む順は「ノード数の少ない順、同数なら入力配列の初出順」。現在位置では並べ替えない
+  // （ELKの実挙動。孤立ノード1個の成分が、入力で最後にあっても先頭に来ることで確認した）
+  const packOrder = [...componentOrder].sort(
+    (a, b) =>
+      componentNodes.get(a)!.length - componentNodes.get(b)!.length ||
+      componentOrder.indexOf(a) - componentOrder.indexOf(b)
+  );
 
-  const placeLayer = (layerIndex: number, fromPrev: boolean) => {
-    const ids = layers[layerIndex];
-    if (ids.length === 0) return;
-    const desired = ids.map((id) => {
-      const related = fromPrev ? edgesIntoLayer[layerIndex] : edgesIntoLayer[layerIndex + 1] || [];
-      const values: number[] = [];
-      for (const le of related) {
-        // 相手側のポート位置に、自分のポートオフセットを打ち消す形で合わせる
-        if (fromPrev && le.to === id) values.push(lnodes[le.from].cross + le.fromOffset - le.toOffset);
-        if (!fromPrev && le.from === id) values.push(lnodes[le.to].cross + le.toOffset - le.fromOffset);
-      }
-      return values.length === 0 ? lnodes[id].cross : values.reduce((a, b) => a + b, 0) / values.length;
-    });
-    const weights = ids.map((id) => lnodes[id].weight);
-    const placed = solveOrderedPlacement(desired, weights, gapsFor(ids));
-    ids.forEach((id, i) => (lnodes[id].cross = placed[i]));
-  };
-
-  // 初期配置: 現在のcross座標を希望値として、重なりだけ解消しておく
-  for (let l = 0; l < layerCount; l++) {
-    const ids = layers[l];
-    const placed = solveOrderedPlacement(
-      ids.map((id) => lnodes[id].cross),
-      ids.map((id) => lnodes[id].weight),
-      gapsFor(ids)
-    );
-    ids.forEach((id, i) => (lnodes[id].cross = placed[i]));
-  }
-  for (let sweep = 0; sweep < PLACEMENT_SWEEPS; sweep++) {
-    for (let l = 1; l < layerCount; l++) placeLayer(l, true);
-    for (let l = layerCount - 2; l >= 0; l--) placeLayer(l, false);
+  // --- 成分ごとにレイアウトし、cross方向に COMPONENT_GAP で積む（primaryは左揃え）---
+  const centers = new Map<string, { p: number; c: number }>();
+  let crossCursor = 0;
+  for (const r of packOrder) {
+    const compNodes = componentNodes.get(r)!;
+    const laid = layoutComponent(compNodes, componentEdges.get(r)!, componentLoops.get(r)!, direction);
+    const offset = crossCursor - laid.crossMin;
+    for (const n of compNodes) {
+      const pc = laid.centers.get(n.id)!;
+      centers.set(n.id, { p: pc.p, c: pc.c + offset });
+    }
+    crossCursor += laid.crossMax - laid.crossMin + COMPONENT_GAP;
   }
 
-  // --- primary軸: 層ごとに「その層の最大primaryサイズ + LAYER_GAP」で積む（ELKと同じ左揃え）---
-  const layerStart: number[] = [];
-  let cursor = 0;
-  for (let l = 0; l < layerCount; l++) {
-    layerStart.push(cursor);
-    const maxSize = Math.max(0, ...layers[l].map((id) => lnodes[id].primarySize));
-    cursor += maxSize + LAYER_GAP;
-  }
-
-  // --- (primary, cross) → (x, y) へ戻し、入力の外接矩形の左上に合わせて平行移動する ---
-  // （ELK本体は原点付近へ正規化するためマップ全体が飛ぶ。自前実装ではその必要が無いので、
-  //   メンタルマップ保持のために元の位置に留める）
-  const laidOut = new Map<string, { x: number; y: number }>();
-  for (const ln of lnodes) {
-    if (!ln.real) continue;
-    const node = nodesById.get(ln.id)!;
-    const w = node.width || DEFAULT_NODE_WIDTH;
-    const h = node.height || DEFAULT_NODE_HEIGHT;
-    const p = layerStart[ln.layer];
-    laidOut.set(
-      ln.id,
-      direction === 'RIGHT' ? { x: p, y: ln.cross - h / 2 } : { x: ln.cross - w / 2, y: p }
-    );
-  }
-
-  const originalMinX = Math.min(...nodes.map((n) => n.position.x));
-  const originalMinY = Math.min(...nodes.map((n) => n.position.y));
-  const laidOutMinX = Math.min(...[...laidOut.values()].map((p) => p.x));
-  const laidOutMinY = Math.min(...[...laidOut.values()].map((p) => p.y));
-  const dx = originalMinX - laidOutMinX;
-  const dy = originalMinY - laidOutMinY;
-
+  // --- (primary, cross) → (x, y) に戻す（ELK本体と同じく原点＋PADDINGへ正規化される）---
+  // 成分パッキングの時点で cross の最小は0（ダミー込みの外接矩形基準）、primary の最小も
+  // layerStart[0]=0 なので、ここでは PADDING を足すだけで正規化が完了する
   return {
     nodes: nodes.map((n) => {
-      const p = laidOut.get(n.id);
-      return { id: n.id, position: p ? { x: p.x + dx, y: p.y + dy } : n.position };
+      const c = centers.get(n.id)!;
+      const w = n.width || DEFAULT_NODE_WIDTH;
+      const h = n.height || DEFAULT_NODE_HEIGHT;
+      const position =
+        direction === 'RIGHT'
+          ? { x: c.p - w / 2 + PADDING, y: c.c - h / 2 + PADDING }
+          : { x: c.c - w / 2 + PADDING, y: c.p - h / 2 + PADDING };
+      // ELKは最終座標を整数に丸めて返す。EDGE_THICKNESSが奇数なので通り道の隣は .5 刻みになり、
+      // 丸めないと「ほぼ一致するが常に0.5ずれる」結果になる
+      return { id: n.id, position: { x: Math.round(position.x), y: Math.round(position.y) } };
     }),
   };
 }

@@ -29,7 +29,8 @@ function setAxisValue(
 // React Flowの実測サイズ(node.measured)から、指定ノードのprimary/cross方向サイズを求める。
 // sugiyamaExtLayout.tsのprimarySize/crossSizeと同じ定義（RIGHT: primary=幅・cross=高さ、
 // DOWN: primary=高さ・cross=幅）に揃えることで、手動作成（Enter/Shift+Enter/Tab）の間隔を
-// 自動レイアウト(sugiyama-ext)と一致させる（docs/decisions.md参照）。実測が無ければDEFAULTにフォールバック
+// 自動レイアウト(sugiyama-ext / 既定のsugiyama-port。定数は同値)と一致させる（docs/decisions.md参照）。
+// 実測が無ければDEFAULTにフォールバック
 function measuredPrimarySize(
   node: { measured?: { width?: number; height?: number } } | undefined,
   direction: LayoutDirection
@@ -59,7 +60,7 @@ interface SiblingInsertionPlan {
 // 兄弟ノード（弟/兄）挿入の位置計算。対象のすぐ隣（1スロット先）に新ノードを置き、
 // 押し出す側（遠い側）の兄弟をサブツリーごと平行移動する分を shifts として返す。
 // targetCrossSize: 対象ノードのcross方向実測サイズ（呼び出し側=useNodeCreationがReact Flowの
-// node.measuredから渡す）。cross方向の間隔は自動レイアウト(sugiyama-ext)の兄弟サブツリー間隔と
+// node.measuredから渡す）。cross方向の間隔は自動レイアウト(sugiyama-ext / 既定のsugiyama-port)の兄弟サブツリー間隔と
 // 同じ式（boxGap = targetCross/2 + SIBLING_GAP + newNodeCross/2）にすることで、手動作成した
 // 兄弟の間隔がAlign後も（葉ノードなら）ほぼ動かないようにする（docs/decisions.md参照）
 function computeSiblingInsertion(
@@ -219,7 +220,7 @@ export function useNodeCreation() {
       // 子ノードの位置はレイアウト方向に応じて設定。親の実測primaryサイズ＋PRIMARY_GAPで配置する
       // ことで、親右端(下端)と子左端(上端)の間隔が親の幅（高さ）によらず常にPRIMARY_GAPで
       // 一定になる（固定オフセットだと親が広い場合に子と重なっていた不具合の修正。
-      // auto-layout(sugiyama-ext)のforward配置とも一致する。docs/decisions.md参照）
+      // auto-layout(sugiyama-ext / 既定のsugiyama-port)のforward配置とも一致する。docs/decisions.md参照）
       const direction = currentMap.layoutDirection;
       const rfParentNode = getNodes().find((n) => n.id === nodeId);
       const parentPrimary = measuredPrimarySize(rfParentNode, direction);

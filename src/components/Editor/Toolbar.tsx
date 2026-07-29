@@ -63,7 +63,7 @@ export function Toolbar() {
   const { addToast } = useToastStore();
   const { save, isLoading } = useSaveMap();
   const { applyLayout } = useAutoLayout();
-  // 整列アルゴリズムの切り替え（本番ビルドでは常に既定のsugiyama-ext、devのみ切り替え可。docs/align-branch-layout.md参照）
+  // 整列アルゴリズムの切り替え（本番ビルドでは常に既定のsugiyama-port、devのみ切り替え可。docs/align-branch-layout.md参照）
   const [alignAlgorithm, setAlignAlgorithm] = useAlignAlgorithmDebug();
   const { exportPng } = useExportPng();
   const { fitView } = useReactFlow();
@@ -497,8 +497,10 @@ export function Toolbar() {
             <option value="branch">branch</option>
             <option value="flat-axis">flat-axis</option>
             <option value="sugiyama-ext">sugiyama-ext</option>
+            <option value="sugiyama-port">sugiyama-port</option>
             <option value="elk-port">elk-port</option>
             <option value="elk-port-ext">elk-port-ext</option>
+            <option value="elk-port-pava">elk-port-pava</option>
           </select>
         )}
 

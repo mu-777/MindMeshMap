@@ -26,7 +26,7 @@ import { FormatToolbar } from './FormatToolbar';
 import { useMapStore, loadDraft } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { isFirstVisit, markAsVisited, createDefaultMap } from '../../data/defaultMap';
-import { EMPTY_NODE_CONTENT } from '../../utils/nodeContent';
+import { EMPTY_NODE_CONTENT, EMPTY_NODE_WIDTH, EMPTY_NODE_HEIGHT } from '../../utils/nodeContent';
 import { getUndirectedShortestPath } from '../../utils/graphTraversal';
 
 const nodeTypes = {
@@ -283,13 +283,27 @@ export function MindMapCanvas() {
 
   // エッジ接続終了時（空白にドロップした場合、新しいノードを作成）
   const onConnectEnd: OnConnectEnd = useCallback(
-    (event) => {
+    (event, connectionState) => {
       const { nodeId, handleId } = connectingInfo.current;
       if (!nodeId) return;
 
       // Toggle interactivityでロック中は、ハンドルドラッグ経由の新規ノード作成も禁止する
       // （nodesDraggable=falseだけでは自前実装のこの作成ルートは止まらないための保険）
       if (!nodesConnectable) {
+        connectingInfo.current = { nodeId: null, handleId: null };
+        return;
+      }
+
+      // 既存ノードのハンドルへスナップして終わったドラッグでは新規ノードを作らない。
+      // React Flowは connectionRadius（既定20 flow単位）以内でドロップするとハンドルに
+      // スナップして接続を成立させる（onConnectが発火する）。このときポインタ自体は
+      // ノードの外＝ペイン上にあることがあるため、下のDOMヒットテスト
+      // （elementFromPoint）だけでは「接続できた」ことを検出できず、
+      // エッジ接続と新規ノード作成が同時に起きてしまう。
+      // toHandleはスナップ先ハンドル（接続が無効だった場合もセットされる）なので、
+      // これが埋まっている＝ユーザーは既存ハンドルを狙っていた、と判断して打ち切る。
+      // （decisions.md §51。回帰テストは e2e/edge-drop-connect.mjs）
+      if (connectionState?.toHandle) {
         connectingInfo.current = { nodeId: null, handleId: null };
         return;
       }
@@ -318,16 +332,37 @@ export function MindMapCanvas() {
       const isOverNode = elementAtPoint?.closest('.react-flow__node') !== null;
 
       if (targetIsPane || (!isOverNode && elementAtPoint?.closest('.react-flow'))) {
-        // スクリーン座標をFlow座標に変換
-        const position = screenToFlowPosition({
-          x: clientX,
-          y: clientY,
-        });
-
-        // レイアウト方向に応じてハンドルを決定
+        // レイアウト方向とドラッグ開始ハンドルに応じて、新規ノード側の受け口を決める。
+        // 既定は backward 面（RIGHT:left / DOWN:top）で受けるが、**引き伸ばし始めた面が
+        // backward だったときだけは forward 面（RIGHT:right / DOWN:bottom）で受ける**。
+        // こうするとエッジが「親のbackward面 → 子のforward面」になり、エッジが親側へ
+        // 折り返さない見た目になる。レイアウト側の解釈（ソース面がbackwardなら子を1層
+        // 後退させる。sugiyamaExtLayout.ts handleRole/roleDelta）とも整合し、
+        // targetHandle 未設定時の既定＝ソース面の反対面（sugiyamaPortLayout.ts
+        // targetSideOf / elkPortLayout.ts）と同じ組み合わせになる。
+        // cross面（RIGHT:top/bottom）起点は流れ方向としては前進する扱い（roleDelta=0.5）なので
+        // 従来どおりbackward面で受ける（decisions.md §52。回帰テストは e2e/edge-drop-handle-side.mjs）
         const direction = currentMap.layoutDirection;
-        const sourceHandle = handleId || (direction === 'RIGHT' ? 'right' : 'bottom');
-        const targetHandle = direction === 'RIGHT' ? 'left' : 'top';
+        const forwardHandle = direction === 'RIGHT' ? 'right' : 'bottom';
+        const backwardHandle = direction === 'RIGHT' ? 'left' : 'top';
+        const sourceHandle = handleId || forwardHandle;
+        const isBackwardDrag = sourceHandle === backwardHandle;
+        const targetHandle = isBackwardDrag ? forwardHandle : backwardHandle;
+
+        // 新規ノードの位置。React Flowの位置は左上基準なので、ドロップ点はそのままだと
+        // 常に新規ノードのbackward面（RIGHT:左端 / DOWN:上端）になる。**backward面から
+        // 引き伸ばしたときは、受け口と同じくドロップ点が forward 面（RIGHT:右端 /
+        // DOWN:下端）になるように primary 方向へ1ノード分ずらす**（＝ポインタから
+        // 引き伸ばした向きへノードが伸びる）。作成直後の空ノードはReact Flowの実測が
+        // まだ無いため、空ノードの実寸定数（nodeContent.ts）を使う
+        const position = screenToFlowPosition({ x: clientX, y: clientY });
+        if (isBackwardDrag) {
+          if (direction === 'RIGHT') {
+            position.x -= EMPTY_NODE_WIDTH;
+          } else {
+            position.y -= EMPTY_NODE_HEIGHT;
+          }
+        }
 
         // 新しいノードを作成（空ノード。理由は utils/nodeContent.ts 参照）
         const newNodeId = addNode(

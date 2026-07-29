@@ -1,4 +1,4 @@
-// dev限定の整列アルゴリズム（branch / flat-axis / sugiyama-ext / elk-port / elk-port-ext）の**個別の設計意図**を検証する、
+// dev限定の整列アルゴリズム（branch / flat-axis / sugiyama-ext / sugiyama-port / elk-port / elk-port-ext / elk-port-pava）の**個別の設計意図**を検証する、
 // ブラウザを起動しない純Nodeテスト。docs/align-branch-layout.md参照。
 //
 // このファイルは「そのアルゴリズムが狙った配置になっているか」（右子は右へ、上/下子は親に被せて、等）を
@@ -19,6 +19,8 @@ const { calculateFlatAxisLayout } = await import('../src/utils/flatAxisLayout.ts
 const { calculateSugiyamaExtLayout } = await import('../src/utils/sugiyamaExtLayout.ts');
 const { calculateElkPortLayout } = await import('../src/utils/elkPortLayout.ts');
 const { calculateElkPortExtLayout } = await import('../src/utils/elkPortExtLayout.ts');
+const { calculateElkPortPavaLayout } = await import('../src/utils/elkPortPavaLayout.ts');
+const { calculateSugiyamaPortLayout, ESCAPE_FORWARD_AS_GROUP } = await import('../src/utils/sugiyamaPortLayout.ts');
 const { calculateLayoutForAlign } = await import('../src/utils/alignAlgorithm.ts');
 const { calculateLayout } = await import('../src/utils/layout.ts');
 
@@ -671,9 +673,136 @@ async function testElkPortDispatcherParity() {
   );
 }
 
-// --- 21. elk-port-ext: 直交ポートがcross方向の配置に効く（上ハンドル子は上、下ハンドル子は下）---
+// --- 21. elk-port-ext: elk-port（elkjs本体）と同じ座標を返す（この方式の存在意義そのもの）---
+async function testElkPortExtMatchesElkPort() {
+  // elk-port-extの目標は「良い配置」ではなく「elk-portと同じ配置」。ここでは代表的な形を
+  // 直接突き合わせて、再現できている形を固定する（コーパス全体の一致率は
+  // `npm run layout:parity` で測る。docs/layout-lab.md「ELK再現度」）。
+  // **ここが落ちたらELK側の挙動が変わったか、フェーズのどれかが壊れたかのどちらか**。
+  const cases = [
+    {
+      name: '右ハンドルの子2つ',
+      nodes: [
+        { id: 'p', content: '', position: { x: 0, y: 0 } },
+        { id: 'c1', content: '', position: { x: 300, y: -100 } },
+        { id: 'c2', content: '', position: { x: 300, y: 100 } },
+      ],
+      edges: [
+        { id: 'e1', source: 'p', target: 'c1', sourceHandle: 'right', targetHandle: 'left' },
+        { id: 'e2', source: 'p', target: 'c2', sourceHandle: 'right', targetHandle: 'left' },
+      ],
+    },
+    {
+      name: '上/右/下ハンドルの混在',
+      nodes: [
+        { id: 'p', content: '', position: { x: 0, y: 0 } },
+        { id: 't', content: '', position: { x: 300, y: -200 } },
+        { id: 'r', content: '', position: { x: 300, y: 0 } },
+        { id: 'b', content: '', position: { x: 300, y: 200 } },
+      ],
+      edges: [
+        { id: 'e1', source: 'p', target: 't', sourceHandle: 'top', targetHandle: 'bottom' },
+        { id: 'e2', source: 'p', target: 'r', sourceHandle: 'right', targetHandle: 'left' },
+        { id: 'e3', source: 'p', target: 'b', sourceHandle: 'bottom', targetHandle: 'top' },
+      ],
+    },
+    {
+      name: '2分木（深さ2）',
+      nodes: [
+        { id: 'r', content: '', position: { x: 0, y: 0 } },
+        { id: 'a', content: '', position: { x: 300, y: -100 } },
+        { id: 'b', content: '', position: { x: 300, y: 100 } },
+        { id: 'a1', content: '', position: { x: 600, y: -150 } },
+        { id: 'a2', content: '', position: { x: 600, y: -50 } },
+        { id: 'b1', content: '', position: { x: 600, y: 50 } },
+        { id: 'b2', content: '', position: { x: 600, y: 150 } },
+      ],
+      edges: [
+        { id: 'e1', source: 'r', target: 'a', sourceHandle: 'right', targetHandle: 'left' },
+        { id: 'e2', source: 'r', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+        { id: 'e3', source: 'a', target: 'a1', sourceHandle: 'right', targetHandle: 'left' },
+        { id: 'e4', source: 'a', target: 'a2', sourceHandle: 'right', targetHandle: 'left' },
+        { id: 'e5', source: 'b', target: 'b1', sourceHandle: 'right', targetHandle: 'left' },
+        { id: 'e6', source: 'b', target: 'b2', sourceHandle: 'right', targetHandle: 'left' },
+      ],
+    },
+    {
+      name: '複数の連結成分＋孤立ノード（成分パッキング）',
+      nodes: [
+        { id: 't0', content: '', position: { x: 0, y: 0 } },
+        { id: 't0a', content: '', position: { x: 300, y: 0 } },
+        { id: 't1', content: '', position: { x: 0, y: 600 } },
+        { id: 't1a', content: '', position: { x: 300, y: 600 } },
+        { id: 'lonely', content: '', position: { x: 0, y: 1200 } },
+      ],
+      edges: [
+        { id: 'e1', source: 't0', target: 't0a', sourceHandle: 'right', targetHandle: 'left' },
+        { id: 'e2', source: 't1', target: 't1a', sourceHandle: 'right', targetHandle: 'left' },
+      ],
+    },
+  ];
+
+  // 位置を「id=(x,y)」の並びに落として比較する（差分がメッセージにそのまま出るように）
+  const render = (result) =>
+    result.nodes.map((n) => `${n.id}=(${n.position.x},${n.position.y})`).join(' ');
+
+  for (const c of cases) {
+    const viaElk = await calculateElkPortLayout(c.nodes, c.edges, 'RIGHT');
+    const viaOwn = calculateElkPortExtLayout(c.nodes, c.edges, 'RIGHT');
+    await assertEqual(
+      null,
+      render(viaOwn),
+      render(viaElk),
+      `[elk-port-ext] elk-portと同じ座標を返すこと（${c.name}）`
+    );
+  }
+}
+
+// --- 21b. elk-port-ext: 直交ポートのダミーが場所を取る（上/下ハンドルの子は親の外側に離れる）---
 async function testElkPortExtCrossPorts() {
-  // 方針Gの中身そのもの。流れ方向（層）は単一のままだが、cross方向の位置はポート面で決まる
+  // north/southポートは「同じ層に置かれる大きさ0のダミー」になり、実ノードとの間隔は
+  // EDGE_NODE_GAP(10)。したがって上/下ハンドルの子は親の箱から 10×2=20px 離れた位置から始まる
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 }, width: 180, height: 60 },
+    { id: 'b', content: '', position: { x: 300, y: 200 }, width: 180, height: 60 },
+  ];
+  const edges = [{ id: 'e1', source: 'p', target: 'b', sourceHandle: 'bottom', targetHandle: 'top' }];
+  const pos = positionsById(calculateElkPortExtLayout(nodes, edges, 'RIGHT'));
+  await assertEqual(
+    null,
+    pos.get('b').y - (pos.get('p').y + 60),
+    20,
+    '[elk-port-ext] 下ハンドル子の上端が親の下端から20px（=edgeNode×2）離れること'
+  );
+  // 層は単一の流れ方向のまま（下ハンドル子も前方の層に置かれる）
+  await assertTrue(
+    null,
+    pos.get('b').x > pos.get('p').x + 100,
+    '[elk-port-ext] 下ハンドル子が前方(右)の層に置かれること'
+  );
+}
+
+// --- 21c. elk-port-ext: 同じ層のノードが順序どおりに最小間隔を守る ---
+async function testElkPortExtLayerSpacing() {
+  const nodes = [{ id: 'p', content: '', position: { x: 0, y: 0 } }];
+  const edges = [];
+  for (let i = 0; i < 4; i++) {
+    nodes.push({ id: `c${i}`, content: '', position: { x: 300, y: i * 100 } });
+    edges.push({ id: `e${i}`, source: 'p', target: `c${i}`, sourceHandle: 'right', targetHandle: 'left' });
+  }
+  const pos = positionsById(calculateElkPortExtLayout(nodes, edges, 'RIGHT'));
+  for (let i = 1; i < 4; i++) {
+    await assertEqual(
+      null,
+      pos.get(`c${i}`).y - (pos.get(`c${i - 1}`).y + 60),
+      50,
+      `[elk-port-ext] 同じ層の兄弟がnodeNode=50の間隔で並ぶこと (c${i})`
+    );
+  }
+}
+
+// --- 21d. elk-port-ext: 層は単一方向のまま（旧テスト21の置き換え。仕様上の限界の固定）---
+async function testElkPortExtSingleFlow() {
   const nodes = [
     { id: 'p', content: '', position: { x: 0, y: 0 } },
     { id: 'r', content: '', position: { x: 300, y: 0 } },
@@ -687,14 +816,6 @@ async function testElkPortExtCrossPorts() {
   ];
   const pos = positionsById(calculateElkPortExtLayout(nodes, edges, 'RIGHT'));
   const p = pos.get('p');
-  await assertTrue(null, pos.get('t').y < p.y, '[elk-port-ext] 上ハンドル子が親より上に置かれること');
-  await assertTrue(null, pos.get('b').y > p.y, '[elk-port-ext] 下ハンドル子が親より下に置かれること');
-  await assertTrue(
-    null,
-    Math.abs(pos.get('r').y - p.y) < Math.abs(pos.get('t').y - p.y),
-    '[elk-port-ext] 右ハンドル子は上ハンドル子より親のcross位置に近いこと（流れ方向の面はオフセット0）'
-  );
-  // 層は単一の流れ方向のまま（上/下ハンドル子も前方の層に置かれる）
   for (const id of ['r', 't', 'b']) {
     await assertTrue(null, pos.get(id).x > p.x + 100, `[elk-port-ext] ${id}が前方(右)の層に置かれること`);
   }
@@ -797,14 +918,47 @@ async function testElkPortExtDownDirection() {
   const p = pos.get('p');
   await assertTrue(null, pos.get('d').y > p.y + 50, '[elk-port-ext DOWN] forward(下)の子が親より下の層に置かれること');
   await assertTrue(null, pos.get('l').x < p.x, '[elk-port-ext DOWN] 左ハンドル(crossNeg)の子が親より左に置かれること');
-  await assertTrue(
-    null,
-    Math.abs(pos.get('d').x - p.x) < Math.abs(pos.get('l').x - p.x),
-    '[elk-port-ext DOWN] forwardの子のほうがcross(左右)方向で親に近いこと'
-  );
+
+  // DOWN方向でもelk-portと同じ座標になること（primary/crossの入れ替えが正しいことの確認）。
+  // 上の2ノードは入力位置が同じでキーが同値になる退化ケースなので、位置を分けた形で突き合わせる
+  const render = (r) => r.nodes.map((n) => `${n.id}=(${n.position.x},${n.position.y})`).join(' ');
+  const parityCases = [
+    {
+      name: '下ハンドルの子2つ',
+      nodes: [
+        { id: 'p', content: '', position: { x: 0, y: 0 } },
+        { id: 'a', content: '', position: { x: -200, y: 300 } },
+        { id: 'b', content: '', position: { x: 200, y: 300 } },
+      ],
+      edges: [
+        { id: 'e1', source: 'p', target: 'a', sourceHandle: 'bottom', targetHandle: 'top' },
+        { id: 'e2', source: 'p', target: 'b', sourceHandle: 'bottom', targetHandle: 'top' },
+      ],
+    },
+    {
+      name: '下＋左ハンドル',
+      nodes: [
+        { id: 'p', content: '', position: { x: 0, y: 0 } },
+        { id: 'd', content: '', position: { x: 0, y: 300 } },
+        { id: 'l', content: '', position: { x: -300, y: 300 } },
+      ],
+      edges: [
+        { id: 'e1', source: 'p', target: 'd', sourceHandle: 'bottom', targetHandle: 'top' },
+        { id: 'e2', source: 'p', target: 'l', sourceHandle: 'left', targetHandle: 'right' },
+      ],
+    },
+  ];
+  for (const c of parityCases) {
+    await assertEqual(
+      null,
+      render(calculateElkPortExtLayout(c.nodes, c.edges, 'DOWN')),
+      render(await calculateElkPortLayout(c.nodes, c.edges, 'DOWN')),
+      `[elk-port-ext DOWN] elk-portと同じ座標を返すこと（${c.name}）`
+    );
+  }
 }
 
-// --- 25. elk-port-ext: 循環・複数親・孤立ノード・自己ループで決定的、位置は元の場所に留まる ---
+// --- 25. elk-port-ext: 循環・複数親・孤立ノード・自己ループで決定的、原点付近へ正規化される ---
 async function testElkPortExtRobustness() {
   const nodes = [
     { id: 'a', content: '', position: { x: 1000, y: 500 } },
@@ -833,12 +987,13 @@ async function testElkPortExtRobustness() {
   const r2 = calculateElkPortExtLayout(nodes, edges, 'RIGHT');
   await assertEqual(null, JSON.stringify(r1), JSON.stringify(r2), '[elk-port-ext頑健性] 2回実行で結果が完全一致すること（決定性）');
 
-  // ELK版と違い原点付近へ正規化しない: 整列後の外接矩形の左上が元の左上と一致する
+  // ELK本体と同じく原点＋padding(12)へ正規化する（＝整列するとマップ全体が原点付近へ飛ぶ）。
+  // 元の位置に留まるのは elk-port-pava のほう（テスト27）で、両者を区別する性質そのもの
   const pos = positionsById(r1);
   const minX = Math.min(...r1.nodes.map((n) => n.position.x));
   const minY = Math.min(...r1.nodes.map((n) => n.position.y));
-  await assertEqual(null, minX, 1000, '[elk-port-ext] 外接矩形の左上xが元の位置に留まること');
-  await assertEqual(null, minY, 500, '[elk-port-ext] 外接矩形の左上yが元の位置に留まること');
+  await assertEqual(null, minX, 12, '[elk-port-ext] 外接矩形の左上xが原点＋paddingへ正規化されること');
+  await assertEqual(null, minY, 12, '[elk-port-ext] 外接矩形の左上yが原点＋paddingへ正規化されること');
   await assertTrue(null, Number.isFinite(pos.get('iso').x), '[elk-port-ext] 孤立ノードにも座標が付くこと');
 }
 
@@ -860,6 +1015,422 @@ async function testElkPortExtDispatcherParity() {
     JSON.stringify(viaDispatcher),
     JSON.stringify(viaDirect),
     '[elk-port-extディスパッチャ] 経由と直接呼び出しが一致すること'
+  );
+}
+
+// --- 27. elk-port-pava: 原点へ正規化せず、入力の外接矩形の左上に留まる ---
+async function testElkPortPavaKeepsPosition() {
+  // elk-port-ext（ELK忠実版）との決定的な違い。ELKは必ず原点付近へ飛ばすが、こちらは
+  // メンタルマップ保持のため元の位置に留める（docs/align-branch-layout.md「方針G'」）
+  const nodes = [
+    { id: 'a', content: '', position: { x: 1000, y: 500 } },
+    { id: 'b', content: '', position: { x: 1200, y: 500 } },
+    { id: 'iso', content: '', position: { x: 1000, y: 900 } },
+  ];
+  const edges = [{ id: 'e1', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left' }];
+  const r = calculateElkPortPavaLayout(nodes, edges, 'RIGHT');
+  const minX = Math.min(...r.nodes.map((n) => n.position.x));
+  const minY = Math.min(...r.nodes.map((n) => n.position.y));
+  await assertEqual(null, minX, 1000, '[elk-port-pava] 外接矩形の左上xが元の位置に留まること');
+  await assertEqual(null, minY, 500, '[elk-port-pava] 外接矩形の左上yが元の位置に留まること');
+
+  // 同じ入力に対し elk-port-ext は原点＋paddingへ飛ばす（＝2方式が別物であることの陽性確認）
+  const ext = calculateElkPortExtLayout(nodes, edges, 'RIGHT');
+  await assertEqual(
+    null,
+    Math.min(...ext.nodes.map((n) => n.position.x)),
+    12,
+    '[elk-port-pava] 同じ入力でelk-port-extは原点＋paddingへ正規化されること（両者が別物であること）'
+  );
+}
+
+// --- 28. elk-port-pava: 循環・自己ループで決定的、ディスパッチャ経由と直接呼び出しが一致 ---
+async function testElkPortPavaRobustnessAndDispatcher() {
+  const nodes = [
+    { id: 'a', content: '', position: { x: 0, y: 0 } },
+    { id: 'b', content: '', position: { x: 200, y: 0 } },
+    { id: 'c', content: '', position: { x: 100, y: 200 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'b', target: 'c', sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: 'e3', source: 'c', target: 'a', sourceHandle: 'right', targetHandle: 'left' }, // 循環
+    { id: 'e4', source: 'c', target: 'c', sourceHandle: 'right', targetHandle: 'right' }, // 自己ループ
+  ];
+  const r1 = calculateElkPortPavaLayout(nodes, edges, 'RIGHT');
+  await assertEqual(null, r1.nodes.length, 3, '[elk-port-pava頑健性] 全ノードの位置が返ること');
+  for (const n of r1.nodes) {
+    await assertTrue(
+      null,
+      Number.isFinite(n.position.x) && Number.isFinite(n.position.y),
+      `[elk-port-pava頑健性] ${n.id}の座標が有限であること`
+    );
+  }
+  const r2 = calculateElkPortPavaLayout(nodes, edges, 'RIGHT');
+  await assertEqual(null, JSON.stringify(r1), JSON.stringify(r2), '[elk-port-pava頑健性] 2回実行で結果が完全一致すること（決定性）');
+
+  const viaDispatcher = await calculateLayoutForAlign(nodes, edges, 'RIGHT', 'elk-port-pava');
+  await assertEqual(
+    null,
+    JSON.stringify(viaDispatcher),
+    JSON.stringify(r1),
+    '[elk-port-pavaディスパッチャ] 経由と直接呼び出しが一致すること'
+  );
+}
+
+// --- 29. sugiyama-port: 主たる親は「ターゲットのLEFT面」が深さより優先される ---
+async function testSugiyamaPortLeftHandleWins() {
+  // 方針Eとの決定的な違い（docs/align-branch-layout.md「方針H」）。
+  // x には2本の入辺がある: 深い鎖の先端 p2 から x の**上**ハンドルへ／浅い s から x の**左**ハンドルへ。
+  // 方針E（ロンゲストパス）は深い p2 を親に選ぶが、方針Hは「左ハンドルに入っている」ほうを採る
+  const nodes = [
+    { id: 'p0', content: '', position: { x: 0, y: 0 } },
+    { id: 'p1', content: '', position: { x: 300, y: 0 } },
+    { id: 'p2', content: '', position: { x: 600, y: 0 } },
+    { id: 's', content: '', position: { x: 0, y: 400 } },
+    { id: 'x', content: '', position: { x: 900, y: 200 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'p0', target: 'p1', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'p1', target: 'p2', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e3', source: 'p2', target: 'x', sourceHandle: 'right', targetHandle: 'top' }, // 深いが上ハンドル入り
+    { id: 'e4', source: 's', target: 'x', sourceHandle: 'right', targetHandle: 'left' }, // 浅いが左ハンドル入り
+  ];
+  const pos = positionsById(await calculateSugiyamaPortLayout(nodes, edges, 'RIGHT'));
+  await assertEqual(null, pos.get('x').y, pos.get('s').y, '[sugiyama-port] 左ハンドルに入る辺の親(s)の子として配置されること');
+  await assertEqual(
+    null,
+    pos.get('x').x - pos.get('s').x,
+    240,
+    '[sugiyama-port] 親sの1層前方（180+PRIMARY_GAP=240）に置かれること'
+  );
+
+  // 陽性確認: 同じ入力で方針Eは深いp2を親に選ぶ（＝このテストが常にPASSするテストではない）
+  const extPos = positionsById(await calculateSugiyamaExtLayout(nodes, edges, 'RIGHT'));
+  await assertTrue(
+    null,
+    extPos.get('x').x > extPos.get('p2').x,
+    '[sugiyama-port] 陽性確認: sugiyama-extは深いp2の子として配置すること'
+  );
+}
+
+// --- 30. sugiyama-port: 左ハンドル入りが複数なら、ソースがRIGHT面のものを採る ---
+async function testSugiyamaPortRightSourceWins() {
+  // どちらも x の左ハンドルに入る。pb は下ハンドルから、pr は右ハンドルから出ている
+  const nodes = [
+    { id: 'pb', content: '', position: { x: 0, y: 0 } },
+    { id: 'pr', content: '', position: { x: 0, y: 300 } },
+    { id: 'x', content: '', position: { x: 400, y: 150 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'pb', target: 'x', sourceHandle: 'bottom', targetHandle: 'left' },
+    { id: 'e2', source: 'pr', target: 'x', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  const pos = positionsById(await calculateSugiyamaPortLayout(nodes, edges, 'RIGHT'));
+  await assertEqual(null, pos.get('x').y, pos.get('pr').y, '[sugiyama-port] ソースが右ハンドルのpr側の子になること');
+  await assertEqual(null, pos.get('x').x - pos.get('pr').x, 240, '[sugiyama-port] prの1層前方に置かれること');
+}
+
+// --- 31. sugiyama-port: 同順位の親が複数なら両方の親のバリセンタへ置く ---
+async function testSugiyamaPortMultiParentBarycenter() {
+  // ダイヤモンド a→b→d / a→c→d。b と c は同じ層・同じ向きなので d は「同列の複数親」を持つ。
+  // 方針Eは片方（配列順で先着）の子に決め打ちするため d は b の真横に来るが、方針Hは中間に置く
+  const nodes = [
+    { id: 'a', content: '', position: { x: 0, y: 0 } },
+    { id: 'b', content: '', position: { x: 300, y: -200 } },
+    { id: 'c', content: '', position: { x: 300, y: 200 } },
+    { id: 'd', content: '', position: { x: 600, y: 0 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'a', target: 'c', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e3', source: 'b', target: 'd', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e4', source: 'c', target: 'd', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  const pos = positionsById(await calculateSugiyamaPortLayout(nodes, edges, 'RIGHT'));
+  await assertEqual(
+    null,
+    pos.get('d').y,
+    (pos.get('b').y + pos.get('c').y) / 2,
+    '[sugiyama-port] 複数親の子が親たちのバリセンタ（＝中間）に置かれること'
+  );
+  await assertTrue(
+    null,
+    pos.get('d').x >= Math.max(pos.get('b').x, pos.get('c').x) + 240,
+    '[sugiyama-port] 複数親の子が両方の親より1層以上前方に置かれること'
+  );
+
+  // 陽性確認: 方針Eは片方の親の子として決め打ちするので、中間には来ない
+  const extPos = positionsById(await calculateSugiyamaExtLayout(nodes, edges, 'RIGHT'));
+  await assertTrue(
+    null,
+    Math.abs(extPos.get('d').y - (extPos.get('b').y + extPos.get('c').y) / 2) > 30,
+    '[sugiyama-port] 陽性確認: sugiyama-extは片方の親の真横に置くこと'
+  );
+}
+
+// --- 31b. sugiyama-port: 同じ親の集合を持つ複数親の子どうしは「兄弟」として同じ層に並ぶ ---
+async function testSugiyamaPortSharedSiblings() {
+  // A→B,A→C / B→D,C→D / B→E,C→E。D と E は同じ2つの親を持つので兄弟であり、
+  // B・C と同じくcross方向に並ぶのが期待。**修正前は D と E が同じバリセンタを取り合い、
+  // 「cross方向で重なるものの前へ逃がす」規則が兄弟同士に効いてEがDの1層前に押し出されていた**
+  const nodes = [
+    { id: 'A', content: '', position: { x: 0, y: 0 } },
+    { id: 'B', content: '', position: { x: 300, y: -100 } },
+    { id: 'C', content: '', position: { x: 300, y: 100 } },
+    { id: 'D', content: '', position: { x: 600, y: -100 } },
+    { id: 'E', content: '', position: { x: 600, y: 100 } },
+  ];
+  const link = (id, source, target) => ({ id, source, target, sourceHandle: 'right', targetHandle: 'left' });
+  const edges = [
+    link('e1', 'A', 'B'),
+    link('e2', 'A', 'C'),
+    link('e3', 'B', 'D'),
+    link('e4', 'C', 'D'),
+    link('e5', 'B', 'E'),
+    link('e6', 'C', 'E'),
+  ];
+  const pos = positionsById(await calculateSugiyamaPortLayout(nodes, edges, 'RIGHT'));
+
+  await assertEqual(null, pos.get('B').x, pos.get('C').x, '[sugiyama-port] BとCが同じ層に並ぶこと');
+  await assertEqual(null, pos.get('D').x, pos.get('E').x, '[sugiyama-port] DとEも同じ層に並ぶこと（primary方向に前後しない）');
+  await assertTrue(
+    null,
+    pos.get('D').x >= pos.get('B').x + 240,
+    '[sugiyama-port] D/Eが親B/Cより1層以上前方に置かれること'
+  );
+  await assertTrue(
+    null,
+    Math.abs(pos.get('D').y - pos.get('E').y) >= 60,
+    '[sugiyama-port] DとEがcross方向に重ならず並ぶこと'
+  );
+  // 2人兄弟の中心は親たちの中心（＝Aの中心）に揃う
+  await assertEqual(
+    null,
+    (pos.get('D').y + pos.get('E').y) / 2,
+    (pos.get('B').y + pos.get('C').y) / 2,
+    '[sugiyama-port] D/E群の中心が親B/Cの中心に揃うこと'
+  );
+}
+
+// 親pに forward子3つ（cross方向に広がる）＋ 上ハンドル子t（tはさらにforward子t2を持つ）。
+// tの初期位置だけが違う2パターンを作る（cross群の配置パターン判定は現在位置から読む）
+function sugiyamaPortCrossCase(topChildY) {
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'f0', content: '', position: { x: 300, y: -110 } },
+    { id: 'f1', content: '', position: { x: 300, y: 0 } },
+    { id: 'f2', content: '', position: { x: 300, y: 110 } },
+    { id: 't', content: '', position: { x: 0, y: topChildY } },
+    { id: 't2', content: '', position: { x: 300, y: topChildY } },
+  ];
+  const edges = [
+    { id: 'e0', source: 'p', target: 'f0', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e1', source: 'p', target: 'f1', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'p', target: 'f2', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e3', source: 'p', target: 't', sourceHandle: 'top', targetHandle: 'bottom' },
+    { id: 'e4', source: 't', target: 't2', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  return { nodes, edges };
+}
+
+async function assertNoOverlaps(nodes, pos, label) {
+  const nodesById = new Map(nodes.map((n) => [n.id, n]));
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i].id;
+      const b = nodes[j].id;
+      await assertTrue(
+        null,
+        !rectanglesOverlap(rectOf(pos.get(a), nodesById.get(a)), rectOf(pos.get(b), nodesById.get(b))),
+        `${label} ${a}と${b}が重ならないこと`
+      );
+    }
+  }
+}
+
+// --- 32. sugiyama-port: cross群を親に寄せるか外へ出すかを、ユーザーの現在位置から決める ---
+async function testSugiyamaPortCrossHugPattern() {
+  // パターン1: ユーザーが t を**親のすぐ上**（forward群の広がりの内側）に置いている
+  //   → 「親の補足情報」と解釈し、tを親の隣に確保してforward群をprimary方向へ逃がす
+  const { nodes, edges } = sugiyamaPortCrossCase(-80);
+  const pos = positionsById(await calculateSugiyamaPortLayout(nodes, edges, 'RIGHT'));
+
+  // (a) 上ハンドル子は親のすぐ上（CROSS_GAP=10）に来る
+  await assertEqual(
+    null,
+    pos.get('p').y - (pos.get('t').y + 60),
+    10,
+    '[sugiyama-port hug] 上ハンドル子が親のすぐ上（CROSS_GAP=10）に来ること'
+  );
+  // (b) forward群の帯に入り込むので、被りは深いほう（CROSS_OVERLAP_RATIO_INSIDE=0.2）を使う
+  //     ＝押し出す量を抑える
+  await assertEqual(null, pos.get('t').x - pos.get('p').x, 36, '[sugiyama-port hug] 被りが0.2（180×0.2=36px前方）になること');
+  // (c) tとcross方向で重なるf0が、tのサブツリー（t2の右端）の前方へ逃げる
+  await assertTrue(
+    null,
+    pos.get('f0').x >= pos.get('t2').x + 180 + 60,
+    `[sugiyama-port hug] cross群と重なるforward子がprimary方向へ逃げること（f0.x=${pos.get('f0').x}）`
+  );
+  // (d) 重ならないf1の扱いは ESCAPE_FORWARD_AS_GROUP（逃がす単位）で決まる
+  if (ESCAPE_FORWARD_AS_GROUP) {
+    await assertEqual(null, pos.get('f1').x, pos.get('f0').x, '[sugiyama-port hug] 群ごと逃がす設定では f1 も f0 と同じ線に揃うこと');
+  } else {
+    await assertEqual(null, pos.get('f1').x - pos.get('p').x, 240, '[sugiyama-port hug] 子ごとに逃がす設定では f1 は1層前方のまま');
+  }
+  await assertNoOverlaps(nodes, pos, '[sugiyama-port hug]');
+
+  // 陽性確認: 方針Eはこの初期位置でも t を forward群の外側へ置く（＝親のすぐ上には来ない）
+  const extPos = positionsById(await calculateSugiyamaExtLayout(nodes, edges, 'RIGHT'));
+  await assertTrue(
+    null,
+    extPos.get('p').y - (extPos.get('t').y + 60) > 50,
+    '[sugiyama-port hug] 陽性確認: sugiyama-extは初期位置に関係なくforward群の外側へ逃がすこと'
+  );
+}
+
+async function testSugiyamaPortCrossOutsidePattern() {
+  // パターン2: ユーザーが t を**forward群の外側**に置いている
+  //   → 「親と並ぶ別の情報」と解釈し、方針Eと同じくforward群の外へ積む（forward群は押さない）
+  const { nodes, edges } = sugiyamaPortCrossCase(-300);
+  const pos = positionsById(await calculateSugiyamaPortLayout(nodes, edges, 'RIGHT'));
+
+  // (a) forward群は押し出されない（＝primary方向に伸びない）
+  await assertEqual(null, pos.get('f1').x - pos.get('p').x, 240, '[sugiyama-port outside] forward群が1層前方のままであること');
+  await assertEqual(null, pos.get('f0').x, pos.get('f1').x, '[sugiyama-port outside] forward群が同じ層に揃うこと');
+  // (b) tはforward群の外側（f0のさらに上）にCROSS_GAPで積まれる
+  await assertEqual(
+    null,
+    pos.get('f0').y - (pos.get('t').y + 60),
+    10,
+    '[sugiyama-port outside] 上ハンドル子がforward群の外側にCROSS_GAP(10)で積まれること'
+  );
+  // (c) forward群と重ならないので、被りは通常の CROSS_OVERLAP_RATIO=0.8
+  await assertEqual(
+    null,
+    pos.get('t').x - pos.get('p').x,
+    144,
+    '[sugiyama-port outside] 被りが0.8（180×0.8=144px前方）になること'
+  );
+  await assertNoOverlaps(nodes, pos, '[sugiyama-port outside]');
+}
+
+// --- 32c. sugiyama-port: 'outside' のcross群の中に親がいる複数親の子も必ず配置される ---
+async function testSugiyamaPortSharedChildUnderOutsideCross() {
+  // ファズ（seed 48）で見つけた不具合の回帰テスト。'outside' のcross群を複数親の子より**後**に
+  // 置くと、cross群のサブツリーに親がいる子はアンカーを見つけられず**座標が返らないまま初期位置に
+  // 取り残され**（＝他のノードと重なる）。sは初期位置を左端に置いてあるので、配置されなければ
+  // 「親より前方」の判定で落ちる
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 't', content: '', position: { x: 0, y: -600 } }, // 十分上＝'outside'と判定される
+    { id: 'x1', content: '', position: { x: 300, y: -600 } },
+    { id: 'x1b', content: '', position: { x: 600, y: -600 } },
+    { id: 'f', content: '', position: { x: 300, y: 0 } },
+    { id: 'x2', content: '', position: { x: 600, y: 0 } },
+    { id: 's', content: '', position: { x: -2000, y: 0 } }, // 配置されなければここに残る
+  ];
+  const link = (id, source, target, sourceHandle = 'right', targetHandle = 'left') => ({
+    id,
+    source,
+    target,
+    sourceHandle,
+    targetHandle,
+  });
+  const edges = [
+    link('e1', 'p', 't', 'top', 'bottom'),
+    link('e2', 't', 'x1'),
+    link('e3', 'x1', 'x1b'),
+    link('e4', 'p', 'f'),
+    link('e5', 'f', 'x2'),
+    link('e6', 'x1b', 's'), // x1b と x2 は同じ層・同じ向き → sは同順位の複数親を持つ
+    link('e7', 'x2', 's'),
+  ];
+  const pos = positionsById(await calculateSugiyamaPortLayout(nodes, edges, 'RIGHT'));
+  await assertTrue(
+    null,
+    pos.get('s').x >= Math.max(pos.get('x1b').x, pos.get('x2').x) + 240,
+    `[sugiyama-port] outside群の中に親がいる複数親の子も配置されること（s.x=${pos.get('s').x}）`
+  );
+  await assertNoOverlaps(nodes, pos, '[sugiyama-port outside+shared]');
+}
+
+// --- 32b. sugiyama-port: 整列を繰り返しても結果が変わらない（配置パターン判定の冪等性）---
+async function testSugiyamaPortReAlignStable() {
+  // 配置パターンを「現在位置」から読むので、**整列後の位置が同じパターンに分類され続ける**
+  // ことが必要（そうでないとAlignを押すたびに2つの配置を行き来する）。両パターンで確認する
+  for (const [label, topChildY] of [['hug', -80], ['outside', -300]]) {
+    const { nodes, edges } = sugiyamaPortCrossCase(topChildY);
+    let current = nodes;
+    let previous = null;
+    for (let i = 0; i < 3; i++) {
+      const result = await calculateSugiyamaPortLayout(current, edges, 'RIGHT');
+      const positions = positionsById(result);
+      current = nodes.map((n) => ({ ...n, position: positions.get(n.id) }));
+      const snapshot = JSON.stringify(current.map((n) => [n.id, n.position]));
+      if (previous !== null) {
+        await assertEqual(null, snapshot, previous, `[sugiyama-port ${label}] 整列を繰り返しても結果が変わらないこと（${i + 1}回目）`);
+      }
+      previous = snapshot;
+    }
+  }
+}
+
+// --- 33. sugiyama-port: 下向きレイアウトへの自然な回転 ---
+async function testSugiyamaPortDownDirection() {
+  // DOWN: bottom=前方(下)、right=crossPos(右に被せる)
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'd', content: '', position: { x: 0, y: 300 } },
+    { id: 'r', content: '', position: { x: 300, y: 0 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'p', target: 'd', sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: 'e2', source: 'p', target: 'r', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  const pos = positionsById(await calculateSugiyamaPortLayout(nodes, edges, 'DOWN'));
+  await assertEqual(null, pos.get('d').y - pos.get('p').y, 120, '[sugiyama-port DOWN] bottom子が1層下（60+PRIMARY_GAP）に置かれること');
+  await assertEqual(
+    null,
+    pos.get('r').x - (pos.get('p').x + 180),
+    10,
+    '[sugiyama-port DOWN] right子が親のすぐ右（CROSS_GAP=10）に来ること'
+  );
+  await assertTrue(null, pos.get('r').y < pos.get('d').y, '[sugiyama-port DOWN] cross子が前方(下)の子より手前に被ること');
+}
+
+// --- 34. sugiyama-port: 循環・自己ループ・孤立ノードで決定的、ディスパッチャ経由と一致 ---
+async function testSugiyamaPortRobustnessAndDispatcher() {
+  const nodes = [
+    { id: 'a', content: '', position: { x: 0, y: 0 } },
+    { id: 'b', content: '', position: { x: 200, y: 0 } },
+    { id: 'c', content: '', position: { x: 100, y: 200 } },
+    { id: 'iso', content: '', position: { x: 0, y: 600 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'b', target: 'c', sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: 'e3', source: 'c', target: 'a', sourceHandle: 'right', targetHandle: 'left' }, // 循環
+    { id: 'e4', source: 'c', target: 'c', sourceHandle: 'right', targetHandle: 'right' }, // 自己ループ
+  ];
+  const r1 = await calculateSugiyamaPortLayout(nodes, edges, 'RIGHT');
+  await assertEqual(null, r1.nodes.length, 4, '[sugiyama-port頑健性] 全ノードの位置が返ること');
+  for (const n of r1.nodes) {
+    await assertTrue(
+      null,
+      Number.isFinite(n.position.x) && Number.isFinite(n.position.y),
+      `[sugiyama-port頑健性] ${n.id}の座標が有限であること`
+    );
+  }
+  const r2 = await calculateSugiyamaPortLayout(nodes, edges, 'RIGHT');
+  await assertEqual(null, JSON.stringify(r1), JSON.stringify(r2), '[sugiyama-port頑健性] 2回実行で結果が完全一致すること（決定性）');
+
+  const viaDispatcher = await calculateLayoutForAlign(nodes, edges, 'RIGHT', 'sugiyama-port');
+  await assertEqual(
+    null,
+    JSON.stringify(viaDispatcher),
+    JSON.stringify(r1),
+    '[sugiyama-portディスパッチャ] 経由と直接呼び出しが一致すること'
   );
 }
 
@@ -885,12 +1456,27 @@ export async function run() {
   await testElkPortDanglingEdge();
   await testElkPortCycleAndMultiParent();
   await testElkPortDispatcherParity();
+  await testElkPortExtMatchesElkPort();
   await testElkPortExtCrossPorts();
+  await testElkPortExtLayerSpacing();
+  await testElkPortExtSingleFlow();
   await testElkPortExtLongEdge();
   await testElkPortExtNoOverlapInLayer();
   await testElkPortExtDownDirection();
   await testElkPortExtRobustness();
   await testElkPortExtDispatcherParity();
+  await testElkPortPavaKeepsPosition();
+  await testElkPortPavaRobustnessAndDispatcher();
+  await testSugiyamaPortLeftHandleWins();
+  await testSugiyamaPortRightSourceWins();
+  await testSugiyamaPortMultiParentBarycenter();
+  await testSugiyamaPortSharedSiblings();
+  await testSugiyamaPortCrossHugPattern();
+  await testSugiyamaPortCrossOutsidePattern();
+  await testSugiyamaPortSharedChildUnderOutsideCross();
+  await testSugiyamaPortReAlignStable();
+  await testSugiyamaPortDownDirection();
+  await testSugiyamaPortRobustnessAndDispatcher();
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -7,7 +7,7 @@ import { MapNode } from '../types';
 
 export function useAutoLayout() {
   const { currentMap, updateNodePositions, saveToHistory } = useMapStore();
-  // 整列アルゴリズム。本番ビルドでは常に既定（sugiyama-ext）、devのみ切り替え可能（詳細はフック側参照）
+  // 整列アルゴリズム。本番ビルドでは常に既定（sugiyama-port）、devのみ切り替え可能（詳細はフック側参照）
   const [alignAlgorithm] = useAlignAlgorithmDebug();
   const { getNodes } = useReactFlow();
 
