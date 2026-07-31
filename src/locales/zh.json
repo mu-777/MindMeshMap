@@ -76,6 +76,8 @@
     "opSelectEdgeDesc": "Shift+点击可切换选择（可与节点选择混合）",
     "opEdgeLabel": "连线标签",
     "opEdgeLabelDesc": "点击连线上的任意位置，会打开标签输入框和用于删除的×按钮",
+    "opSelectSubtree": "选择子树",
+    "opSelectSubtreeDesc": "右键点击 / 长按节点 →「选择子树」（选中该节点及其下方全部节点）",
     "opDeleteMenu": "删除菜单",
     "opDeleteMenuDesc": "右键点击 / 长按",
     "formatIntro": "编辑节点时，画布右上角会常驻显示格式面板",
@@ -116,6 +118,9 @@
     "fitView": "适应视图",
     "toggleLayoutDirection": "切换布局方向",
     "autoLayout": "对齐"
+  },
+  "contextMenu": {
+    "selectSubtree": "选择子树"
   },
   "editor": {
     "placeholder": "输入文本...",

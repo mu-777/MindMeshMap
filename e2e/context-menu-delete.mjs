@@ -35,8 +35,11 @@ export async function run() {
   await testEdgeDeleteViaContextMenuClearsSelection();
 }
 
+// 削除ボタンはメニュー内の最後の項目（ノードメニューでは「サブツリーを選択」の次、
+// エッジメニューでは唯一の項目）。項目が増えても壊れないよう、位置ではなく
+// text-red-400（削除だけが赤字）で特定する
 async function openContextMenuAndDelete(page) {
-  const deleteButton = page.locator('.fixed.z-50.min-w-\\[120px\\] button');
+  const deleteButton = page.locator('.fixed.z-50.min-w-\\[120px\\] button.text-red-400');
   await assertTrue(page, (await deleteButton.count()) === 1, 'コンテキストメニューの削除ボタンが1つ表示されること');
   await deleteButton.click();
   await page.waitForTimeout(200);

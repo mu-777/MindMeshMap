@@ -27,6 +27,7 @@ const basicOperationKeys = [
   'createConnectedNode',
   'selectEdge',
   'edgeLabel',
+  'selectSubtree',
   'deleteMenu',
 ] as const;
 

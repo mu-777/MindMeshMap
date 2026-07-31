@@ -2,13 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../stores/uiStore';
 import { useMapStore } from '../../stores/mapStore';
+import { getDescendantIds } from '../../utils/graphTraversal';
 
 // メニューと対象（ノード矩形）/ビューポート端との間に空ける余白（px）
 const CONTEXT_MENU_GAP = 8;
 
 export function ContextMenu() {
   const { t } = useTranslation();
-  const { contextMenu, closeContextMenu, selectedNodeId, selectedNodeIds, selectedEdgeIds, setSelectedNodeId, toggleNodeSelection, toggleEdgeSelection, setDeletedFocusAnchor } = useUIStore();
+  const { contextMenu, closeContextMenu, selectedNodeId, selectedNodeIds, selectedEdgeIds, setSelectedNodeId, toggleNodeSelection, toggleEdgeSelection, setMultiSelection, clearEdgeSelection, setDeletedFocusAnchor } = useUIStore();
   const { deleteNode, deleteEdge, currentMap } = useMapStore();
   const menuRef = useRef<HTMLDivElement>(null);
   // 自サイズ計測が済むまでの初期位置（画面外0,0ではなくcontextMenu.x/yを暫定表示に使う）。
@@ -127,6 +128,20 @@ export function ContextMenu() {
     setDeletedFocusAnchor,
   ]);
 
+  // 対象ノードを根とするサブツリー（自身＋全子孫）をまとめて選択する。
+  // 子孫の探索はgetDescendantIds（child方向へのDFS。循環があっても無限ループしない）に任せる。
+  // 選択の反映にはsetMultiSelectionを使う（selectedNodeIdsに一括で入れ、selectedNodeIdはクリア）。
+  // setMultiSelectionはノード・エッジ混在選択のためselectedEdgeIdsを維持する仕様なので、
+  // ここでは先にclearEdgeSelectionを呼ぶ。呼ばないと「直前に選択していた無関係なエッジ」が
+  // 選択に残り、続けてDeleteを押すとサブツリー外のエッジまで消える
+  const handleSelectSubtree = useCallback(() => {
+    if (!contextMenu || contextMenu.type !== 'node' || !currentMap) return;
+    const ids = [contextMenu.id, ...getDescendantIds(contextMenu.id, currentMap.edges)];
+    clearEdgeSelection();
+    setMultiSelection(ids);
+    closeContextMenu();
+  }, [contextMenu, currentMap, clearEdgeSelection, setMultiSelection, closeContextMenu]);
+
   if (!contextMenu) return null;
 
   return (
@@ -138,8 +153,34 @@ export function ContextMenu() {
         top: position?.top ?? contextMenu.y,
       }}
     >
+      {contextMenu.type === 'node' && (
+        <button
+          className="flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm text-gray-200 hover:bg-gray-700"
+          onClick={handleSelectSubtree}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            {/* サブツリー（1つの親から2つの子へ枝分かれ）を表すアイコン */}
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 7v3M5 13v-3h14v3"
+            />
+            <rect x="9" y="3" width="6" height="4" rx="1" strokeWidth={2} />
+            <rect x="2" y="13" width="6" height="4" rx="1" strokeWidth={2} />
+            <rect x="16" y="13" width="6" height="4" rx="1" strokeWidth={2} />
+          </svg>
+          {t('contextMenu.selectSubtree')}
+        </button>
+      )}
       <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-700"
+        className="flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-700"
         onClick={handleDelete}
       >
         <svg

@@ -76,6 +76,8 @@
     "opSelectEdgeDesc": "Shift+クリックで選択をトグル（ノード選択と混在可）",
     "opEdgeLabel": "エッジラベル",
     "opEdgeLabelDesc": "エッジ上のどこをクリックしてもラベル入力欄と削除用の×ボタンが開く",
+    "opSelectSubtree": "サブツリーを選択",
+    "opSelectSubtreeDesc": "ノードを右クリック / 長押し →「サブツリーを選択」（そのノードと配下すべてを選択）",
     "opDeleteMenu": "削除メニュー",
     "opDeleteMenuDesc": "右クリック / 長押し",
     "formatIntro": "ノード編集中は、キャンバス右上に書式パネルが表示されます",
@@ -116,6 +118,9 @@
     "fitView": "全体表示",
     "toggleLayoutDirection": "レイアウト方向切替",
     "autoLayout": "整列"
+  },
+  "contextMenu": {
+    "selectSubtree": "サブツリーを選択"
   },
   "editor": {
     "placeholder": "テキストを入力...",

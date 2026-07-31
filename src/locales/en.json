@@ -76,6 +76,8 @@
     "opSelectEdgeDesc": "Shift+Click to select (toggle) — mixes with node selection",
     "opEdgeLabel": "Edge Label",
     "opEdgeLabelDesc": "Click anywhere on an edge — opens the label input with a × button to delete it",
+    "opSelectSubtree": "Select Subtree",
+    "opSelectSubtreeDesc": "Right-click / Long-press a node → \"Select subtree\" (selects it and everything below it)",
     "opDeleteMenu": "Delete Menu",
     "opDeleteMenuDesc": "Right-click / Long-press",
     "formatIntro": "While editing a node, a formatting panel stays visible in the top-right corner of the canvas",
@@ -116,6 +118,9 @@
     "fitView": "Fit View",
     "toggleLayoutDirection": "Toggle Layout Direction",
     "autoLayout": "Align"
+  },
+  "contextMenu": {
+    "selectSubtree": "Select subtree"
   },
   "editor": {
     "placeholder": "Enter text...",
