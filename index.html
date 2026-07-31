@@ -95,7 +95,15 @@
         JavaScript is required to use the editor. Open
         <a href="https://mu-777.github.io/MindMeshMap/">MindMeshMap</a> in a modern browser.
       </p>
+      <p>
+        <a href="/MindMeshMap/terms.html">Terms of Service</a> ·
+        <a href="/MindMeshMap/privacy.html">Privacy Policy</a>
+      </p>
     </noscript>
+    <!--
+      規約・ポリシーはJS無効でも辿れる必要がある（Google OAuth審査・クローラ対策）。
+      アプリ内の導線（サイドバー下部）とは別に、noscript内にも同じリンクを置いておく。詳細: docs/decisions.md §55
+    -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

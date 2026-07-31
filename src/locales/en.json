@@ -158,5 +158,9 @@
     "importSuccess": "Map imported successfully",
     "importFailed": "Failed to import map. The file format is invalid.",
     "exportPngFailed": "Failed to export PNG"
+  },
+  "legal": {
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service"
   }
 }

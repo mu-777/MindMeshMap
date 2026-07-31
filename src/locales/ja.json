@@ -148,5 +148,9 @@
     "importSuccess": "マップをインポートしました",
     "importFailed": "マップのインポートに失敗しました。ファイル形式が正しくありません。",
     "exportPngFailed": "PNGのエクスポートに失敗しました"
+  },
+  "legal": {
+    "privacy": "プライバシーポリシー",
+    "terms": "利用規約"
   }
 }

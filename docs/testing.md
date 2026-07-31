@@ -66,6 +66,7 @@ MindMeshMapのE2Eテストは、素の[playwright](https://playwright.dev/)（`@
 | `menu-outside-click.mjs` | コンテキストメニュー/ファイルメニューの外側クリッククローズ | 右クリックメニュー・ファイルメニューがキャンバス空白クリックで閉じること、メニュー自身のボタンクリックは引き続き機能すること（キャプチャフェーズ化の回帰確認） | 自動 |
 | `rect-select-delete.mjs` | Shift+ドラッグの矩形選択をuiStoreの複数選択へ橋渡し（`onSelectionChange`。decisions.md §45） | 全ノードを囲むShift+ドラッグの矩形選択で各ノードが選択状態(青枠)になること、Deleteキーで選択したノードがまとめて削除され保護されたルートノードのみ残ること（uiStoreへ未反映だとDeleteが無反応になる不具合の回帰確認） | 自動 |
 | `png-export.mjs` | PNGエクスポートの実寸・見切れ | 出力画像の実寸がuseExportPng.tsの計算式と一致すること、四辺（外周1px）が背景色のみでノードが見切れていないこと | 自動 |
+| `legal-pages.mjs` | 利用規約・プライバシーポリシーのページ（decisions.md §55） | サイドバーに両ページへのリンクがあり、hrefが`/MindMeshMap/<file>`（BASE_URL基準）・`target="_blank"`で、実際に200で配信されていること。**JavaScriptを無効にしたコンテキスト**で開いても英語→日本語の順に全文（`h2#english`→`h2#japanese`）と連絡先メールが読めること（アプリ本体と違いJS不要である、という仕様の固定。devサーバのSPAフォールバックでファイルが無くてもステータスは200になるため、見出しと本文の中身までアサートしている）、幅390pxで横スクロールが出ないこと、`index.html`の`<noscript>`と`sitemap.xml`にも両URLが載っていること。Google Cloud Consoleに登録したURLが壊れると審査で落ちるまで気づけないための回帰テスト | 自動 |
 | `mobile-viewport.mjs` | モバイル表示・2タップ編集フロー、ドキュメントスクロール抑止（decisions.md §46） | ツールバーが画面上端から可視、React Flow Controlsがビューポート内に収まる、`window.scrollTo`後もドキュメントがスクロールせずツールバーが画面上端に留まること、1タップ目はエディタにフォーカスが入らない（選択のみ）、2タップ目で編集モードに入る | 自動 |
 
 ## 手動確認チェックリスト
@@ -102,6 +103,11 @@ MindMeshMapのE2Eテストは、素の[playwright](https://playwright.dev/)（`@
   Reactのハンドラまで届かず自動化できない（試行済み）。メニューの中身と配置そのものは
   `context-menu-select-subtree.mjs`（右クリック経路。開いた後は長押しと同じ`openContextMenu('node', …)`）で
   自動検証済みなので、実機で見るのは「長押しでちゃんと開くか」「2項目がタップしやすいか」。
+- **Google Cloud Console側の登録内容**: 利用規約・プライバシーポリシーのURL、アプリのホームページ、
+  承認済みドメイン（`mu-777.github.io`）、公開ステータス（「本番」であること）は、Console上の設定であり
+  リポジトリからは検証できない。`legal-pages.mjs`が守れるのは「登録先のURLが実在し、JSなしで読めること」までで、
+  **Console側に正しいURLが入っているか**は人間が確認する（decisions.md §55）。ポリシーのファイル名を変える・
+  独自ドメインへ移すといった変更をしたら、Consoleの登録も同じ作業内で更新すること。
 - **PNGエクスポートの目視品質**: `png-export.mjs`は実寸・四辺の背景余白（見切れの有無）を
   ピクセル単位で自動検証しているが、フォントのアンチエイリアシングや配色など「見た目の質」の
   最終確認は人間の目視に委ねる。手順: エクスポートしたPNGを画像ビューアで開き、文字が

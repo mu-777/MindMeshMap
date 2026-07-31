@@ -195,6 +195,15 @@ Try this: https://mu-777.github.io/MindMeshMap/
 | エクスポート | PNG画像 | 現在のマップをPNG画像としてダウンロード（余白付きで全ノードが必ず収まります） |
 | インポート | JSON | JSONファイルを選択してマップを読み込み（インポート後はDrive未保存の新規マップとして扱われます） |
 
+### 利用規約・プライバシーポリシー
+
+- [利用規約](https://mu-777.github.io/MindMeshMap/terms.html)
+- [プライバシーポリシー](https://mu-777.github.io/MindMeshMap/privacy.html)
+
+サイドバー下部（Googleログインボタンの下）からも開けます。いずれも英語・日本語の併記で、日本語版が正文です。
+
+本アプリは開発者側のサーバーを持たず、マップの内容や個人情報を収集しません。データはブラウザのlocalStorage / sessionStorageと、ログインした場合のみユーザー自身のGoogle Driveにのみ保存されます。
+
 ---
 
 ## 開発者向け情報
@@ -268,6 +277,14 @@ npm run test:e2e
 VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 ```
 
+6. 「Google 認証プラットフォーム」→「ブランディング」に以下を登録（Google API利用の要件）:
+   - アプリのホームページ: `https://mu-777.github.io/MindMeshMap/`
+   - プライバシーポリシー: `https://mu-777.github.io/MindMeshMap/privacy.html`
+   - 利用規約: `https://mu-777.github.io/MindMeshMap/terms.html`
+   - 承認済みドメイン: `mu-777.github.io`（所有権確認は `index.html` の `google-site-verification` メタタグ経由）
+
+使用スコープ（`drive.file` / `openid` / `userinfo.email` / `userinfo.profile`）はいずれも非センシティブなので、OAuthアプリ審査は不要です。公開ステータスは「テスト」のままだとトークンが7日で失効しテストユーザー100人の上限があるため、「本番」に切り替えます。なお**アプリのロゴを登録するとブランド確認の審査が走る**ため、必要になるまで空のままにしています（[docs/decisions.md §55](docs/decisions.md)）。
+
 ### ディレクトリ構成
 
 ```
@@ -327,6 +344,14 @@ src/
 │   ├── en.json / ja.json / zh.json  # i18nリソース
 └── types/
     └── index.ts                   # 型定義
+
+public/                            # Viteがdistへそのままコピーする静的ファイル
+├── terms.html                     # 利用規約（英日併記・素のHTML。JS無効でも読める）
+├── privacy.html                   # プライバシーポリシー（同上）
+├── logo.svg
+├── og-image.png / og-image.ja.png
+├── robots.txt
+└── sitemap.xml
 ```
 
 ### データモデル

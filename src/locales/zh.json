@@ -148,5 +148,9 @@
     "importSuccess": "地图导入成功",
     "importFailed": "导入地图失败。文件格式无效。",
     "exportPngFailed": "导出PNG失败"
+  },
+  "legal": {
+    "privacy": "隐私政策",
+    "terms": "服务条款"
   }
 }

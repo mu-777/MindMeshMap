@@ -329,6 +329,32 @@ export function MapList() {
           <p className="mb-2 text-xs text-gray-500">{t('mapList.signInPrompt')}</p>
         )}
         <GoogleAuthButton />
+
+        {/*
+          利用規約・プライバシーポリシーへの導線（docs/decisions.md §55）。
+          Google OAuth の同意画面に登録するURLと同じページで、public/ 配下の静的HTML。
+          アプリのルーティングを通さないので target="_blank"（編集中の下書きを失わせない）。
+          BASE_URL を使うのは dev（/MindMeshMap/）と本番で同じパスにするため。
+        */}
+        <div className="mt-3 flex flex-wrap gap-x-2 gap-y-1 text-xs text-gray-500">
+          <a
+            href={`${import.meta.env.BASE_URL}terms.html`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-gray-300 hover:underline"
+          >
+            {t('legal.terms')}
+          </a>
+          <span aria-hidden="true">·</span>
+          <a
+            href={`${import.meta.env.BASE_URL}privacy.html`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-gray-300 hover:underline"
+          >
+            {t('legal.privacy')}
+          </a>
+        </div>
       </div>
     </div>
   );
