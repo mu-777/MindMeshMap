@@ -791,3 +791,20 @@ MindMeshMap における設計判断のうち、選択肢を比較して決め�
   - **無向（親方向にもたどる）連結成分を選ぶ**: それは「サブツリー」ではなく「つながっている塊全部」で、ルート付近を対象にすると事実上の全選択になる。`Shift`+クリックの経路追加と役割も被る。
 - **再検討の条件**: 「親も含めて枝ごと」「兄弟だけ」といった別の選択単位の要望が出たら、メニューをサブメニュー化するか、選択系の操作をまとめた別UIに移すことを検討する（今は項目2つなのでフラットで足りる）。
 - **回帰テスト**: `e2e/context-menu-select-subtree.mjs`（[testing.md](./testing.md)）。エッジの `aria-label` からテスト側でグラフを組み直して期待値を独立に計算し、サブツリー内が全部選択・サブツリー外が非選択であること、続く `Delete` でサブツリーだけが消えること、エッジのメニューには項目が出ないことを確認する。メニュー項目を消した状態で実際に FAIL することを確認済み。
+
+## 55. ハンドルドラッグ中のEscapeは、React Flowの`cancelConnection()`＋自前のキャンセルフラグで打ち切る
+
+- **決定**: ハンドルからエッジを引き伸ばしている最中の `Escape` で接続をキャンセルする（エッジも新規ノードも作らない）。実装は `src/components/Editor/MindMapCanvas.tsx` で、(1) `window` の **capture phase** で `keydown` を監視し、React Flowストアの `connection.inProgress` が真のときだけ拾う、(2) ストアの `cancelConnection()` を呼んで接続線を即座に消す、(3) 自前の `connectionCancelledRef` を立て、続いて発火する `onConnect` / `onConnectEnd` の**両方**を打ち切る、の3点セット。フラグは `onConnectEnd`（キャンセル経路）と `onConnectStart` の両方で戻す。
+- **背景**: React Flow v12 は接続ドラッグ中の `Escape` を見ていない（@xyflow/system の `XYHandle.onPointerDown` は pointermove / pointerup / touch 系しか listen しない）。引き伸ばし始めてから「やっぱりやめる」には、ドラッグ元のハンドルまでポインタを戻すか、既存ノードのどこにも当たらない場所を探して離す（＝空ノードができるので消す）しかなかった。
+- **採用理由**:
+  - **`cancelConnection()` だけでは足りない**。ストアの `connection` を初期状態に戻すと接続線は消えるが、進行中のドラッグ（`XYHandle` のクロージャ）は生きたままで、次の pointermove / pointerup で `onConnect`（スナップ先が確定していた場合）と `onConnectEnd`（ドラッグ中の `previousConnection` を持ったまま）が発火する。**表示だけ消して作成は走る**状態になるため、アプリ側のフラグで両方を止める必要がある。
+  - **`connectingInfo.current` をクリアするだけでも新規ノード作成は止まる**（`onConnectEnd` 冒頭の `if (!nodeId) return`）が、`onConnect` は別経路なので**エッジ作成は止まらない**。ハンドル近くでEscapeを押すとエッジだけができてしまうので、明示的なフラグを分けて持つ。
+  - **capture phase で `stopPropagation()` する**のは、同じ `Escape` が `useKeyboardShortcuts` の `finishEdit`（編集終了）などにも流れるのを防ぐため。接続中（`connection.inProgress`）のときしか止めないので、通常の `Escape` の意味は変わらない。
+  - **キャンセルの検知に `connection.inProgress`（React Flowストア）を使う**。自前の `connectingInfo` は `onConnectStart` で立てて `onConnectEnd` で戻す値なので概ね一致するが、「いま本当に接続線が出ているか」を知っているのはReact Flow自身。§51 と同じ理由で、状態はReact Flowから読む。
+- **不採用案とその理由**:
+  - **`document` に合成の `mouseup` を投げてドラッグを強制終了する**: `XYHandle` の後始末（listener解除・autoPanのキャンセル）まで一度に走る利点はあるが、合成イベントがアプリの他のハンドラ（ペインのクリック判定など）にも流れるため副作用が読みにくい。実際には Escape 後の最初の pointermove で `XYHandle` 自身が `getFromHandle()` の null を見て pointerup 処理に進むので、放っておいても後始末は走る。
+  - **`onConnectEnd` だけでキャンセルを判定する（Escape押下をrefに記録して離すまで待つ）**: 接続線が出たままになり、「キャンセルできたのか」が見た目で分からない。Escapeの意味（いまの操作を今すぐやめる）と合わない。
+  - **`Escape` をキーバインド設定（`keybindStore`）の対象にする**: 現状の `Escape` は編集終了（`finishEdit`）に割り当て済みで、同じキーが状況で2つの意味を持つ形になる。ヘルプ上も「キャンセル」はマウス操作の一部として説明したほうが分かりやすいので、固定キーとして扱う（`help.opCancelEdgeDrag`）。
+- **既知の制約**: ポインタをキャンバス端に置いたままEscapeを押すと、React Flowの自動パン（`autoPan`）はポインタを動かすか離すまで続く（`XYHandle` が `cancelAnimationFrame` を呼ぶのが pointerup のため）。1px動かすか離せば止まるので実害は小さいと判断した。
+- **再検討の条件**: React Flow が接続ドラッグの `Escape` キャンセルを標準で持ったら、この自前実装は削る（`connection.inProgress` の監視ごと不要になる）。タッチ環境向けに同等の中断手段（2本目の指・画面外へのドラッグ等）が要るという要望が出たら、キャンセル経路を関数に切り出して共用する。
+- **回帰テスト**: `e2e/edge-drag-escape-cancel.mjs`（[testing.md](./testing.md)）。空白へ向かうドラッグ・既存ハンドルへスナップしたドラッグの両方でEscapeを押し、接続線が消えること・ノードもエッジも増えないこと・キャンセル直後の通常ドラッグは従来どおり作成できることを確認する。修正を外した状態で（接続線・新規ノードの両方のアサートについて）実際に FAIL することを確認済み。

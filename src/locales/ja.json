@@ -72,6 +72,8 @@
     "opCreateEdgeDesc": "ハンドル（青い丸）を別のノードへドラッグ",
     "opCreateConnectedNode": "接続済み新ノード作成",
     "opCreateConnectedNodeDesc": "ハンドルをドラッグして空白にドロップ",
+    "opCancelEdgeDrag": "エッジ作成のキャンセル",
+    "opCancelEdgeDragDesc": "ハンドルからドラッグ中に Esc（エッジもノードも作られません）",
     "opSelectEdge": "エッジ選択",
     "opSelectEdgeDesc": "Shift+クリックで選択をトグル（ノード選択と混在可）",
     "opEdgeLabel": "エッジラベル",

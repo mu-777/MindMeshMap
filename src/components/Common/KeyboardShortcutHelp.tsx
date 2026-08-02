@@ -25,6 +25,7 @@ const basicOperationKeys = [
   'moveNode',
   'createEdge',
   'createConnectedNode',
+  'cancelEdgeDrag',
   'selectEdge',
   'edgeLabel',
   'selectSubtree',

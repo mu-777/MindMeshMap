@@ -72,6 +72,8 @@
     "opCreateEdgeDesc": "将连接点（蓝色圆点）拖动到另一个节点",
     "opCreateConnectedNode": "创建已连接的新节点",
     "opCreateConnectedNodeDesc": "拖动连接点并放开在空白处",
+    "opCancelEdgeDrag": "取消创建连线",
+    "opCancelEdgeDragDesc": "从连接点拖动过程中按 Esc（不会创建连线或节点）",
     "opSelectEdge": "选择连线",
     "opSelectEdgeDesc": "Shift+点击可切换选择（可与节点选择混合）",
     "opEdgeLabel": "连线标签",

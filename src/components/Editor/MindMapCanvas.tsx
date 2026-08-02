@@ -11,6 +11,7 @@ import {
   MarkerType,
   useReactFlow,
   useStore,
+  useStoreApi,
   type NodeChange,
   type EdgeChange,
   type Node,
@@ -69,10 +70,18 @@ export function MindMapCanvas() {
   // 全ルート（ダブルクリック/長押し/ハンドルドラッグ/キーボード）も禁止する判定に使う
   // （docs/decisions.md参照）
   const nodesConnectable = useStore((s) => s.nodesConnectable);
+  // Escapeでの接続キャンセル用にReact Flowストアへ直接アクセスする（connection.inProgress /
+  // cancelConnection はフックとして公開されていないため）
+  const storeApi = useStoreApi();
   const connectingInfo = useRef<{ nodeId: string | null; handleId: string | null }>({
     nodeId: null,
     handleId: null,
   });
+  // ハンドルからのエッジドラッグ中にEscapeでキャンセルされたかどうか。
+  // cancelConnection()を呼んでも進行中のドラッグ（@xyflow/systemのXYHandle）自体は止まらず、
+  // 次のpointermove/pointerupで onConnect / onConnectEnd がドラッグ中の情報のまま発火しうる。
+  // このフラグでエッジ作成・新規ノード作成の両方を打ち切る（decisions.md §55）
+  const connectionCancelledRef = useRef<boolean>(false);
   // ハンドルからエッジを引き伸ばして空白にドロップし新規ノードを作った直後は、その pointerup が
   // paneのclickとして扱われ onPaneClick が発火して選択・編集を解除してしまうことがある
   // （新ノードが「どこにも選択されていない」状態になり、IME入力どころかフォーカスも当たらない）。
@@ -262,13 +271,40 @@ export function MindMapCanvas() {
         nodeId: params.nodeId,
         handleId: params.handleId,
       };
+      connectionCancelledRef.current = false;
     },
     []
   );
 
+  // ハンドルからエッジを引き伸ばしている最中のEscapeで、接続（エッジ作成・空白ドロップでの
+  // 新規ノード作成）をキャンセルする。React Flow自身はEscapeを見ていないため自前で処理する。
+  // 接続中（connection.inProgress）のときだけ拾い、そのときはcapture phaseで伝播を止めて
+  // 他のEscape処理（useKeyboardShortcutsのfinishEdit等）が同時に走らないようにする
+  // （decisions.md §55。回帰テストは e2e/edge-drag-escape-cancel.mjs）
+  useEffect(() => {
+    const handleEscapeDuringConnect = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      const { connection, cancelConnection } = storeApi.getState();
+      if (!connection.inProgress) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      connectionCancelledRef.current = true;
+      connectingInfo.current = { nodeId: null, handleId: null };
+      // 接続線を即座に消す。ドラッグ自体は次のpointermove/pointerupで終わる
+      // （XYHandleはconnection.fromHandleがnullになるとpointerup処理へ進む）
+      cancelConnection();
+    };
+
+    window.addEventListener('keydown', handleEscapeDuringConnect, true);
+    return () => window.removeEventListener('keydown', handleEscapeDuringConnect, true);
+  }, [storeApi]);
+
   // 新しいエッジ接続ハンドラ
   const onConnect = useCallback(
     (connection: Connection) => {
+      // Escapeでキャンセル済みのドラッグでは、ハンドルにスナップしていてもエッジを作らない
+      if (connectionCancelledRef.current) return;
       if (connection.source && connection.target) {
         storeAddEdge(
           connection.source,
@@ -284,6 +320,13 @@ export function MindMapCanvas() {
   // エッジ接続終了時（空白にドロップした場合、新しいノードを作成）
   const onConnectEnd: OnConnectEnd = useCallback(
     (event, connectionState) => {
+      // Escapeでキャンセル済みなら何もせず、次のドラッグに備えてフラグを戻す
+      if (connectionCancelledRef.current) {
+        connectionCancelledRef.current = false;
+        connectingInfo.current = { nodeId: null, handleId: null };
+        return;
+      }
+
       const { nodeId, handleId } = connectingInfo.current;
       if (!nodeId) return;
 

@@ -72,6 +72,8 @@
     "opCreateEdgeDesc": "Drag a handle (blue circle) to another node",
     "opCreateConnectedNode": "Create Connected Node",
     "opCreateConnectedNodeDesc": "Drag a handle and drop on empty canvas",
+    "opCancelEdgeDrag": "Cancel Edge Drag",
+    "opCancelEdgeDragDesc": "Press Esc while dragging from a handle (no edge or node is created)",
     "opSelectEdge": "Select Edge",
     "opSelectEdgeDesc": "Shift+Click to select (toggle) — mixes with node selection",
     "opEdgeLabel": "Edge Label",
