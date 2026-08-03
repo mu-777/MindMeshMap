@@ -157,6 +157,17 @@ ELKに渡すレイアウトオプション自体（INTERACTIVE戦略・spacing�
 | `EDGE_LABEL_INPUT_WIDTH` | `src/components/Editor/CustomEdge.tsx` | 84（px） | 編集中のエッジラベルinputの幅。未指定だとブラウザ既定幅（size=20相当、実測168px）で広すぎるため明示している。エッジラベル入力欄の幅を変えたいときはここだけを変える |
 | `CONTEXT_MENU_GAP` | `src/components/Editor/ContextMenu.tsx` | 8（px） | ノードのコンテキストメニューと対象ノード（anchorRect）/ビューポート端との間に空ける余白。詳細は[decisions.md §47](./decisions.md)参照 |
 
+## エクスポート / インポート（JSONテキスト）
+
+| 定数 | 場所 | 現在値 | 意味 |
+|---|---|---|---|
+| `JSON_INDENT` | `src/utils/exportImport.ts` | 2 | エクスポートするJSONのインデント幅。JSONファイル版とJSONテキスト版で同じ文字列を使う。0にすると1行のminifyになる（テキストエリアでの目視確認は犠牲になる。[decisions.md §58](./decisions.md)参照） |
+| `COPIED_FEEDBACK_MS` | `src/components/Common/JsonTextDialog.tsx` | 2000（ms） | 「クリップボードにコピー」ボタンが「コピーしました」表示のまま留まる時間 |
+| `MIN_SELECTION_FOR_PARTIAL_EXPORT` | `src/components/Common/JsonTextDialog.tsx` | 2 | 「選択したノードのみ」チェックボックスを出す最小の選択ノード数。整列の部分適用（`Toolbar.tsx` の `handleAutoLayout`）と同じ基準にそろえている。[decisions.md §59](./decisions.md)参照 |
+| テキストエリアの高さ | `src/components/Common/JsonTextDialog.tsx` の `h-[40vh]` | 40vh | JSON入出力テキストエリアの高さ（Tailwindクラスで直接指定） |
+| ダイアログ幅 | `src/components/Common/JsonTextDialog.tsx` の `maxWidthClass="max-w-2xl"` | max-w-2xl | JSONテキストダイアログの最大幅。`Modal`の既定は`max-w-lg` |
+| 本文スクロール高 | `src/components/Common/Modal.tsx` の `max-h-[60vh]` | 60vh | モーダル本文のスクロール領域の高さ。操作ボタンは`footer`としてこの外側に固定表示されるので、本文が伸びてもボタンは見切れない（[decisions.md §60](./decisions.md)） |
+
 ## リッチテキスト（ノード内Tiptapエディタ）
 
 | 定数 | 場所 | 現在値 | 意味 |

@@ -4,10 +4,23 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  // 幅を広げたい場合のTailwindのmax-widthクラス（例: JSONテキストの入出力は 'max-w-2xl'）。
+  // Tailwindはクラス名を静的に走査するため、呼び出し側にはリテラルのクラス名を書くこと
+  maxWidthClass?: string;
+  // 操作ボタン等、本文がスクロールしても常に見えていてほしい要素。
+  // 本文（children）のスクロール領域の外側に固定表示する
+  footer?: ReactNode;
   children: ReactNode;
 }
 
-export function Modal({ isOpen, onClose, title, children }: ModalProps) {
+export function Modal({
+  isOpen,
+  onClose,
+  title,
+  maxWidthClass = 'max-w-lg',
+  footer,
+  children,
+}: ModalProps) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -34,7 +47,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
       onClick={onClose}
     >
       <div
-        className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-lg bg-gray-800 shadow-xl"
+        className={`max-h-[80vh] w-full ${maxWidthClass} overflow-hidden rounded-lg bg-gray-800 shadow-xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-gray-700 px-6 py-4">
@@ -59,6 +72,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
           </button>
         </div>
         <div className="max-h-[60vh] overflow-y-auto px-6 py-4">{children}</div>
+        {footer && <div className="border-t border-gray-700 px-6 py-3">{footer}</div>}
       </div>
     </div>
   );

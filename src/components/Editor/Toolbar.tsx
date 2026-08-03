@@ -1,6 +1,5 @@
 import { useCallback, useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useReactFlow } from '@xyflow/react';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useConfirmStore } from '../../stores/confirmStore';
@@ -9,7 +8,8 @@ import { useAutoLayout } from '../../hooks/useAutoLayout';
 import { useAlignAlgorithmDebug } from '../../hooks/useAlignAlgorithmDebug';
 import { useSaveMap } from '../../hooks/useSaveMap';
 import { useExportPng } from '../../hooks/useExportPng';
-import { exportMapAsJson, parseImportedMap } from '../../utils/exportImport';
+import { useImportMap } from '../../hooks/useImportMap';
+import { exportMapAsJson } from '../../utils/exportImport';
 import { LayoutDirection, AlignAlgorithm } from '../../types';
 import { LanguageSwitcher } from '../Common/LanguageSwitcher';
 
@@ -51,22 +51,20 @@ export function Toolbar() {
     createNewMap,
     updateMap,
     setLayoutDirection,
-    setCurrentMap,
-    setDirty,
     undo,
     redo,
     history,
     historyIndex,
   } = useMapStore();
-  const { toggleSidebar, setHelpModalOpen } = useUIStore();
+  const { toggleSidebar, setHelpModalOpen, openJsonTextDialog } = useUIStore();
   const { requestConfirm } = useConfirmStore();
   const { addToast } = useToastStore();
   const { save, isLoading } = useSaveMap();
   const { applyLayout } = useAutoLayout();
+  const { importFromJsonText } = useImportMap();
   // 整列アルゴリズムの切り替え（本番ビルドでは常に既定のsugiyama-port、devのみ切り替え可。docs/align-branch-layout.md参照）
   const [alignAlgorithm, setAlignAlgorithm] = useAlignAlgorithmDebug();
   const { exportPng } = useExportPng();
-  const { fitView } = useReactFlow();
 
   // タイトル編集用のstate
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -203,11 +201,20 @@ export function Toolbar() {
     applyLayout(selectedNodeIds.length >= 2 ? selectedNodeIds : undefined);
   }, [applyLayout]);
 
-  // JSONエクスポート
-  const handleExportJson = useCallback(() => {
+  // JSONファイルとしてエクスポート（ダウンロード）
+  const handleExportJsonFile = useCallback(() => {
     if (!currentMap) return;
     exportMapAsJson(currentMap);
   }, [currentMap]);
+
+  // JSONテキストとしてエクスポート／インポート（クリップボード経由。ダイアログはApp.tsxのJsonTextDialog）
+  const handleExportJsonText = useCallback(() => {
+    openJsonTextDialog('export');
+  }, [openJsonTextDialog]);
+
+  const handleImportJsonText = useCallback(() => {
+    openJsonTextDialog('import');
+  }, [openJsonTextDialog]);
 
   // PNGエクスポート
   const handleExportPng = useCallback(() => {
@@ -215,12 +222,12 @@ export function Toolbar() {
     exportPng();
   }, [currentMap, exportPng]);
 
-  // JSONインポートのファイル選択ダイアログを開く
-  const handleImportClick = useCallback(() => {
+  // JSONファイルのインポート：ファイル選択ダイアログを開く
+  const handleImportJsonFileClick = useCallback(() => {
     importInputRef.current?.click();
   }, []);
 
-  // JSONインポート：ファイル選択後の処理
+  // JSONファイルのインポート：ファイル選択後の処理（検証・未保存確認・反映はuseImportMapが担う）
   const handleImportFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -228,25 +235,18 @@ export function Toolbar() {
       e.target.value = '';
       if (!file) return;
 
-      const text = await file.text();
-      const importedMap = parseImportedMap(text);
-      if (!importedMap) {
-        addToast({ type: 'error', message: t('toast.importFailed') });
+      const outcome = await importFromJsonText(await file.text());
+      if (outcome.status === 'invalid') {
+        addToast({
+          type: 'error',
+          message: t('toast.importFailed', { reason: t(`importError.${outcome.reason}`) }),
+        });
         return;
       }
-
-      if (isDirty) {
-        const confirmed = await requestConfirm(t('dialogs.unsavedChangesContinue'));
-        if (!confirmed) return;
-      }
-
-      // インポートしたマップはDrive未保存の状態として扱う（fileIdなし・isDirty=true）
-      setCurrentMap(importedMap, null);
-      setDirty(true);
+      if (outcome.status !== 'applied') return;
       addToast({ type: 'success', message: t('toast.importSuccess') });
-      setTimeout(() => fitView(), 50);
     },
-    [isDirty, requestConfirm, setCurrentMap, setDirty, addToast, t, fitView]
+    [importFromJsonText, addToast, t]
   );
 
   return (
@@ -360,13 +360,24 @@ export function Toolbar() {
               </div>
               <button
                 onClick={() => {
-                  handleExportJson();
+                  handleExportJsonFile();
                   setIsFileMenuOpen(false);
                 }}
                 disabled={!currentMap}
                 className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {t('toolbar.itemJson')}
+                {t('toolbar.itemJsonFile')}
+              </button>
+              <button
+                onClick={() => {
+                  handleExportJsonText();
+                  setIsFileMenuOpen(false);
+                }}
+                disabled={!currentMap}
+                data-testid="menu-export-json-text"
+                className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t('toolbar.itemJsonText')}
               </button>
               <button
                 onClick={() => {
@@ -387,12 +398,22 @@ export function Toolbar() {
               </div>
               <button
                 onClick={() => {
-                  handleImportClick();
+                  handleImportJsonFileClick();
                   setIsFileMenuOpen(false);
                 }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
               >
-                {t('toolbar.itemJson')}
+                {t('toolbar.itemJsonFile')}
+              </button>
+              <button
+                onClick={() => {
+                  handleImportJsonText();
+                  setIsFileMenuOpen(false);
+                }}
+                data-testid="menu-import-json-text"
+                className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
+              >
+                {t('toolbar.itemJsonText')}
               </button>
             </div>
           )}
@@ -610,13 +631,24 @@ export function Toolbar() {
               </div>
               <button
                 onClick={() => {
-                  handleExportJson();
+                  handleExportJsonFile();
                   setIsToolMenuOpen(false);
                 }}
                 disabled={!currentMap}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {t('toolbar.itemJson')}
+                {t('toolbar.itemJsonFile')}
+              </button>
+              <button
+                onClick={() => {
+                  handleExportJsonText();
+                  setIsToolMenuOpen(false);
+                }}
+                disabled={!currentMap}
+                data-testid="menu-mobile-export-json-text"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t('toolbar.itemJsonText')}
               </button>
               <button
                 onClick={() => {
@@ -637,12 +669,22 @@ export function Toolbar() {
               </div>
               <button
                 onClick={() => {
-                  handleImportClick();
+                  handleImportJsonFileClick();
                   setIsToolMenuOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
               >
-                {t('toolbar.itemJson')}
+                {t('toolbar.itemJsonFile')}
+              </button>
+              <button
+                onClick={() => {
+                  handleImportJsonText();
+                  setIsToolMenuOpen(false);
+                }}
+                data-testid="menu-mobile-import-json-text"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
+              >
+                {t('toolbar.itemJsonText')}
               </button>
 
               <div className="my-1 h-px bg-gray-700" />

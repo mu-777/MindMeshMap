@@ -27,7 +27,8 @@
     "fileMenu": "ファイル",
     "sectionExport": "エクスポート",
     "sectionImport": "インポート",
-    "itemJson": "JSON",
+    "itemJsonFile": "JSONファイル",
+    "itemJsonText": "JSONテキスト",
     "itemPng": "PNG画像"
   },
   "auth": {
@@ -142,13 +143,36 @@
     "loadFailed": "マップの読み込みに失敗しました",
     "deleteFailed": "削除に失敗しました"
   },
+  "jsonText": {
+    "exportTitle": "JSONテキストをエクスポート",
+    "importTitle": "JSONテキストをインポート",
+    "exportHint": "テキストを選択してコピーするか、「クリップボードにコピー」を押してください。",
+    "onlySelected": "選択したノードのみ（{{n}}個）",
+    "onlySelectedHint": "選択外のノードにつながるエッジは含まれません。",
+    "importHint": "JSONテキストを貼り付けるか直接入力して、「読み込む」を押してください（Ctrl+Enter）。",
+    "targetReplace": "新しいマップとして開く（今のマップは置き換わります）",
+    "targetAppend": "今のマップに追加する",
+    "targetAppendHint": "別のツリーとして、JSONの座標のまま追加します。既存のノードと位置が重なることがあります。追加したノードは選択状態になるので、そのままドラッグや整列で動かせます。",
+    "importPlaceholder": "ここにJSONを貼り付け…",
+    "copy": "クリップボードにコピー",
+    "copied": "コピーしました",
+    "copyFailed": "クリップボードにコピーできませんでした。テキストを選択して手動でコピーしてください。",
+    "load": "読み込む"
+  },
+  "importError": {
+    "empty": "JSONテキストが空です",
+    "invalidJson": "JSONとして読み取れません（構文エラー）",
+    "invalidShape": "マップの形式が正しくありません（name / nodes / edges を確認してください）",
+    "danglingEdge": "存在しないノードを参照しているエッジがあります"
+  },
   "toast": {
     "localSaved": "この端末に保存しました",
     "migratedToDrive": "Google Drive に保存しました",
     "alreadySaved": "保存済みです",
     "sessionExpired": "ログインの有効期限が切れました。再ログインしてください。",
     "importSuccess": "マップをインポートしました",
-    "importFailed": "マップのインポートに失敗しました。ファイル形式が正しくありません。",
+    "importAppendSuccess": "マップに{{n}}個のノードを追加しました",
+    "importFailed": "マップのインポートに失敗しました：{{reason}}",
     "exportPngFailed": "PNGのエクスポートに失敗しました"
   }
 }

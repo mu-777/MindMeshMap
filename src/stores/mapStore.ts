@@ -47,6 +47,10 @@ interface MapState {
   // ノードと明示指定エッジを1回の履歴エントリでまとめて削除する（複数選択のDelete一括削除用）。
   // ノードに接続するエッジは自動的に連鎖削除される（deleteNode/deleteNodesと同様）
   deleteNodesAndEdges: (nodeIds: string[], edgeIds: string[]) => void;
+  // ノード群とエッジ群を、既存のマップに1回の履歴エントリでまとめて追加する
+  // （JSONテキストの「今のマップに追加」インポート用。docs/decisions.md §60）。
+  // ID・座標はそのまま使うので、呼び出し側でID衝突を解消しておくこと
+  appendNodesAndEdges: (nodes: MapNode[], edges: MapEdge[]) => void;
   updateNodePositions: (positions: { id: string; position: { x: number; y: number } }[]) => void;
 
   // エッジ操作
@@ -374,6 +378,25 @@ export const useMapStore = create<MapState>((set, get) => ({
             !nodeDeleteSet.has(edge.target) &&
             !edgeDeleteSet.has(edge.id)
         ),
+        updatedAt: new Date().toISOString(),
+      },
+      isDirty: true,
+    });
+  },
+
+  appendNodesAndEdges: (nodes, edges) => {
+    const { currentMap, saveToHistory } = get();
+    if (!currentMap || nodes.length === 0) return;
+
+    saveToHistory();
+
+    // 既存のノード・エッジには一切触れず、末尾に足すだけ（マージ・重複排除はしない）。
+    // 追加分は独立した別のツリーになり、座標もそのまま使うので既存ノードと重なることがある
+    set({
+      currentMap: {
+        ...currentMap,
+        nodes: [...currentMap.nodes, ...nodes],
+        edges: [...currentMap.edges, ...edges],
         updatedAt: new Date().toISOString(),
       },
       isDirty: true,

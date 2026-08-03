@@ -37,12 +37,14 @@ export function useKeyboardShortcuts() {
         lastSelectedNodeId,
         editingNodeId,
         isHelpModalOpen,
+        jsonTextDialogMode,
         deletedFocusAnchor,
       } = useUIStore.getState();
 
-      // ヘルプモーダル表示中（キーバインドキャプチャ含む）・確認ダイアログ表示中は
-      // グローバルショートカットを無効化する（Delete等の誤発火を防ぐ）
-      if (isHelpModalOpen || isConfirmDialogOpen) {
+      // ヘルプモーダル表示中（キーバインドキャプチャ含む）・確認ダイアログ表示中・
+      // JSONテキスト入出力ダイアログ表示中はグローバルショートカットを無効化する
+      // （Delete等の誤発火や、テキストエリアへの入力でノード編集が始まるのを防ぐ）
+      if (isHelpModalOpen || isConfirmDialogOpen || jsonTextDialogMode) {
         return;
       }
 

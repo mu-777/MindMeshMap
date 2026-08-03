@@ -5,6 +5,7 @@ import { MapList } from './components/Sidebar/MapList';
 import { KeyboardShortcutHelp } from './components/Common/KeyboardShortcutHelp';
 import { ToastContainer } from './components/Common/ToastContainer';
 import { ConfirmDialog } from './components/Common/ConfirmDialog';
+import { JsonTextDialog } from './components/Common/JsonTextDialog';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useUnloadGuard } from './hooks/useUnloadGuard';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -42,6 +43,9 @@ function AppContent() {
       {isHelpModalOpen && (
         <KeyboardShortcutHelp onClose={() => setHelpModalOpen(false)} />
       )}
+
+      {/* JSONテキストの入出力ダイアログ（開閉はuiStoreのjsonTextDialogMode） */}
+      <JsonTextDialog />
 
       {/* トースト通知 */}
       <ToastContainer />

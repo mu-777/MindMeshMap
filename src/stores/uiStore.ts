@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { UIState } from '../types';
 
+// JSONテキストの入出力ダイアログの状態。開いている間はグローバルショートカットを
+// 無効化する必要があるため（テキストエリアへの入力がノード編集開始やDelete削除を
+// 誘発しないように。useKeyboardShortcuts参照）、ローカルstateではなくここで持つ
+export type JsonTextDialogMode = 'export' | 'import';
+
 export interface ContextMenuState {
   type: 'node' | 'edge';
   id: string;
@@ -18,6 +23,8 @@ interface UIStoreState extends UIState {
   // （単独クリックは常にラベル編集モードを開く。docs/decisions.md参照）
   selectedEdgeIds: string[];
   contextMenu: ContextMenuState | null;
+  // nullなら閉じている
+  jsonTextDialogMode: JsonTextDialogMode | null;
   // Drive保存が成功するたびにインクリメントするカウンタ。
   // MapListの一覧取得useEffectの依存に加えることで、保存後に一覧（名前・更新日時）を再取得させる
   mapListVersion: number;
@@ -39,6 +46,8 @@ interface UIStoreState extends UIState {
   toggleSidebar: () => void;
   setHelpModalOpen: (open: boolean) => void;
   toggleHelpModal: () => void;
+  openJsonTextDialog: (mode: JsonTextDialogMode) => void;
+  closeJsonTextDialog: () => void;
   openContextMenu: (
     type: 'node' | 'edge',
     id: string,
@@ -59,6 +68,7 @@ export const useUIStore = create<UIStoreState>((set) => ({
   isSidebarOpen: true,
   isHelpModalOpen: false,
   contextMenu: null,
+  jsonTextDialogMode: null,
   mapListVersion: 0,
   deletedFocusAnchor: null,
 
@@ -174,6 +184,10 @@ export const useUIStore = create<UIStoreState>((set) => ({
   setHelpModalOpen: (open) => set({ isHelpModalOpen: open }),
 
   toggleHelpModal: () => set((state) => ({ isHelpModalOpen: !state.isHelpModalOpen })),
+
+  openJsonTextDialog: (mode) => set({ jsonTextDialogMode: mode }),
+
+  closeJsonTextDialog: () => set({ jsonTextDialogMode: null }),
 
   openContextMenu: (type, id, x, y, anchorRect) => set({ contextMenu: { type, id, x, y, anchorRect } }),
 

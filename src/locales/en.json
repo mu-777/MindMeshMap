@@ -27,7 +27,8 @@
     "fileMenu": "File",
     "sectionExport": "Export",
     "sectionImport": "Import",
-    "itemJson": "JSON",
+    "itemJsonFile": "JSON file",
+    "itemJsonText": "JSON text",
     "itemPng": "PNG image"
   },
   "auth": {
@@ -152,13 +153,36 @@
     "loadFailed": "Failed to load map",
     "deleteFailed": "Failed to delete"
   },
+  "jsonText": {
+    "exportTitle": "Export as JSON text",
+    "importTitle": "Import from JSON text",
+    "exportHint": "Select the text to copy it, or press \"Copy to clipboard\".",
+    "onlySelected": "Only selected nodes ({{n}})",
+    "onlySelectedHint": "Edges connected to unselected nodes are not included.",
+    "importHint": "Paste or type JSON text, then press \"Load\" (Ctrl+Enter).",
+    "targetReplace": "Open as a new map (replaces the current map)",
+    "targetAppend": "Add to the current map",
+    "targetAppendHint": "Added as a separate tree at the coordinates in the JSON, so it may overlap existing nodes. The added nodes are selected, so you can drag or align them right away.",
+    "importPlaceholder": "Paste JSON here...",
+    "copy": "Copy to clipboard",
+    "copied": "Copied",
+    "copyFailed": "Could not copy to the clipboard. Please select the text and copy it manually.",
+    "load": "Load"
+  },
+  "importError": {
+    "empty": "The JSON text is empty",
+    "invalidJson": "Not valid JSON (syntax error)",
+    "invalidShape": "Not a valid map (check name / nodes / edges)",
+    "danglingEdge": "Some edges refer to nodes that do not exist"
+  },
   "toast": {
     "localSaved": "Saved to this device",
     "migratedToDrive": "Saved to Google Drive",
     "alreadySaved": "Already saved",
     "sessionExpired": "Your login session has expired. Please sign in again.",
     "importSuccess": "Map imported successfully",
-    "importFailed": "Failed to import map. The file format is invalid.",
+    "importAppendSuccess": "Added {{n}} nodes to the map",
+    "importFailed": "Failed to import the map: {{reason}}",
     "exportPngFailed": "Failed to export PNG"
   }
 }

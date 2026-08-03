@@ -27,7 +27,8 @@
     "fileMenu": "文件",
     "sectionExport": "导出",
     "sectionImport": "导入",
-    "itemJson": "JSON",
+    "itemJsonFile": "JSON 文件",
+    "itemJsonText": "JSON 文本",
     "itemPng": "PNG图片"
   },
   "auth": {
@@ -142,13 +143,36 @@
     "loadFailed": "加载地图失败",
     "deleteFailed": "删除失败"
   },
+  "jsonText": {
+    "exportTitle": "导出为 JSON 文本",
+    "importTitle": "从 JSON 文本导入",
+    "exportHint": "选中文本进行复制，或点击“复制到剪贴板”。",
+    "onlySelected": "仅选中的节点（{{n}} 个）",
+    "onlySelectedHint": "与未选中节点相连的连线不会包含在内。",
+    "importHint": "粘贴或直接输入 JSON 文本，然后点击“载入”（Ctrl+Enter）。",
+    "targetReplace": "作为新地图打开（会替换当前地图）",
+    "targetAppend": "添加到当前地图",
+    "targetAppendHint": "将按 JSON 中的坐标作为独立的树添加，可能与现有节点重叠。添加的节点会处于选中状态，可直接拖动或对齐。",
+    "importPlaceholder": "在此粘贴 JSON…",
+    "copy": "复制到剪贴板",
+    "copied": "已复制",
+    "copyFailed": "无法复制到剪贴板。请选中文本手动复制。",
+    "load": "载入"
+  },
+  "importError": {
+    "empty": "JSON 文本为空",
+    "invalidJson": "无法解析为 JSON（语法错误）",
+    "invalidShape": "地图格式不正确（请检查 name / nodes / edges）",
+    "danglingEdge": "存在引用了不存在节点的连线"
+  },
   "toast": {
     "localSaved": "已保存到本机",
     "migratedToDrive": "已保存到 Google Drive",
     "alreadySaved": "已保存",
     "sessionExpired": "登录会话已过期，请重新登录。",
     "importSuccess": "地图导入成功",
-    "importFailed": "导入地图失败。文件格式无效。",
+    "importAppendSuccess": "已向地图添加 {{n}} 个节点",
+    "importFailed": "导入地图失败：{{reason}}",
     "exportPngFailed": "导出PNG失败"
   }
 }
