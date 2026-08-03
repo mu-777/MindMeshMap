@@ -17,6 +17,7 @@ export const ALGORITHMS = [
   'elk-port',
   'elk-port-ext',
   'elk-port-pava',
+  'hola-lite',
 ];
 
 export const CONTRACTS = {
@@ -43,6 +44,10 @@ export const CONTRACTS = {
   // ポート制約は取り付き面だけを制御し流れ方向は変えないため、HANDLE_DIRECTIONは契約に入れない
   // （docs/align-branch-layout.md「方針G'」）
   'elk-port-pava': [INVARIANT_CODES.NODE_OVERLAP],
+  // 方針I: HOLAの最小構成再実装。強制フォレスト（＝unambiguousTreeEdgesと同じ集合）を
+  // ハンドルの向きどおりに置き、成分の箱は重ならないよう押し離すので、この2つを保証する
+  // （docs/align-branch-layout.md「方針I」）
+  'hola-lite': [INVARIANT_CODES.NODE_OVERLAP, INVARIANT_CODES.HANDLE_DIRECTION],
 };
 
 /** 全アルゴリズム共通で必ず守るもの（座標が返らない・壊れている、は契約以前の問題） */

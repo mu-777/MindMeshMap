@@ -21,7 +21,8 @@ export type AlignAlgorithm =
   | 'sugiyama-port'
   | 'elk-port'
   | 'elk-port-ext'
-  | 'elk-port-pava';
+  | 'elk-port-pava'
+  | 'hola-lite';
 
 // ノード
 export interface MapNode {

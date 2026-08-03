@@ -501,6 +501,7 @@ export function Toolbar() {
             <option value="elk-port">elk-port</option>
             <option value="elk-port-ext">elk-port-ext</option>
             <option value="elk-port-pava">elk-port-pava</option>
+            <option value="hola-lite">hola-lite</option>
           </select>
         )}
 

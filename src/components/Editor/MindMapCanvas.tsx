@@ -28,6 +28,7 @@ import { useMapStore, loadDraft } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { isFirstVisit, markAsVisited, createDefaultMap } from '../../data/defaultMap';
 import { EMPTY_NODE_CONTENT, EMPTY_NODE_WIDTH, EMPTY_NODE_HEIGHT } from '../../utils/nodeContent';
+import { DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT } from '../../utils/sugiyamaExtLayout';
 import { getUndirectedShortestPath } from '../../utils/graphTraversal';
 
 const nodeTypes = {
@@ -64,7 +65,7 @@ export function MindMapCanvas() {
     saveToHistory,
   } = useMapStore();
   const { selectedNodeId, selectedNodeIds, selectedEdgeIds, setSelectedNodeId, toggleNodeSelection, addNodesToSelection, setMultiSelection, clearMultiSelection, clearEdgeSelection, setEditingNodeId, closeContextMenu } = useUIStore();
-  const { screenToFlowPosition, fitView, getViewport } = useReactFlow();
+  const { screenToFlowPosition, fitView, getViewport, getNodes } = useReactFlow();
   // Controls左下の「Toggle interactivity」ロック状態。ロック中はnodesDraggable/elementsSelectableと
   // 一緒にnodesConnectableもfalseになる。ロック中はエッジ接続だけでなく新規ノード作成の
   // 全ルート（ダブルクリック/長押し/ハンドルドラッグ/キーボード）も禁止する判定に使う
@@ -375,31 +376,48 @@ export function MindMapCanvas() {
       const isOverNode = elementAtPoint?.closest('.react-flow__node') !== null;
 
       if (targetIsPane || (!isOverNode && elementAtPoint?.closest('.react-flow'))) {
-        // レイアウト方向とドラッグ開始ハンドルに応じて、新規ノード側の受け口を決める。
-        // 既定は backward 面（RIGHT:left / DOWN:top）で受けるが、**引き伸ばし始めた面が
-        // backward だったときだけは forward 面（RIGHT:right / DOWN:bottom）で受ける**。
-        // こうするとエッジが「親のbackward面 → 子のforward面」になり、エッジが親側へ
-        // 折り返さない見た目になる。レイアウト側の解釈（ソース面がbackwardなら子を1層
-        // 後退させる。sugiyamaExtLayout.ts handleRole/roleDelta）とも整合し、
-        // targetHandle 未設定時の既定＝ソース面の反対面（sugiyamaPortLayout.ts
-        // targetSideOf / elkPortLayout.ts）と同じ組み合わせになる。
-        // cross面（RIGHT:top/bottom）起点は流れ方向としては前進する扱い（roleDelta=0.5）なので
-        // 従来どおりbackward面で受ける（decisions.md §52。回帰テストは e2e/edge-drop-handle-side.mjs）
+        // 新規ノードの受け口と位置は、**どのハンドルから引き伸ばしたかではなく、
+        // ドロップ点が開始ハンドルより primary 方向のどちら側かで決める**
+        // （decisions.md §52。回帰テストは e2e/edge-drop-handle-side.mjs）:
+        //   forward 側（RIGHT:ハンドルより右 / DOWN:下）へ離した … 受け口=backward面、
+        //                                                        ドロップ点=新規ノードのbackward面
+        //   backward 側（RIGHT:ハンドルより左 / DOWN:上）へ離した … 受け口=forward面、
+        //                                                        ドロップ点=新規ノードのforward面
+        // どちらも「ポインタはエッジが入ってくる面」「ノードは引き伸ばした向きへ伸びる」で一貫し、
+        // エッジが新規ノードを回り込んで折り返す形にならない。cross面（RIGHT:top/bottom）起点も
+        // 同じ規則で、ハンドルの primary 座標（＝ノードの中心）を基準に判定する
         const direction = currentMap.layoutDirection;
         const forwardHandle = direction === 'RIGHT' ? 'right' : 'bottom';
         const backwardHandle = direction === 'RIGHT' ? 'left' : 'top';
         const sourceHandle = handleId || forwardHandle;
-        const isBackwardDrag = sourceHandle === backwardHandle;
-        const targetHandle = isBackwardDrag ? forwardHandle : backwardHandle;
 
-        // 新規ノードの位置。React Flowの位置は左上基準なので、ドロップ点はそのままだと
-        // 常に新規ノードのbackward面（RIGHT:左端 / DOWN:上端）になる。**backward面から
-        // 引き伸ばしたときは、受け口と同じくドロップ点が forward 面（RIGHT:右端 /
-        // DOWN:下端）になるように primary 方向へ1ノード分ずらす**（＝ポインタから
-        // 引き伸ばした向きへノードが伸びる）。作成直後の空ノードはReact Flowの実測が
-        // まだ無いため、空ノードの実寸定数（nodeContent.ts）を使う
+        // 開始ハンドルの primary 座標（flow座標）。ノードの実測サイズはReact Flow側が持つ
+        // （node.measured）。実測が無い場合だけ既定サイズにフォールバックする
+        const rfSourceNode = getNodes().find((n) => n.id === nodeId);
+        const sourceNode = currentMap.nodes.find((n) => n.id === nodeId);
+        const sourcePosition = rfSourceNode?.position ?? sourceNode?.position ?? { x: 0, y: 0 };
+        const sourceSizePrimary =
+          direction === 'RIGHT'
+            ? rfSourceNode?.measured?.width ?? DEFAULT_NODE_WIDTH
+            : rfSourceNode?.measured?.height ?? DEFAULT_NODE_HEIGHT;
+        const sourcePrimary = direction === 'RIGHT' ? sourcePosition.x : sourcePosition.y;
+        // forward面のハンドルはノードの前端、backward面は後端、cross面は中央にある
+        const handlePrimary =
+          sourceHandle === forwardHandle
+            ? sourcePrimary + sourceSizePrimary
+            : sourceHandle === backwardHandle
+              ? sourcePrimary
+              : sourcePrimary + sourceSizePrimary / 2;
+
+        // ドロップ点。React Flowの位置は左上基準なので、そのままだと常に新規ノードの
+        // backward面（RIGHT:左端 / DOWN:上端）になる。backward側へ離したときは primary 方向へ
+        // 1ノード分ずらしてドロップ点を forward 面（RIGHT:右端 / DOWN:下端）にする。
+        // 作成直後の空ノードはReact Flowの実測がまだ無いため、空ノードの実寸定数（nodeContent.ts）を使う
         const position = screenToFlowPosition({ x: clientX, y: clientY });
-        if (isBackwardDrag) {
+        const dropPrimary = direction === 'RIGHT' ? position.x : position.y;
+        const isBackwardDrop = dropPrimary < handlePrimary;
+        const targetHandle = isBackwardDrop ? forwardHandle : backwardHandle;
+        if (isBackwardDrop) {
           if (direction === 'RIGHT') {
             position.x -= EMPTY_NODE_WIDTH;
           } else {
@@ -438,6 +456,7 @@ export function MindMapCanvas() {
     [
       nodesConnectable,
       screenToFlowPosition,
+      getNodes,
       addNode,
       setSelectedNodeId,
       setEditingNodeId,

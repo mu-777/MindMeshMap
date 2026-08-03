@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-29T20:24:33.570Z",
+  "updatedAt": "2026-08-02T15:04:28.796Z",
   "entries": {
     "a-right|uniform": {
       "nodeOverlapPairs": 0,
@@ -112,6 +112,20 @@
       "edgeLenCv": 0,
       "moveMean": 13.333333,
       "moveMax": 20,
+      "siblingInversion": 0
+    },
+    "a-right|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 53.76,
+      "aspectRatio": 3.28125,
+      "fillRatio": 0.602679,
+      "edgeLenCv": 0,
+      "moveMean": 30.118285,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-left|uniform": {
@@ -226,6 +240,20 @@
       "moveMax": 20,
       "siblingInversion": 0
     },
+    "a-left|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 53.76,
+      "aspectRatio": 3.28125,
+      "fillRatio": 0.602679,
+      "edgeLenCv": 0,
+      "moveMean": 30.118285,
+      "moveMax": 45.177428,
+      "siblingInversion": 0
+    },
     "a-right-left|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -338,6 +366,20 @@
       "moveMax": 40,
       "siblingInversion": 0
     },
+    "a-right-left|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 84.48,
+      "aspectRatio": 5.15625,
+      "fillRatio": 0.639205,
+      "edgeLenCv": 0,
+      "moveMean": 36.141942,
+      "moveMax": 45.177428,
+      "siblingInversion": 0
+    },
     "a-top|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -400,12 +442,12 @@
       "handleMismatch": 0,
       "edgeCrossings": 0,
       "edgeThroughNode": 1,
-      "areaKpx2": 64.8,
-      "aspectRatio": 1.62,
-      "fillRatio": 0.5,
-      "edgeLenCv": 0.065949,
-      "moveMean": 110.606769,
-      "moveMax": 254,
+      "areaKpx2": 61.2,
+      "aspectRatio": 1.53,
+      "fillRatio": 0.529412,
+      "edgeLenCv": 0.082915,
+      "moveMean": 102.601764,
+      "moveMax": 236,
       "siblingInversion": 0
     },
     "a-top|elk-port": {
@@ -448,6 +490,20 @@
       "edgeLenCv": 0,
       "moveMean": 151.747249,
       "moveMax": 300,
+      "siblingInversion": 0
+    },
+    "a-top|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 66.24,
+      "aspectRatio": 2.044444,
+      "fillRatio": 0.48913,
+      "edgeLenCv": 0,
+      "moveMean": 17.074998,
+      "moveMax": 25.612497,
       "siblingInversion": 0
     },
     "a-right-top|uniform": {
@@ -515,9 +571,9 @@
       "areaKpx2": 112.56,
       "aspectRatio": 1.567164,
       "fillRatio": 0.479744,
-      "edgeLenCv": 0.427413,
-      "moveMean": 79.227603,
-      "moveMax": 256.265487,
+      "edgeLenCv": 0.392694,
+      "moveMean": 73.637372,
+      "moveMax": 238.436574,
       "siblingInversion": 0
     },
     "a-right-top|elk-port": {
@@ -560,6 +616,20 @@
       "edgeLenCv": 0.464344,
       "moveMean": 151.626882,
       "moveMax": 300,
+      "siblingInversion": 0
+    },
+    "a-right-top|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 109.996,
+      "aspectRatio": 2.401869,
+      "fillRatio": 0.490927,
+      "edgeLenCv": 0.235776,
+      "moveMean": 28.31597,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-left-top|uniform": {
@@ -624,12 +694,12 @@
       "handleMismatch": 0,
       "edgeCrossings": 0,
       "edgeThroughNode": 1,
-      "areaKpx2": 151.152,
-      "aspectRatio": 2.104478,
-      "fillRatio": 0.357256,
-      "edgeLenCv": 0.427413,
-      "moveMean": 79.227603,
-      "moveMax": 256.265487,
+      "areaKpx2": 146.328,
+      "aspectRatio": 2.037313,
+      "fillRatio": 0.369034,
+      "edgeLenCv": 0.392694,
+      "moveMean": 73.637372,
+      "moveMax": 238.436574,
       "siblingInversion": 0
     },
     "a-left-top|elk-port": {
@@ -672,6 +742,20 @@
       "edgeLenCv": 0.464344,
       "moveMean": 75.461581,
       "moveMax": 170,
+      "siblingInversion": 0
+    },
+    "a-left-top|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 109.996,
+      "aspectRatio": 2.401869,
+      "fillRatio": 0.490927,
+      "edgeLenCv": 0.235776,
+      "moveMean": 28.31597,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-right-left-top|uniform": {
@@ -739,9 +823,9 @@
       "areaKpx2": 176.88,
       "aspectRatio": 2.462687,
       "fillRatio": 0.427408,
-      "edgeLenCv": 0.464645,
-      "moveMean": 69.498982,
-      "moveMax": 256.265487,
+      "edgeLenCv": 0.418405,
+      "moveMean": 65.50596,
+      "moveMax": 238.436574,
       "siblingInversion": 0
     },
     "a-right-left-top|elk-port": {
@@ -784,6 +868,20 @@
       "edgeLenCv": 0.527637,
       "moveMean": 66.373669,
       "moveMax": 170,
+      "siblingInversion": 0
+    },
+    "a-right-left-top|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 141.24,
+      "aspectRatio": 3.084112,
+      "fillRatio": 0.535259,
+      "edgeLenCv": 0.241253,
+      "moveMean": 33.133529,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-bottom|uniform": {
@@ -848,12 +946,12 @@
       "handleMismatch": 0,
       "edgeCrossings": 0,
       "edgeThroughNode": 1,
-      "areaKpx2": 64.8,
-      "aspectRatio": 1.62,
-      "fillRatio": 0.5,
-      "edgeLenCv": 0.065949,
-      "moveMean": 99.156388,
-      "moveMax": 263.469163,
+      "areaKpx2": 61.2,
+      "aspectRatio": 1.53,
+      "fillRatio": 0.529412,
+      "edgeLenCv": 0.082915,
+      "moveMean": 87.387516,
+      "moveMax": 246.162548,
       "siblingInversion": 0
     },
     "a-bottom|elk-port": {
@@ -896,6 +994,20 @@
       "edgeLenCv": 0,
       "moveMean": 164.218306,
       "moveMax": 302.654919,
+      "siblingInversion": 0
+    },
+    "a-bottom|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 66.24,
+      "aspectRatio": 2.044444,
+      "fillRatio": 0.48913,
+      "edgeLenCv": 0,
+      "moveMean": 17.074998,
+      "moveMax": 25.612497,
       "siblingInversion": 0
     },
     "a-right-bottom|uniform": {
@@ -963,9 +1075,9 @@
       "areaKpx2": 112.56,
       "aspectRatio": 1.567164,
       "fillRatio": 0.479744,
-      "edgeLenCv": 0.427413,
-      "moveMean": 78.995323,
-      "moveMax": 256.538496,
+      "edgeLenCv": 0.392694,
+      "moveMean": 73.332283,
+      "moveMax": 238.729973,
       "siblingInversion": 0
     },
     "a-right-bottom|elk-port": {
@@ -1008,6 +1120,20 @@
       "edgeLenCv": 0.464344,
       "moveMean": 146.185987,
       "moveMax": 301.039864,
+      "siblingInversion": 0
+    },
+    "a-right-bottom|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 109.996,
+      "aspectRatio": 2.401869,
+      "fillRatio": 0.490927,
+      "edgeLenCv": 0.235776,
+      "moveMean": 28.31597,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-left-bottom|uniform": {
@@ -1072,12 +1198,12 @@
       "handleMismatch": 0,
       "edgeCrossings": 0,
       "edgeThroughNode": 1,
-      "areaKpx2": 151.152,
-      "aspectRatio": 2.104478,
-      "fillRatio": 0.357256,
-      "edgeLenCv": 0.427413,
-      "moveMean": 78.995323,
-      "moveMax": 256.538496,
+      "areaKpx2": 146.328,
+      "aspectRatio": 2.037313,
+      "fillRatio": 0.369034,
+      "edgeLenCv": 0.392694,
+      "moveMean": 73.332283,
+      "moveMax": 238.729973,
       "siblingInversion": 0
     },
     "a-left-bottom|elk-port": {
@@ -1120,6 +1246,20 @@
       "edgeLenCv": 0.464344,
       "moveMean": 66.520223,
       "moveMax": 171.828403,
+      "siblingInversion": 0
+    },
+    "a-left-bottom|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 109.996,
+      "aspectRatio": 2.401869,
+      "fillRatio": 0.490927,
+      "edgeLenCv": 0.235776,
+      "moveMean": 28.31597,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-right-left-bottom|uniform": {
@@ -1187,9 +1327,9 @@
       "areaKpx2": 176.88,
       "aspectRatio": 2.462687,
       "fillRatio": 0.427408,
-      "edgeLenCv": 0.464645,
-      "moveMean": 69.333067,
-      "moveMax": 256.538496,
+      "edgeLenCv": 0.418405,
+      "moveMean": 65.288039,
+      "moveMax": 238.729973,
       "siblingInversion": 0
     },
     "a-right-left-bottom|elk-port": {
@@ -1232,6 +1372,20 @@
       "edgeLenCv": 0.527637,
       "moveMean": 59.099538,
       "moveMax": 171.828403,
+      "siblingInversion": 0
+    },
+    "a-right-left-bottom|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 141.24,
+      "aspectRatio": 3.084112,
+      "fillRatio": 0.535259,
+      "edgeLenCv": 0.241253,
+      "moveMean": 33.133529,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-top-bottom|uniform": {
@@ -1296,12 +1450,12 @@
       "handleMismatch": 0,
       "edgeCrossings": 0,
       "edgeThroughNode": 2,
-      "areaKpx2": 110.16,
-      "aspectRatio": 1.049383,
-      "fillRatio": 0.490196,
-      "edgeLenCv": 0.065949,
-      "moveMean": 125.857894,
-      "moveMax": 263.469163,
+      "areaKpx2": 104.04,
+      "aspectRatio": 1.111111,
+      "fillRatio": 0.519031,
+      "edgeLenCv": 0.082915,
+      "moveMean": 113.993568,
+      "moveMax": 246.162548,
       "siblingInversion": 0
     },
     "a-top-bottom|elk-port": {
@@ -1344,6 +1498,20 @@
       "edgeLenCv": 0,
       "moveMean": 169.145048,
       "moveMax": 310.483494,
+      "siblingInversion": 0
+    },
+    "a-top-bottom|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 110.4,
+      "aspectRatio": 1.226667,
+      "fillRatio": 0.48913,
+      "edgeLenCv": 0,
+      "moveMean": 20.489998,
+      "moveMax": 25.612497,
       "siblingInversion": 0
     },
     "a-right-top-bottom|uniform": {
@@ -1411,9 +1579,9 @@
       "areaKpx2": 171.36,
       "aspectRatio": 1.029412,
       "fillRatio": 0.441176,
-      "edgeLenCv": 0.358646,
-      "moveMean": 100.108539,
-      "moveMax": 256.538496,
+      "edgeLenCv": 0.33631,
+      "moveMean": 92.070489,
+      "moveMax": 238.729973,
       "siblingInversion": 0
     },
     "a-right-top-bottom|elk-port": {
@@ -1456,6 +1624,20 @@
       "edgeLenCv": 0.387017,
       "moveMean": 157.281605,
       "moveMax": 304.138127,
+      "siblingInversion": 0
+    },
+    "a-right-top-bottom|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 154.2,
+      "aspectRatio": 1.713333,
+      "fillRatio": 0.490272,
+      "edgeLenCv": 0.206095,
+      "moveMean": 27.543549,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-left-top-bottom|uniform": {
@@ -1520,12 +1702,12 @@
       "handleMismatch": 0,
       "edgeCrossings": 0,
       "edgeThroughNode": 2,
-      "areaKpx2": 230.112,
-      "aspectRatio": 1.382353,
-      "fillRatio": 0.328536,
-      "edgeLenCv": 0.358646,
-      "moveMean": 100.108539,
-      "moveMax": 256.538496,
+      "areaKpx2": 222.768,
+      "aspectRatio": 1.338235,
+      "fillRatio": 0.339367,
+      "edgeLenCv": 0.33631,
+      "moveMean": 92.070489,
+      "moveMax": 238.729973,
       "siblingInversion": 0
     },
     "a-left-top-bottom|elk-port": {
@@ -1568,6 +1750,20 @@
       "edgeLenCv": 0.387017,
       "moveMean": 100.774716,
       "moveMax": 177.200451,
+      "siblingInversion": 0
+    },
+    "a-left-top-bottom|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 154.2,
+      "aspectRatio": 1.713333,
+      "fillRatio": 0.490272,
+      "edgeLenCv": 0.206095,
+      "moveMean": 27.543549,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-right-left-top-bottom|uniform": {
@@ -1635,9 +1831,9 @@
       "areaKpx2": 269.28,
       "aspectRatio": 1.617647,
       "fillRatio": 0.360963,
-      "edgeLenCv": 0.427413,
-      "moveMean": 87.901626,
-      "moveMax": 256.538496,
+      "edgeLenCv": 0.392694,
+      "moveMean": 81.649809,
+      "moveMax": 238.729973,
       "siblingInversion": 0
     },
     "a-right-left-top-bottom|elk-port": {
@@ -1680,6 +1876,20 @@
       "edgeLenCv": 0.485634,
       "moveMean": 88.093307,
       "moveMax": 177.200451,
+      "siblingInversion": 0
+    },
+    "a-right-left-top-bottom|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 198,
+      "aspectRatio": 2.2,
+      "fillRatio": 0.490909,
+      "edgeLenCv": 0.235776,
+      "moveMean": 31.462189,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-count1|uniform": {
@@ -1747,9 +1957,9 @@
       "areaKpx2": 54.6,
       "aspectRatio": 3.230769,
       "fillRatio": 0.593407,
-      "edgeLenCv": 0.412763,
-      "moveMean": 110.492172,
-      "moveMax": 263.469163,
+      "edgeLenCv": 0.35621,
+      "moveMean": 104.7233,
+      "moveMax": 246.162548,
       "siblingInversion": 0
     },
     "a-count1|elk-port": {
@@ -1792,6 +2002,20 @@
       "edgeLenCv": 0.533608,
       "moveMean": 128.255151,
       "moveMax": 159.765453,
+      "siblingInversion": 0
+    },
+    "a-count1|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 75.6,
+      "aspectRatio": 2.333333,
+      "fillRatio": 0.428571,
+      "edgeLenCv": 0,
+      "moveMean": 59.936917,
+      "moveMax": 111.803399,
       "siblingInversion": 0
     },
     "a-count5|uniform": {
@@ -1859,9 +2083,9 @@
       "areaKpx2": 248.976,
       "aspectRatio": 1.197368,
       "fillRatio": 0.477154,
-      "edgeLenCv": 0.519547,
-      "moveMean": 213.607041,
-      "moveMax": 660.284787,
+      "edgeLenCv": 0.507447,
+      "moveMean": 218.251087,
+      "moveMax": 677.374343,
       "siblingInversion": 0
     },
     "a-count5|elk-port": {
@@ -1904,6 +2128,20 @@
       "edgeLenCv": 0.256148,
       "moveMean": 321.51555,
       "moveMax": 588.068874,
+      "siblingInversion": 0
+    },
+    "a-count5|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 375.824,
+      "aspectRatio": 3.409639,
+      "fillRatio": 0.316105,
+      "edgeLenCv": 0.897392,
+      "moveMean": 380.362545,
+      "moveMax": 730.273921,
       "siblingInversion": 0
     },
     "a-down-direction|uniform": {
@@ -1971,8 +2209,8 @@
       "areaKpx2": 204.048,
       "aspectRatio": 2.096154,
       "fillRatio": 0.370501,
-      "edgeLenCv": 0.484257,
-      "moveMean": 42.778214,
+      "edgeLenCv": 0.481956,
+      "moveMean": 42.863465,
       "moveMax": 112.200713,
       "siblingInversion": 0
     },
@@ -2016,6 +2254,20 @@
       "edgeLenCv": 0.273827,
       "moveMean": 116.213357,
       "moveMax": 235.637433,
+      "siblingInversion": 0
+    },
+    "a-down-direction|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 154.2,
+      "aspectRatio": 1.713333,
+      "fillRatio": 0.490272,
+      "edgeLenCv": 0.206095,
+      "moveMean": 27.543549,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "a-no-handle|uniform": {
@@ -2130,6 +2382,20 @@
       "moveMax": 55,
       "siblingInversion": 0
     },
+    "a-no-handle|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 82.32,
+      "aspectRatio": 2.142857,
+      "fillRatio": 0.524781,
+      "edgeLenCv": 0.179792,
+      "moveMean": 53.747654,
+      "moveMax": 104.923782,
+      "siblingInversion": 0
+    },
     "b-chain4|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -2240,6 +2506,20 @@
       "edgeLenCv": 0,
       "moveMean": 101.202688,
       "moveMax": 165,
+      "siblingInversion": 0
+    },
+    "b-chain4|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 54,
+      "aspectRatio": 15,
+      "fillRatio": 0.8,
+      "edgeLenCv": 0,
+      "moveMean": 102.011029,
+      "moveMax": 204.022058,
       "siblingInversion": 0
     },
     "b-asymmetric|uniform": {
@@ -2354,6 +2634,20 @@
       "moveMax": 68.007353,
       "siblingInversion": 0
     },
+    "b-asymmetric|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 237.6,
+      "aspectRatio": 3.409091,
+      "fillRatio": 0.318182,
+      "edgeLenCv": 0.255957,
+      "moveMean": 81.221515,
+      "moveMax": 142.562267,
+      "siblingInversion": 0
+    },
     "b-cross-deep|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -2416,12 +2710,12 @@
       "handleMismatch": 0,
       "edgeCrossings": 0,
       "edgeThroughNode": 0,
-      "areaKpx2": 268.536,
-      "aspectRatio": 2.407186,
-      "fillRatio": 0.361963,
-      "edgeLenCv": 0.446142,
-      "moveMean": 128.126677,
-      "moveMax": 256.007812,
+      "areaKpx2": 262.524,
+      "aspectRatio": 2.353293,
+      "fillRatio": 0.370252,
+      "edgeLenCv": 0.401748,
+      "moveMean": 120.537319,
+      "moveMax": 238.15961,
       "siblingInversion": 0
     },
     "b-cross-deep|elk-port": {
@@ -2464,6 +2758,20 @@
       "edgeLenCv": 0.521831,
       "moveMean": 103.137414,
       "moveMax": 150,
+      "siblingInversion": 0
+    },
+    "b-cross-deep|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 1,
+      "areaKpx2": 347.6,
+      "aspectRatio": 3.481013,
+      "fillRatio": 0.279632,
+      "edgeLenCv": 1.063241,
+      "moveMean": 194.374263,
+      "moveMax": 419.761837,
       "siblingInversion": 0
     },
     "b-alternating|uniform": {
@@ -2528,12 +2836,12 @@
       "handleMismatch": 0,
       "edgeCrossings": 0,
       "edgeThroughNode": 0,
-      "areaKpx2": 189.6,
-      "aspectRatio": 4.74,
-      "fillRatio": 0.28481,
-      "edgeLenCv": 0.301355,
-      "moveMean": 175.715563,
-      "moveMax": 439.527019,
+      "areaKpx2": 182.4,
+      "aspectRatio": 4.56,
+      "fillRatio": 0.296053,
+      "edgeLenCv": 0.246942,
+      "moveMean": 161.681912,
+      "moveMax": 404.554075,
       "siblingInversion": 0
     },
     "b-alternating|elk-port": {
@@ -2576,6 +2884,20 @@
       "edgeLenCv": 0.534005,
       "moveMean": 156.126579,
       "moveMax": 340.036763,
+      "siblingInversion": 0
+    },
+    "b-alternating|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 198,
+      "aspectRatio": 2.2,
+      "fillRatio": 0.272727,
+      "edgeLenCv": 0.475607,
+      "moveMean": 73.699016,
+      "moveMax": 148.660687,
       "siblingInversion": 0
     },
     "b-wide|uniform": {
@@ -2690,6 +3012,20 @@
       "moveMax": 551.452627,
       "siblingInversion": 0
     },
+    "b-wide|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 533.28,
+      "aspectRatio": 1.224242,
+      "fillRatio": 0.384788,
+      "edgeLenCv": 0.777337,
+      "moveMean": 218.921851,
+      "moveMax": 316.284682,
+      "siblingInversion": 0
+    },
     "c-diamond|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -2755,9 +3091,9 @@
       "areaKpx2": 85.8,
       "aspectRatio": 5.076923,
       "fillRatio": 0.503497,
-      "edgeLenCv": 0.456966,
-      "moveMean": 116.872805,
-      "moveMax": 263.469163,
+      "edgeLenCv": 0.489364,
+      "moveMean": 112.546151,
+      "moveMax": 246.162548,
       "siblingInversion": 0
     },
     "c-diamond|elk-port": {
@@ -2800,6 +3136,20 @@
       "edgeLenCv": 0.817299,
       "moveMean": 155.38011,
       "moveMax": 186.010752,
+      "siblingInversion": 0
+    },
+    "c-diamond|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 1,
+      "areaKpx2": 179.448744,
+      "aspectRatio": 2.548334,
+      "fillRatio": 0.240737,
+      "edgeLenCv": 0.859042,
+      "moveMean": 71.580085,
+      "moveMax": 179.405196,
       "siblingInversion": 0
     },
     "c-merge-depth|uniform": {
@@ -2914,6 +3264,20 @@
       "moveMax": 111.803399,
       "siblingInversion": 0
     },
+    "c-merge-depth|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 1,
+      "areaKpx2": 209.470033,
+      "aspectRatio": 3.977026,
+      "fillRatio": 0.257793,
+      "edgeLenCv": 0.828231,
+      "moveMean": 63.418932,
+      "moveMax": 111.256949,
+      "siblingInversion": 0
+    },
     "c-pure-cycle|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -2976,12 +3340,12 @@
       "handleMismatch": 0,
       "edgeCrossings": 0,
       "edgeThroughNode": 0,
-      "areaKpx2": 73.32,
-      "aspectRatio": 4.338462,
-      "fillRatio": 0.441899,
-      "edgeLenCv": 0.400788,
-      "moveMean": 88.161623,
-      "moveMax": 219.763509,
+      "areaKpx2": 70.98,
+      "aspectRatio": 4.2,
+      "fillRatio": 0.456467,
+      "edgeLenCv": 0.381144,
+      "moveMean": 82.332799,
+      "moveMax": 202.277038,
       "siblingInversion": 0
     },
     "c-pure-cycle|elk-port": {
@@ -3024,6 +3388,20 @@
       "edgeLenCv": 0.444533,
       "moveMean": 114.496193,
       "moveMax": 240,
+      "siblingInversion": 0
+    },
+    "c-pure-cycle|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 75.6,
+      "aspectRatio": 2.333333,
+      "fillRatio": 0.428571,
+      "edgeLenCv": 0.15301,
+      "moveMean": 38.213877,
+      "moveMax": 74.330344,
       "siblingInversion": 0
     },
     "c-cycle-under-root|uniform": {
@@ -3138,6 +3516,20 @@
       "moveMax": 165,
       "siblingInversion": 0
     },
+    "c-cycle-under-root|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 1,
+      "areaKpx2": 108.1,
+      "aspectRatio": 8.173913,
+      "fillRatio": 0.39963,
+      "edgeLenCv": 0.986565,
+      "moveMean": 51.005514,
+      "moveMax": 136.014705,
+      "siblingInversion": 0
+    },
     "c-two-cycle|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -3248,6 +3640,20 @@
       "edgeLenCv": 0,
       "moveMean": 37.5,
       "moveMax": 55,
+      "siblingInversion": 0
+    },
+    "c-two-cycle|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 25.2,
+      "aspectRatio": 7,
+      "fillRatio": 0.857143,
+      "edgeLenCv": 0,
+      "moveMean": 34.003676,
+      "moveMax": 68.007353,
       "siblingInversion": 0
     },
     "c-self-loop|uniform": {
@@ -3362,6 +3768,20 @@
       "moveMax": 55,
       "siblingInversion": 0
     },
+    "c-self-loop|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 52.9,
+      "aspectRatio": 4,
+      "fillRatio": 0.408318,
+      "edgeLenCv": 0,
+      "moveMean": 0,
+      "moveMax": 0,
+      "siblingInversion": 0
+    },
     "c-forest|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -3427,9 +3847,9 @@
       "areaKpx2": 781.2,
       "aspectRatio": 4.428571,
       "fillRatio": 0.138249,
-      "edgeLenCv": 0.412763,
-      "moveMean": 99.442955,
-      "moveMax": 263.469163,
+      "edgeLenCv": 0.35621,
+      "moveMean": 94.25097,
+      "moveMax": 246.162548,
       "siblingInversion": 0
     },
     "c-forest|elk-port": {
@@ -3472,6 +3892,20 @@
       "edgeLenCv": 0.533608,
       "moveMean": 129.964078,
       "moveMax": 159.765453,
+      "siblingInversion": 0
+    },
+    "c-forest|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 781.2,
+      "aspectRatio": 4.428571,
+      "fillRatio": 0.138249,
+      "edgeLenCv": 0,
+      "moveMean": 53.943225,
+      "moveMax": 111.803399,
       "siblingInversion": 0
     },
     "c-cross-links|uniform": {
@@ -3539,9 +3973,9 @@
       "areaKpx2": 175.56,
       "aspectRatio": 2.481203,
       "fillRatio": 0.430622,
-      "edgeLenCv": 0.449531,
-      "moveMean": 135.622804,
-      "moveMax": 254.007874,
+      "edgeLenCv": 0.445173,
+      "moveMean": 127.935662,
+      "moveMax": 236.008474,
       "siblingInversion": 0
     },
     "c-cross-links|elk-port": {
@@ -3584,6 +4018,20 @@
       "edgeLenCv": 0.745564,
       "moveMean": 131.69017,
       "moveMax": 173.8579,
+      "siblingInversion": 0.5
+    },
+    "c-cross-links|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 1,
+      "areaKpx2": 819.10356,
+      "aspectRatio": 1.421299,
+      "fillRatio": 0.092296,
+      "edgeLenCv": 0.853248,
+      "moveMean": 165.924517,
+      "moveMax": 360.092558,
       "siblingInversion": 0.5
     },
     "d-tall-nodes|uniform": {
@@ -3698,6 +4146,20 @@
       "moveMax": 238.537209,
       "siblingInversion": 0
     },
+    "d-tall-nodes|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 182.28,
+      "aspectRatio": 1.033333,
+      "fillRatio": 0.552995,
+      "edgeLenCv": 0.424099,
+      "moveMean": 72.22556,
+      "moveMax": 111.803399,
+      "siblingInversion": 0
+    },
     "d-wide-nodes|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -3763,9 +4225,9 @@
       "areaKpx2": 138.6,
       "aspectRatio": 3.535354,
       "fillRatio": 0.497835,
-      "edgeLenCv": 0.692787,
-      "moveMean": 86.723338,
-      "moveMax": 256.538496,
+      "edgeLenCv": 0.659792,
+      "moveMean": 82.271207,
+      "moveMax": 238.729973,
       "siblingInversion": 0
     },
     "d-wide-nodes|elk-port": {
@@ -3808,6 +4270,20 @@
       "edgeLenCv": 0.70179,
       "moveMean": 158.328173,
       "moveMax": 261.199158,
+      "siblingInversion": 0
+    },
+    "d-wide-nodes|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 175.48,
+      "aspectRatio": 3.831776,
+      "fillRatio": 0.393207,
+      "edgeLenCv": 0.064047,
+      "moveMean": 28.178884,
+      "moveMax": 45.177428,
       "siblingInversion": 0
     },
     "d-mixed-sizes|uniform": {
@@ -3922,6 +4398,20 @@
       "moveMax": 668.907318,
       "siblingInversion": 0.25
     },
+    "d-mixed-sizes|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 1,
+      "areaKpx2": 993.278,
+      "aspectRatio": 2.777592,
+      "fillRatio": 0.391929,
+      "edgeLenCv": 1.127407,
+      "moveMean": 251.13511,
+      "moveMax": 684.448135,
+      "siblingInversion": 0
+    },
     "e-init-tidy|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -3987,9 +4477,9 @@
       "areaKpx2": 221.76,
       "aspectRatio": 1.964286,
       "fillRatio": 0.438312,
-      "edgeLenCv": 0.448064,
-      "moveMean": 121.229796,
-      "moveMax": 254.007874,
+      "edgeLenCv": 0.394086,
+      "moveMean": 115.293706,
+      "moveMax": 236.008474,
       "siblingInversion": 0
     },
     "e-init-tidy|elk-port": {
@@ -4032,6 +4522,20 @@
       "edgeLenCv": 0.525479,
       "moveMean": 97.985242,
       "moveMax": 150.167152,
+      "siblingInversion": 0
+    },
+    "e-init-tidy|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 258,
+      "aspectRatio": 2.866667,
+      "fillRatio": 0.376744,
+      "edgeLenCv": 0.552885,
+      "moveMean": 77.912774,
+      "moveMax": 134.62912,
       "siblingInversion": 0
     },
     "e-init-random|uniform": {
@@ -4146,6 +4650,20 @@
       "moveMax": 717.591109,
       "siblingInversion": 0.5
     },
+    "e-init-random|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 258,
+      "aspectRatio": 2.866667,
+      "fillRatio": 0.376744,
+      "edgeLenCv": 0.552885,
+      "moveMean": 664.737816,
+      "moveMax": 1047.191005,
+      "siblingInversion": 0
+    },
     "e-init-collapsed|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -4257,6 +4775,20 @@
       "moveMean": 388.8374,
       "moveMax": 614.18564,
       "siblingInversion": 0.5
+    },
+    "e-init-collapsed|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 258,
+      "aspectRatio": 2.866667,
+      "fillRatio": 0.376744,
+      "edgeLenCv": 0.552885,
+      "moveMean": 268.204818,
+      "moveMax": 484.653484,
+      "siblingInversion": 0
     },
     "e-init-mirrored|uniform": {
       "nodeOverlapPairs": 0,
@@ -4370,6 +4902,20 @@
       "moveMax": 280,
       "siblingInversion": 0
     },
+    "e-init-mirrored|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 258,
+      "aspectRatio": 2.866667,
+      "fillRatio": 0.376744,
+      "edgeLenCv": 0.552885,
+      "moveMean": 129.197771,
+      "moveMax": 282.311884,
+      "siblingInversion": 0
+    },
     "e-init-shuffled|uniform": {
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
@@ -4435,9 +4981,9 @@
       "areaKpx2": 221.76,
       "aspectRatio": 1.964286,
       "fillRatio": 0.438312,
-      "edgeLenCv": 0.448064,
-      "moveMean": 121.229796,
-      "moveMax": 254.007874,
+      "edgeLenCv": 0.394086,
+      "moveMean": 115.293706,
+      "moveMax": 236.008474,
       "siblingInversion": 0
     },
     "e-init-shuffled|elk-port": {
@@ -4480,6 +5026,20 @@
       "edgeLenCv": 0.525479,
       "moveMean": 97.985242,
       "moveMax": 150.167152,
+      "siblingInversion": 0
+    },
+    "e-init-shuffled|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 0,
+      "edgeThroughNode": 0,
+      "areaKpx2": 258,
+      "aspectRatio": 2.866667,
+      "fillRatio": 0.376744,
+      "edgeLenCv": 0.552885,
+      "moveMean": 77.912774,
+      "moveMax": 134.62912,
       "siblingInversion": 0
     },
     "f-scale50|uniform": {
@@ -4542,14 +5102,14 @@
       "nodeOverlapPairs": 0,
       "nodeOverlapArea": 0,
       "handleMismatch": 0,
-      "edgeCrossings": 7,
-      "edgeThroughNode": 18,
-      "areaKpx2": 4813.668,
-      "aspectRatio": 1.854749,
-      "fillRatio": 0.112181,
-      "edgeLenCv": 1.157204,
-      "moveMean": 848.900106,
-      "moveMax": 1677.41654,
+      "edgeCrossings": 8,
+      "edgeThroughNode": 21,
+      "areaKpx2": 4697.676,
+      "aspectRatio": 1.810056,
+      "fillRatio": 0.11495,
+      "edgeLenCv": 1.16834,
+      "moveMean": 813.688873,
+      "moveMax": 1607.183328,
       "siblingInversion": 0
     },
     "f-scale50|elk-port": {
@@ -4593,6 +5153,20 @@
       "moveMean": 815.878022,
       "moveMax": 1635.098347,
       "siblingInversion": 0.086957
+    },
+    "f-scale50|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 8,
+      "edgeThroughNode": 10,
+      "areaKpx2": 5413.08,
+      "aspectRatio": 1.505802,
+      "fillRatio": 0.099758,
+      "edgeLenCv": 1.364348,
+      "moveMean": 808.794147,
+      "moveMax": 1297.852072,
+      "siblingInversion": 0
     },
     "f-scale150|uniform": {
       "nodeOverlapPairs": 0,
@@ -4655,13 +5229,13 @@
       "nodeOverlapArea": 0,
       "handleMismatch": 0,
       "edgeCrossings": 11,
-      "edgeThroughNode": 27,
-      "areaKpx2": 18676.98,
-      "aspectRatio": 1.405761,
-      "fillRatio": 0.086738,
-      "edgeLenCv": 1.782334,
-      "moveMean": 2218.337696,
-      "moveMax": 3722.23001,
+      "edgeThroughNode": 30,
+      "areaKpx2": 18348.93,
+      "aspectRatio": 1.38107,
+      "fillRatio": 0.088289,
+      "edgeLenCv": 1.795301,
+      "moveMean": 2175.839337,
+      "moveMax": 3616.148815,
       "siblingInversion": 0.040541
     },
     "f-scale150|elk-port": {
@@ -4705,6 +5279,20 @@
       "moveMean": 1780.780693,
       "moveMax": 3503.983697,
       "siblingInversion": 0.108108
+    },
+    "f-scale150|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 16,
+      "edgeThroughNode": 31,
+      "areaKpx2": 25579.2,
+      "aspectRatio": 3,
+      "fillRatio": 0.063333,
+      "edgeLenCv": 1.844426,
+      "moveMean": 2855.031392,
+      "moveMax": 5119.416471,
+      "siblingInversion": 0
     },
     "g-default-map|uniform": {
       "nodeOverlapPairs": 0,
@@ -4816,6 +5404,20 @@
       "edgeLenCv": 0.545474,
       "moveMean": 51.140606,
       "moveMax": 120.340258,
+      "siblingInversion": 0
+    },
+    "g-default-map|hola-lite": {
+      "nodeOverlapPairs": 0,
+      "nodeOverlapArea": 0,
+      "handleMismatch": 0,
+      "edgeCrossings": 3,
+      "edgeThroughNode": 0,
+      "areaKpx2": 407.324535,
+      "aspectRatio": 1.210704,
+      "fillRatio": 0.185601,
+      "edgeLenCv": 0.47148,
+      "moveMean": 132.194468,
+      "moveMax": 174.324462,
       "siblingInversion": 0
     }
   }

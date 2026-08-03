@@ -34,7 +34,7 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 | 切り替えUI | `src/components/Editor/Toolbar.tsx`。デスクトップ表示のみ、`import.meta.env.DEV`が真の場合だけ表示される`<select>`（レイアウト方向selectと整列ボタンの間） |
 | 状態管理フック | `src/hooks/useAlignAlgorithmDebug.ts`。`import.meta.env.DEV`が偽なら常に既定の`'sugiyama-port'`（`DEFAULT_ALGORITHM`）を返しsetterは何もしない（UIの出し分けとは独立に、フック自体にもガードを入れている） |
 | 保存先 | `localStorage`キー `mindmeshmap-debug-align-algorithm`（`AlignAlgorithm`型の値以外・読み取り失敗時は既定の`'sugiyama-port'`にフォールバック。本番＝dev既定を揃えている） |
-| アルゴリズム実装 | `src/utils/branchLayout.ts`（`branch`＝再帰的ブランチ合成）、`src/utils/flatAxisLayout.ts`（`flat-axis`＝2パス軸射影）、`src/utils/sugiyamaExtLayout.ts`（`sugiyama-ext`＝スギヤマ拡張。ELK不使用の自前実装）、`src/utils/sugiyamaPortLayout.ts`（`sugiyama-port`＝そのハンドル起点版。親をハンドルの向きで選び複数親を許す。ELK不使用）、`src/utils/elkPortLayout.ts`（`elk-port`＝ELK layeredのポート制約版）、`src/utils/elkPortExtLayout.ts`（`elk-port-ext`＝ELK layeredの自前再実装。ELK不使用）、`src/utils/elkPortPavaLayout.ts`（`elk-port-pava`＝同じ枠組みの最小構成実装。座標割当はPAVA）、`src/utils/alignAlgorithm.ts`（`calculateLayoutForAlign`：各アルゴリズムを振り分けるディスパッチャ） |
+| アルゴリズム実装 | `src/utils/branchLayout.ts`（`branch`＝再帰的ブランチ合成）、`src/utils/flatAxisLayout.ts`（`flat-axis`＝2パス軸射影）、`src/utils/sugiyamaExtLayout.ts`（`sugiyama-ext`＝スギヤマ拡張。ELK不使用の自前実装）、`src/utils/sugiyamaPortLayout.ts`（`sugiyama-port`＝そのハンドル起点版。親をハンドルの向きで選び複数親を許す。ELK不使用）、`src/utils/elkPortLayout.ts`（`elk-port`＝ELK layeredのポート制約版）、`src/utils/elkPortExtLayout.ts`（`elk-port-ext`＝ELK layeredの自前再実装。ELK不使用）、`src/utils/elkPortPavaLayout.ts`（`elk-port-pava`＝同じ枠組みの最小構成実装。座標割当はPAVA）、`src/utils/holaLiteLayout.ts`（`hola-lite`＝HOLAの最小構成再実装。層を持たず子を4面へ対称に伸ばす。ELK不使用）、`src/utils/alignAlgorithm.ts`（`calculateLayoutForAlign`：各アルゴリズムを振り分けるディスパッチャ） |
 | 統合箇所 | `src/hooks/useAutoLayout.ts`の`applyLayout`（部分整列・全体整列の両方） |
 | テスト | `e2e/branch-layout-algorithms.mjs`（各アルゴリズム固有の設計意図を手書きの小さなグラフで確認）、`e2e/layout-quality.mjs`（ケースコーパス×全アルゴリズムの総当たりで不変条件を検証）。どちらもブラウザ不要の純Nodeテスト |
 | 評価環境 | `npm run layout:sheet`（`scripts/layout-contact-sheet.mjs`）でコンタクトシート（SVG）と採点表を生成する。**下記の定数を変えたら `node scripts/layout-contact-sheet.mjs --scale --compare` で影響（改善と悪化の両方）を確認し、意図した変更なら `npm run layout:baseline` でベースラインを更新する**（更新しないと回帰テストが失敗する）。広い範囲のランダム検証は `npm run layout:fuzz`。詳細は [layout-lab.md](./layout-lab.md) |
@@ -51,17 +51,19 @@ ELKグラフの構築・実行そのものは `src/utils/layout.ts` の低レベ
 | `TREE_SEPARATION_MAX_ITER` | 200 | ツリー分離（押し離し）反復の上限。通常は数回で収束する |
 | `DEFAULT_NODE_WIDTH` / `DEFAULT_NODE_HEIGHT` | 180 / 60 | ノードの実測サイズ（React Flowの`node.measured`）が無い場合のフォールバック既定サイズ（px）。**export済み**。`useNodeCreation.ts`でも実測が取れない場合（新規作成する空ノード等）のフォールバックとして共有する |
 
-`sugiyama-port`のチューニング定数（すべて`src/utils/sugiyamaPortLayout.ts`冒頭）。**`sugiyama-ext`と同じ値だが定数は共有していない**（片方を削除するときに巻き込まれないようにするため。どちらかを変えたらもう片方も合わせるか、意図的に変えるなら[align-branch-layout.md](./align-branch-layout.md)「方針H」に理由を書く）:
+`sugiyama-port`のチューニング定数（すべて`src/utils/sugiyamaPortLayout.ts`冒頭）。**定数は`sugiyama-ext`と共有していない**（片方を削除するときに巻き込まれないようにするため。値を揃えるかどうかは方式ごとに判断し、意図的にずらすなら[align-branch-layout.md](./align-branch-layout.md)「方針H」に理由を書く。現在 `CROSS_OVERLAP_RATIO` だけ `sugiyama-ext` の 0.8 と違う値になっている）。
+
+**値の定義は実装の1箇所だけ**にしてある: `CROSS_OVERLAP_RATIO` / `CROSS_OVERLAP_RATIO_INSIDE` / `ESCAPE_FORWARD_AS_GROUP` は `export` してあり、`e2e/branch-layout-algorithms.mjs` は期待値をハードコードせずこれらをimportして計算する。**値を変えるときに直すのは実装とこの表の2箇所だけ**（テストは自動で追従する）:
 
 | 定数 | 現在値 | 意味 |
 |---|---|---|
 | `PRIMARY_GAP` | 60 | 層と層の間隔（流れ方向、px）。**cross群と重なったforward子を逃がす距離もこれ** |
 | `CROSS_GAP` | 10 | 積み重ねる兄弟の間隔（直交方向、px）。**上/下ハンドル子が親から離れる距離そのもの**（方針Hではcross群が親のすぐ隣に来るため） |
 | `SIBLING_GAP` | 8 | forward/backward群の兄弟サブツリー間の間隔（直交方向、px） |
-| `CROSS_OVERLAP_RATIO` | 0.8 | 上/下ハンドル子を親の流れ方向の帯にどれだけ被せるか。0=全被り、1=被らない。**一律に下げても面積・移動量しか改善せず、エッジのノード貫通は改善しない**（実測は[align-branch-layout.md](./align-branch-layout.md)「方針H」） |
-| `CROSS_OVERLAP_RATIO_INSIDE` | 0.2 | 同上。ただし**forward群の帯に入り込む子だけ**に使う値（被りを深くする＝forward群を前へ押し出す量が減る）。押し出しが起きない子には効かせないので、`CROSS_OVERLAP_RATIO` と同じ値にすると「配置パターン判定が曖昧なときに2パターンの出力が一致する」性質（＝Alignの反復で往復しない）は保たれるが、押し出し量の抑制は効かなくなる |
-| cross群の配置パターン | （定数ではない） | 上/下ハンドル子を「親のすぐ隣（`hug`）」に置くか「forward群の外側（`outside`）」に置くかは、**Align実行時点の現在位置から自動判定**する（しきい値の定数は無い。判定規則と理由は[decisions.md §50](./decisions.md)）。パターン分けをやめて常に片方にしたい場合は `crossPlacementMode()` の戻り値を固定する |
-| `ESCAPE_FORWARD_AS_GROUP` | `true` | cross群と重なったforward子を逃がす単位。`true`=forward群ごと同じ線に揃える（同じ層の兄弟のprimaryが揃うが面積・交差・移動量は悪化）／`false`=実際に重なった子だけ逃がす。**目視比較のための一時的なフラグで、1行で切り替わる**（実測の差は[align-branch-layout.md](./align-branch-layout.md)「方針H」の表。決めたらフラグごと畳む） |
+| `CROSS_OVERLAP_RATIO`（export） | 0.7 | 上/下ハンドル子を親の流れ方向の帯にどれだけ被せるか。0=全被り、1=被らない。**一律に下げても面積・移動量しか改善せず、エッジのノード貫通は改善しない**（実測は[align-branch-layout.md](./align-branch-layout.md)「方針H」） |
+| `CROSS_OVERLAP_RATIO_INSIDE`（export） | 0.2 | 同上。ただし**forward群の帯に入り込む子だけ**に使う値（被りを深くする＝forward群を前へ押し出す量が減る）。押し出しが起きない子には効かせないので、`CROSS_OVERLAP_RATIO` と同じ値にすると「配置パターン判定が曖昧なときに2パターンの出力が一致する」性質（＝Alignの反復で往復しない）は保たれるが、押し出し量の抑制は効かなくなる |
+| cross群の配置パターン | （定数ではない） | 上/下ハンドル子を「親のすぐ隣（`hug`）」に置くか「forward群の外側（`outside`）」に置くかは、**Align実行時点の現在位置から自動判定**する（しきい値の定数は無い。判定規則と理由は[decisions.md §50](./decisions.md)、判定量を配置量と揃えて冪等にした経緯は[§57](./decisions.md)）。パターン分けをやめて常に片方にしたい場合は `crossPlacementMode()` の戻り値を固定する |
+| `ESCAPE_FORWARD_AS_GROUP`（export） | `true` | cross群と重なったforward子を逃がす単位。`true`=forward群ごと同じ線に揃える（同じ層の兄弟のprimaryが揃うが面積・交差・移動量は悪化）／`false`=実際に重なった子だけ逃がす。**目視比較のための一時的なフラグで、1行で切り替わる**（実測の差は[align-branch-layout.md](./align-branch-layout.md)「方針H」の表。決めたらフラグごと畳む） |
 | `TREE_MARGIN` | 40 | 複数root（複数ツリー）が重なるとき空けるツリー間の最小マージン（px） |
 | `TREE_SEPARATION_MAX_ITER` | 200 | ツリー分離（押し離し）反復の上限 |
 | `DEFAULT_NODE_WIDTH` / `DEFAULT_NODE_HEIGHT` | 180 / 60 | 実測サイズが無い場合のフォールバック既定サイズ（px）。**この方式ではexportしない**（手動ノード作成は`sugiyamaExtLayout.ts`側と共有している） |
@@ -102,6 +104,19 @@ ELKに渡すレイアウトオプション自体（INTERACTIVE戦略・spacing�
 | `ORDERING_SWEEPS` | 4 | 交差削減の掃引回数。**0にすると交差削減が丸ごと止まり、兄弟順の反転率が0.045→0.006に改善する代わりに交差209→801・貫通52→229に悪化する**（トレードオフの実測値はalign-branch-layout.md「方針G'」） |
 | `DUMMY_WEIGHT` | 8 | 仮想ノードの配置優先度（実ノードを1としたときの重み）。大きいほど長いエッジがまっすぐになる |
 | `ORDER_PITCH` | 110（`DEFAULT_NODE_HEIGHT + NODE_GAP`） | 交差削減のバリセンタは順序index空間で計算するため、ポートのcrossオフセット(px)を「およそ何ノードぶんか」へ換算する際の縦ピッチの目安 |
+
+`hola-lite`のチューニング定数（すべて`src/utils/holaLiteLayout.ts`冒頭）。**層を持たない4方向対称の方式なので、sugiyama系の「層の間隔」に相当するのは`GROWTH_GAP`だけ**（改善の入口は[align-branch-layout.md](./align-branch-layout.md)「方針I」）:
+
+| 定数 | 現在値 | 意味 |
+|---|---|---|
+| `GROWTH_GAP` | 60 | 親と子の間隔（子が伸びる向き、px）。**4面とも同じ値**（方向で非対称にしない）。**export済み**（`e2e/branch-layout-algorithms.mjs`の設計意図テストが期待値に使う）。上げると全方向に間延びし、下げると密になる |
+| `SIBLING_GAP` | 8 | 同じ面に並ぶ兄弟サブツリーの箱どうしの間隔（px）。**export済み** |
+| `QUADRANT_GAP` | 20 | 別の面へ伸びた群どうし（例: 右の子の群と上の子の群）の間隔（px）。上/下の群を横へ逃がす／外へ押し出すときの余白でもある |
+| `COMPONENT_MARGIN` | 40 | 成分（強制フォレスト1本ぶん）の外接矩形どうしの最小マージン（px）。sugiyama系の`TREE_MARGIN`に相当 |
+| `SEPARATION_MAX_ITER` | 200 | 成分の押し離し反復の上限。通常は数回で収束する |
+| `STRESS_MAX_ITER` | 100 | ストレス最適化（SMACOF）の反復上限。**この段はcoreを含む成分が2つ以上あるときだけ走る**ので、木だけのマップでは0回 |
+| `STRESS_EPSILON` | 0.5 | ストレス最適化の打ち切り閾値（1反復の最大移動量, px） |
+| `STRESS_LINK_GAP` | 80 | 成分間エッジ1本あたりの理想距離に足す余白（px）。理想距離＝両端の箱の半径（外接円）＋この値。**40に下げると交差27→25の代わりに貫通47→51**（実測。面積はほぼ変わらない） |
 
 いずれかに決まったら、決定記録を`decisions.md`へ移し、不採用側のファイル・この切り替えUI・関連テストを削除する予定（`align-branch-layout.md`「今後の運び」参照）。
 
@@ -165,7 +180,7 @@ ELKに渡すレイアウトオプション自体（INTERACTIVE戦略・spacing�
 | `LONG_PRESS_DELAY` | `src/components/Editor/MindMapCanvas.tsx` | 500 | キャンバス空白の長押し（ノード作成）の判定時間（ms） |
 | `MOVE_THRESHOLD` | `MindMapCanvas.tsx` / `CustomNode.tsx` のタッチ処理 | 10 | 長押し判定をキャンセルする指の移動量（px） |
 | `thresholdX` / `thresholdY` / `offsetStep` | `src/hooks/useNodeCreation.ts` の `adjustPositionToAvoidOverlap` | 150 / 60 / 100 | キーボードでのノード作成時の重複判定しきい値とずらし量（px） |
-| `EMPTY_NODE_WIDTH` / `EMPTY_NODE_HEIGHT` | `src/utils/nodeContent.ts` | 150 / 44 | 空ノード（`EMPTY_NODE_CONTENT`）をレンダリングしたときの実寸（px）。`CustomNode` の `min-w-[150px]` と1行ぶんの高さで決まる。ハンドルの backward 面から引き伸ばして作る新規ノードを「ドロップ点＝forward 面」に置くためのずらし量に使う（[decisions.md §52](./decisions.md)）。`CustomNode` の最小幅・パディング・行高を変えたら測り直す（React Flowノードの boundingBox ÷ ズーム倍率。`e2e/edge-drop-handle-side.mjs` がズレを検出する）。実測サイズ不明時のフォールバックである `DEFAULT_NODE_WIDTH`/`DEFAULT_NODE_HEIGHT`（180/60）とは別物 |
+| `EMPTY_NODE_WIDTH` / `EMPTY_NODE_HEIGHT` | `src/utils/nodeContent.ts` | 150 / 44 | 空ノード（`EMPTY_NODE_CONTENT`）をレンダリングしたときの実寸（px）。`CustomNode` の `min-w-[150px]` と1行ぶんの高さで決まる。ハンドルから backward 側へ引き伸ばして作る新規ノードを「ドロップ点＝forward 面」に置くためのずらし量に使う（[decisions.md §52](./decisions.md)）。`CustomNode` の最小幅・パディング・行高を変えたら測り直す（React Flowノードの boundingBox ÷ ズーム倍率。`e2e/edge-drop-handle-side.mjs` がズレを検出する）。実測サイズ不明時のフォールバックである `DEFAULT_NODE_WIDTH`/`DEFAULT_NODE_HEIGHT`（180/60）とは別物 |
 
 ## ストレージキー
 
@@ -187,6 +202,14 @@ ELKに渡すレイアウトオプション自体（INTERACTIVE戦略・spacing�
 
 - **og:image 未設定**: 詳細は [decisions.md §10](./decisions.md)。1200×630 の PNG 素材を作成したら `index.html` に追加。
 - **新規マップの初期文言が英語ハードコード**: `src/stores/mapStore.ts` の新規空マップ作成（`createEmptyMap`）のルートノード `Root Node` とマップ名 `New Map` は i18n されていない。日本語/中国語 UI で新規マップを作ると英語のルートノードになる。（通常のノード作成は空ノード化したため該当しない）
+- **整列（`sugiyama-port`）で、Alignの1回目と2回目で配置が変わることがある**:
+  cross群（上/下ハンドルの子）の `hug` / `outside` 判定が**cross子ノード本体の位置**を見るのに対し、
+  配置は**サブツリーの箱ごと**動かすため、cross子が自分の子をcross方向に持つと
+  「箱は親にくっついているのにノード本体は親から遠い」状態になり、2回目の整列で `hug`→`outside` に
+  反転する。**3回目以降は安定する**（往復＝振動はしない）。ケースコーパス43件中1件（`f-scale50` で797px）。
+  **意図して受け入れた制限**で、判定をサブツリーの箱に揃えれば不動点にできるがエッジのノード貫通が
+  91→104 に悪化する。採用理由・不採用にした変種の実測値は [decisions.md §57](./decisions.md)。
+  本気で直すなら「配置側もcross子ノード本体を基準にする」（重なり回避の作り直しを伴う）。
 - **ノードの色分け・見た目カスタマイズ**: 分類・強調のための色付け機能はない。
 - **ノード検索**: ノード数が増えたときにテキストで検索する手段がない。
 - **ローカル下書きの複数タブ動作**: 後勝ち（last-write-wins）。詳細は [decisions.md §1](./decisions.md)。

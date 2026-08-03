@@ -20,6 +20,7 @@ const VALID_ALGORITHMS: AlignAlgorithm[] = [
   'elk-port',
   'elk-port-ext',
   'elk-port-pava',
+  'hola-lite',
 ];
 
 // 既定の整列アルゴリズム。本番ビルドで常に使う値であり、devで保存値が無いときのフォールバックでもある。

@@ -1,4 +1,4 @@
-// dev限定の整列アルゴリズム（branch / flat-axis / sugiyama-ext / sugiyama-port / elk-port / elk-port-ext / elk-port-pava）の**個別の設計意図**を検証する、
+// dev限定の整列アルゴリズム（branch / flat-axis / sugiyama-ext / sugiyama-port / elk-port / elk-port-ext / elk-port-pava / hola-lite）の**個別の設計意図**を検証する、
 // ブラウザを起動しない純Nodeテスト。docs/align-branch-layout.md参照。
 //
 // このファイルは「そのアルゴリズムが狙った配置になっているか」（右子は右へ、上/下子は親に被せて、等）を
@@ -20,7 +20,14 @@ const { calculateSugiyamaExtLayout } = await import('../src/utils/sugiyamaExtLay
 const { calculateElkPortLayout } = await import('../src/utils/elkPortLayout.ts');
 const { calculateElkPortExtLayout } = await import('../src/utils/elkPortExtLayout.ts');
 const { calculateElkPortPavaLayout } = await import('../src/utils/elkPortPavaLayout.ts');
-const { calculateSugiyamaPortLayout, ESCAPE_FORWARD_AS_GROUP } = await import('../src/utils/sugiyamaPortLayout.ts');
+// 被り量は実装（sugiyamaPortLayout.ts）が唯一の定義。期待値はここで計算し、値をハードコードしない
+const { calculateSugiyamaPortLayout, ESCAPE_FORWARD_AS_GROUP, CROSS_OVERLAP_RATIO, CROSS_OVERLAP_RATIO_INSIDE } =
+  await import('../src/utils/sugiyamaPortLayout.ts');
+
+// 被り量の期待値は定数からの計算なので、比の値によっては丸め誤差が出る（180×0.7=125.99999…）。
+// 実装側は別の式で組み立てるぶん誤差の出方が違うので、両辺を丸めてから比べる
+const round6 = (v) => Math.round(v * 1e6) / 1e6;
+const { calculateHolaLiteLayout, GROWTH_GAP } = await import('../src/utils/holaLiteLayout.ts');
 const { calculateLayoutForAlign } = await import('../src/utils/alignAlgorithm.ts');
 const { calculateLayout } = await import('../src/utils/layout.ts');
 
@@ -1263,9 +1270,14 @@ async function testSugiyamaPortCrossHugPattern() {
     10,
     '[sugiyama-port hug] 上ハンドル子が親のすぐ上（CROSS_GAP=10）に来ること'
   );
-  // (b) forward群の帯に入り込むので、被りは深いほう（CROSS_OVERLAP_RATIO_INSIDE=0.2）を使う
+  // (b) forward群の帯に入り込むので、被りは深いほう（CROSS_OVERLAP_RATIO_INSIDE）を使う
   //     ＝押し出す量を抑える
-  await assertEqual(null, pos.get('t').x - pos.get('p').x, 36, '[sugiyama-port hug] 被りが0.2（180×0.2=36px前方）になること');
+  await assertEqual(
+    null,
+    round6(pos.get('t').x - pos.get('p').x),
+    round6(180 * CROSS_OVERLAP_RATIO_INSIDE),
+    `[sugiyama-port hug] 被りがCROSS_OVERLAP_RATIO_INSIDE（180×${CROSS_OVERLAP_RATIO_INSIDE}=${round6(180 * CROSS_OVERLAP_RATIO_INSIDE)}px前方）になること`
+  );
   // (c) tとcross方向で重なるf0が、tのサブツリー（t2の右端）の前方へ逃げる
   await assertTrue(
     null,
@@ -1305,12 +1317,12 @@ async function testSugiyamaPortCrossOutsidePattern() {
     10,
     '[sugiyama-port outside] 上ハンドル子がforward群の外側にCROSS_GAP(10)で積まれること'
   );
-  // (c) forward群と重ならないので、被りは通常の CROSS_OVERLAP_RATIO=0.8
+  // (c) forward群と重ならないので、被りは通常の CROSS_OVERLAP_RATIO
   await assertEqual(
     null,
-    pos.get('t').x - pos.get('p').x,
-    144,
-    '[sugiyama-port outside] 被りが0.8（180×0.8=144px前方）になること'
+    round6(pos.get('t').x - pos.get('p').x),
+    round6(180 * CROSS_OVERLAP_RATIO),
+    `[sugiyama-port outside] 被りがCROSS_OVERLAP_RATIO（180×${CROSS_OVERLAP_RATIO}=${round6(180 * CROSS_OVERLAP_RATIO)}px前方）になること`
   );
   await assertNoOverlaps(nodes, pos, '[sugiyama-port outside]');
 }
@@ -1358,9 +1370,18 @@ async function testSugiyamaPortSharedChildUnderOutsideCross() {
 // --- 32b. sugiyama-port: 整列を繰り返しても結果が変わらない（配置パターン判定の冪等性）---
 async function testSugiyamaPortReAlignStable() {
   // 配置パターンを「現在位置」から読むので、**整列後の位置が同じパターンに分類され続ける**
-  // ことが必要（そうでないとAlignを押すたびに2つの配置を行き来する）。両パターンで確認する
-  for (const [label, topChildY] of [['hug', -80], ['outside', -300]]) {
-    const { nodes, edges } = sugiyamaPortCrossCase(topChildY);
+  // ことが必要（そうでないとAlignを押すたびに2つの配置を行き来する）。両パターンで確認する。
+  //
+  // **ここで守れるのは「cross群の子が葉のとき」だけ**。cross子が自分の子をcross方向に持つ場合は
+  // 判定（ノード本体の矩形）と配置（サブツリーの箱）がズレるため、1回目と2回目のAlignで
+  // 'hug'→'outside' に反転しうる。これは意図して受け入れた既知の制限で、テストにもしていない
+  // （decisions.md §57 / tuning.md「既知の未対応事項」）。ここを冪等にするには判定を箱に
+  // 揃える必要があり、そうすると `hug` が増えてエッジのノード貫通が悪化する（91→104）
+  const cases = [
+    ['hug', sugiyamaPortCrossCase(-80)],
+    ['outside', sugiyamaPortCrossCase(-300)],
+  ];
+  for (const [label, { nodes, edges }] of cases) {
     let current = nodes;
     let previous = null;
     for (let i = 0; i < 3; i++) {
@@ -1434,6 +1455,157 @@ async function testSugiyamaPortRobustnessAndDispatcher() {
   );
 }
 
+// --- 35. hola-lite: 子はサブツリーごとその面の向きへ伸びる（大域的な流れ方向を持たない） ---
+// sugiyama系は「上/下ハンドルの子は親のprimary帯に被せ、その子孫は流れ方向（右）へ進む」ので、
+// 孫は親の帯に戻ってくる。hola-liteは面ごとに箱を成長させるため、上ハンドルのサブツリーは
+// **孫まで含めて丸ごと親より上**に載る。これが方針Iの主眼（docs/align-branch-layout.md「方針I」）
+async function testHolaLiteSubtreeGrowsWithHandle() {
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'c', content: '', position: { x: 0, y: -200 } },
+    { id: 'g', content: '', position: { x: 300, y: -200 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'p', target: 'c', sourceHandle: 'top', targetHandle: 'bottom' },
+    { id: 'e2', source: 'c', target: 'g', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  const pos = positionsById(await calculateHolaLiteLayout(nodes, edges, 'RIGHT'));
+  await assertTrue(null, pos.get('g').x > pos.get('c').x, '[hola-lite成長] 孫がその子の右にあること');
+  // 「サブツリー丸ごと」なので、**子も孫も**親の上端からGROWTH_GAPぶん離れた帯に載る。
+  // 同じグラフをsugiyama-portに食わせると孫の下端は親の上端の10px上（CROSS_GAP）にしか来ない
+  // ＝この等値アサートは設計の違いを実際に判別する（常にPASSするテストではない）
+  await assertEqual(
+    null,
+    pos.get('p').y - (pos.get('c').y + 60),
+    GROWTH_GAP,
+    '[hola-lite成長] top子の下端が親の上端からGROWTH_GAP(60)離れること'
+  );
+  await assertEqual(
+    null,
+    pos.get('p').y - (pos.get('g').y + 60),
+    GROWTH_GAP,
+    '[hola-lite成長] 孫も同じ帯に載ること（上のサブツリーが丸ごと親より上へ出る）'
+  );
+}
+
+// --- 36. hola-lite: 大域的な流れ方向を持たない（ハンドルが明示されていればdirectionで結果が変わらない） ---
+async function testHolaLiteNoGlobalFlowDirection() {
+  const nodes = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'r', content: '', position: { x: 300, y: 0 } },
+    { id: 'b', content: '', position: { x: 0, y: 200 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'p', target: 'r', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'p', target: 'b', sourceHandle: 'bottom', targetHandle: 'top' },
+  ];
+  const right = await calculateHolaLiteLayout(nodes, edges, 'RIGHT');
+  const down = await calculateHolaLiteLayout(nodes, edges, 'DOWN');
+  await assertEqual(
+    null,
+    JSON.stringify(down),
+    JSON.stringify(right),
+    '[hola-lite方向非依存] sourceHandleが全て付いていればlayoutDirectionで結果が変わらないこと'
+  );
+}
+
+// --- 37. hola-lite: 純粋な木ではストレス段が走らず、rootが現在位置から動かない ---
+// peelでcoreが空になる（＝周辺ツリーだけ）ケース。§26の差分安定性の要。
+async function testHolaLiteTreeKeepsRoot() {
+  const nodes = [
+    { id: 'root', content: '', position: { x: 137, y: 421 } },
+    { id: 'a', content: '', position: { x: 400, y: 300 } },
+    { id: 'b', content: '', position: { x: 400, y: 600 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'root', target: 'a', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'root', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  const pos = positionsById(await calculateHolaLiteLayout(nodes, edges, 'RIGHT'));
+  await assertEqual(null, pos.get('root').x, 137, '[hola-lite木] rootのx座標が動かないこと');
+  await assertEqual(null, pos.get('root').y, 421, '[hola-lite木] rootのy座標が動かないこと');
+}
+
+// --- 38. hola-lite: 兄弟の並び順は現在位置から決まる（メンタルマップ保持） ---
+async function testHolaLiteSiblingOrderFromCurrent() {
+  const base = [
+    { id: 'p', content: '', position: { x: 0, y: 0 } },
+    { id: 'c1', content: '', position: { x: 300, y: 0 } },
+    { id: 'c2', content: '', position: { x: 300, y: 400 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'p', target: 'c1', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'p', target: 'c2', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  const posA = positionsById(await calculateHolaLiteLayout(base, edges, 'RIGHT'));
+  await assertTrue(null, posA.get('c1').y < posA.get('c2').y, '[hola-lite兄弟順] 現在位置が上の子が上に来ること');
+
+  // c1/c2の現在位置だけ入れ替える（グラフの構造・エッジ順は同じ）
+  const swapped = base.map((n) =>
+    n.id === 'c1' ? { ...n, position: { x: 300, y: 400 } } : n.id === 'c2' ? { ...n, position: { x: 300, y: 0 } } : n
+  );
+  const posB = positionsById(await calculateHolaLiteLayout(swapped, edges, 'RIGHT'));
+  await assertTrue(null, posB.get('c2').y < posB.get('c1').y, '[hola-lite兄弟順] 現在位置を入れ替えると並びも入れ替わること');
+}
+
+// --- 39. hola-lite: coreを含む複数成分ではストレス段が働き、離れた成分を引き寄せる ---
+// ダイヤモンド（a→b, a→c, b→d, c→d）はdの入次数が2なので、dは強制フォレストの外＝別成分になる。
+// 全ノードがcoreに残るのでA段（成分どうしのストレス最適化）が走り、遠くに置かれたdが引き寄せられる
+async function testHolaLiteStressPullsComponents() {
+  const nodes = [
+    { id: 'a', content: '', position: { x: 0, y: 0 } },
+    { id: 'b', content: '', position: { x: 300, y: -100 } },
+    { id: 'c', content: '', position: { x: 300, y: 100 } },
+    { id: 'd', content: '', position: { x: 4000, y: 3000 } }, // 遠くに離れている
+  ];
+  const edges = [
+    { id: 'e1', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'a', target: 'c', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e3', source: 'b', target: 'd', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e4', source: 'c', target: 'd', sourceHandle: 'right', targetHandle: 'left' },
+  ];
+  const pos = positionsById(await calculateHolaLiteLayout(nodes, edges, 'RIGHT'));
+  const before = Math.hypot(4000 - 300, 3000 - 0);
+  const after = Math.hypot(pos.get('d').x - pos.get('b').x, pos.get('d').y - pos.get('b').y);
+  await assertTrue(null, after < before / 2, `[hola-liteストレス] 別成分の複数親の子が引き寄せられること（${Math.round(before)}→${Math.round(after)}）`);
+  await assertTrue(null, after > 100, '[hola-liteストレス] 引き寄せすぎて重ならないこと');
+}
+
+// --- 40. hola-lite: 循環・自己ループ・孤立ノードで決定的、ディスパッチャ経由と一致 ---
+async function testHolaLiteRobustnessAndDispatcher() {
+  const nodes = [
+    { id: 'a', content: '', position: { x: 0, y: 0 } },
+    { id: 'b', content: '', position: { x: 200, y: 0 } },
+    { id: 'c', content: '', position: { x: 100, y: 200 } },
+    { id: 'iso', content: '', position: { x: 0, y: 600 } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'a', target: 'b', sourceHandle: 'right', targetHandle: 'left' },
+    { id: 'e2', source: 'b', target: 'c', sourceHandle: 'bottom', targetHandle: 'top' },
+    { id: 'e3', source: 'c', target: 'a', sourceHandle: 'right', targetHandle: 'left' }, // 循環
+    { id: 'e4', source: 'c', target: 'c', sourceHandle: 'right', targetHandle: 'right' }, // 自己ループ
+  ];
+  const r1 = await calculateHolaLiteLayout(nodes, edges, 'RIGHT');
+  await assertEqual(null, r1.nodes.length, 4, '[hola-lite頑健性] 全ノードの位置が返ること');
+  for (const n of r1.nodes) {
+    await assertTrue(
+      null,
+      Number.isFinite(n.position.x) && Number.isFinite(n.position.y),
+      `[hola-lite頑健性] ${n.id}の座標が有限であること`
+    );
+  }
+  const r2 = await calculateHolaLiteLayout(nodes, edges, 'RIGHT');
+  await assertEqual(null, JSON.stringify(r1), JSON.stringify(r2), '[hola-lite頑健性] 2回実行で結果が完全一致すること（決定性）');
+
+  const viaDispatcher = await calculateLayoutForAlign(nodes, edges, 'RIGHT', 'hola-lite');
+  await assertEqual(
+    null,
+    JSON.stringify(viaDispatcher),
+    JSON.stringify(r1),
+    '[hola-liteディスパッチャ] 経由と直接呼び出しが一致すること'
+  );
+}
+
 export async function run() {
   await testBranchSideSeparation();
   await testBranchRecursion();
@@ -1477,6 +1649,12 @@ export async function run() {
   await testSugiyamaPortReAlignStable();
   await testSugiyamaPortDownDirection();
   await testSugiyamaPortRobustnessAndDispatcher();
+  await testHolaLiteSubtreeGrowsWithHandle();
+  await testHolaLiteNoGlobalFlowDirection();
+  await testHolaLiteTreeKeepsRoot();
+  await testHolaLiteSiblingOrderFromCurrent();
+  await testHolaLiteStressPullsComponents();
+  await testHolaLiteRobustnessAndDispatcher();
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

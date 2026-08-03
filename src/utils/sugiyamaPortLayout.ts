@@ -32,12 +32,14 @@ const DEFAULT_NODE_HEIGHT = 60;
 const PRIMARY_GAP = 60; // 層と層の間隔（primary方向、px）
 const CROSS_GAP = 10; // 積み重ねる兄弟の間隔（cross方向、px）
 const SIBLING_GAP = 8; // forward/backward群の兄弟サブツリー間の間隔（cross方向、px）
-// cross(上/下)の子を親のprimary帯にどれだけ被せるか。0=全被り、0.5=前半分に被る、1=被らない
-const CROSS_OVERLAP_RATIO = 0.7;
+// cross(上/下)の子を親のprimary帯にどれだけ被せるか。0=全被り、0.5=前半分に被る、1=被らない。
+// **この2つはここが唯一の定義**。e2e/branch-layout-algorithms.mjs は期待値をハードコードせず
+// この値をimportして計算するので、変更はここだけで済む（docs/tuning.md の表だけ手で追従させる）
+export const CROSS_OVERLAP_RATIO = 0.7;
 // 同上。ただし**forward群の帯に入り込む子**（＝forward群をprimary方向へ押し出す子）だけに使う値。
 // 被りを深くする＝子サブツリーの前端が手前に来るので、押し出す量がそのぶん減る。
 // 押し出しが起きない子には効かせない（効かせても押し出し量は減らず、見た目だけ変わるため）
-const CROSS_OVERLAP_RATIO_INSIDE = 0.2;
+export const CROSS_OVERLAP_RATIO_INSIDE = 0.2;
 // forward/backward群を cross群の前方(後方)へ逃がすときの単位。**目視比較のための切り替え**で、
 // この1行を書き換えるだけで戻せる（実測の差は docs/align-branch-layout.md「方針H」の表）。
 //   true  = 群ごと同じ線に揃えて逃がす。同じ層の兄弟のprimaryが揃うが、1つでもcross群と重なると
@@ -413,9 +415,20 @@ function layoutSubtree(
   // 直接の子が作る「内側の枠」より外に置かれていれば 'outside'。
   //   なぜ「いちばん近い子」だけか: 2番目以降の子は1番目の外側に積まれるので、全員を見ると
   //   整列後に判定が反転してしまう（Alignを2回押すと結果が変わる）。
+  //
+  // **見るのは「cross群のサブツリーの根＝cross子ノード本体」の矩形**であって、サブツリー全体の
+  // 広がりではない（docs/decisions.md §57）。「ユーザーがそのノードをどこに置いたか」が意図であって、
+  // ぶら下がっている子の広がりは意図ではない、という判断。
+  //   **代償**: 配置は箱ごと動かすので、cross子が自分の子をcross方向に持つと、箱が親にくっついていても
+  //   ノード本体は親から離れた位置に来る。そのため**Alignの1回目と2回目で判定が 'hug'→'outside' に
+  //   反転して配置が変わることがある**（3回目以降は安定。実測は f-scale50 相当で797px）。
+  //   これは承知のうえで受け入れている既知の制限（docs/tuning.md「既知の未対応事項」）。
+  //   判定と配置を揃えて冪等にすると `hug` と分類されるケースが増え、エッジのノード貫通が増える
+  //   （91→104）ため、判定の素直さを取った。
   const crossPlacementMode = (links: ParentLink[], sign: 1 | -1): 'hug' | 'outside' => {
     if (links.length === 0) return 'hug';
     const pc = currentCross(node, direction);
+    // signの向きを正とした、そのノードの外側の端(edgeSign=1)／親側の端(edgeSign=-1)
     const outerEdge = (link: ParentLink, edgeSign: 1 | -1): number => {
       const child = nodesById.get(link.childId)!;
       return sign * (currentCross(child, direction) - pc) + (edgeSign * crossSize(child, direction)) / 2;

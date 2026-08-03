@@ -2,10 +2,11 @@
 // 新規ノード側のどのハンドルにエッジが付くか・新規ノードがドロップ点のどちら側にできるかを
 // 検証する（MindMapCanvas.tsx onConnectEnd）。
 //
-// 既定は backward 面（RIGHT: left / DOWN: top）で受け、ドロップ点が新規ノードの backward 面になる。
-// **引き伸ばし始めた面が backward だったときだけは forward 面（RIGHT: right / DOWN: bottom）で受け、
-// ドロップ点も新規ノードの forward 面になる**（＝ポインタから引き伸ばした向きへノードが伸びる）。
-// cross 面（RIGHT: top/bottom）から引き伸ばした場合は既定どおり。
+// 規則は**どのハンドルから引き伸ばしたかではなく、ドロップ点が開始ハンドルより
+// primary 方向のどちら側か**で決まる:
+//   forward 側（RIGHT:ハンドルより右 / DOWN:下）へ離した … 受け口=backward面、ドロップ点=新規ノードのbackward面
+//   backward 側（RIGHT:ハンドルより左 / DOWN:上）へ離した … 受け口=forward面、 ドロップ点=新規ノードのforward面
+// cross面（RIGHT:top/bottom）起点も同じ規則（ハンドルの primary 座標＝ノード中心が基準）。
 //
 // ハンドルの割り当ては DOM からは読めないため、localStorage のドラフト
 // （mindmeshmap-draft。mapStore.ts が500msデバウンスで常時保存する）からエッジを読んで確認する。
@@ -25,6 +26,8 @@ export const name = 'edge-drop-handle-side';
 
 /** ノード位置のズレ許容量（px）。ズーム倍率によるサブピクセル誤差ぶんだけ見る */
 const POSITION_TOLERANCE = 4;
+/** 開始ハンドルとドロップ点の primary 方向の最小距離（px）。判定が境界で揺れないように離す */
+const DROP_MARGIN = 80;
 
 /** ハンドルDOMの中心座標（画面座標） */
 async function handleCenter(page, nodeId, handleId) {
@@ -60,16 +63,16 @@ async function pickSourceNode(page) {
 }
 
 /**
- * ペイン内で、どのノードからも clearance px 以上離れた点を探す。
- * レイアウト方向を切り替えるとノードの配置が変わるため、固定座標では空白を狙えない
+ * ペイン内で、どのノードからも clearance px 以上離れていて accept(x, y) を満たす点を探す。
+ * レイアウト方向・ドロップ方向でノード配置も狙う領域も変わるため、固定座標では空白を狙えない
  */
-async function findBlankPoint(page, clearance = 90) {
+async function findBlankPoint(page, accept, clearance = 80) {
   const paneBox = await page.locator('.react-flow__pane').boundingBox();
   const boxes = await nodeBoxes(page);
   const step = 30;
-  // 下 → 上の順に走査する（新規ノードを作っても既存ノードに重なりにくい下側を優先）
-  for (let y = paneBox.y + paneBox.height - 60; y > paneBox.y + 60; y -= step) {
-    for (let x = paneBox.x + 60; x < paneBox.x + paneBox.width - 60; x += step) {
+  for (let y = paneBox.y + paneBox.height - 40; y > paneBox.y + 40; y -= step) {
+    for (let x = paneBox.x + 40; x < paneBox.x + paneBox.width - 40; x += step) {
+      if (!accept(x, y)) continue;
       const clear = boxes.every(
         (b) =>
           x < b.x - clearance || x > b.x + b.width + clearance || y < b.y - clearance || y > b.y + b.height + clearance
@@ -88,14 +91,24 @@ async function findBlankPoint(page, clearance = 90) {
 /**
  * 独立したページで「handleId から空白へドラッグして新規ノードを作る」を1回だけ実行し、
  * エッジのハンドル割り当てと新規ノードの位置を検証する。
- *   anchorX: 'left'  … ドロップ点が新規ノードの左端 / 'right'  … 右端
- *   anchorY: 'top'   … ドロップ点が新規ノードの上端 / 'bottom' … 下端
+ *   dropSide: 'forward' | 'backward' … 開始ハンドルから見てどちら側へ離すか（primary方向）
+ *   anchorX/anchorY: ドロップ点が新規ノードのどの面になるか（'left'/'right'、'top'/'bottom'）
  * ドロップ先が本当に空白であること・実際にノードが1個増えたことを併せてアサートするので、
  * 何も作られていないのに PASS することはない
  */
-async function assertDropCase({ direction, handleId, expectedSourceHandle, expectedTargetHandle, anchorX, anchorY }) {
-  const { browser, page, pageErrors } = await launchPage();
-  const label = `${direction} / ${handleId}`;
+async function assertDropCase({
+  direction,
+  handleId,
+  dropSide,
+  expectedSourceHandle,
+  expectedTargetHandle,
+  anchorX,
+  anchorY,
+}) {
+  // 既定(1280x800)より広いビューポートを使う。初期マップの左端ノードの**さらに左**にも
+  // 空白が要る（backward側へ離すケース）ため、狭いと空きが見つからない
+  const { browser, page, pageErrors } = await launchPage({ viewport: { width: 1600, height: 950 } });
+  const label = `${direction} / ${handleId} から ${dropSide} 側へ`;
   try {
     if (direction === 'DOWN') {
       // 初期マップはRIGHT。方向を切り替えると整列が走るので、落ち着くまで待ってから測る
@@ -103,13 +116,27 @@ async function assertDropCase({ direction, handleId, expectedSourceHandle, expec
       await page.waitForTimeout(600);
     }
 
+    // 初期表示はfitViewでマップが画面いっぱいに広がっており、端のノードの外側に
+    // 「ハンドルより十分backward側の空白」が取れない。2段階ズームアウトして余白を作る。
+    // ズーム倍率は判定にも位置アサートにも影響しない（どちらも実際の描画結果を見ている）
+    for (let i = 0; i < 2; i++) {
+      await page.locator('.react-flow__controls-zoomout').click();
+      await page.waitForTimeout(250);
+    }
+
     const sourceId = await pickSourceNode(page);
     const nodesBefore = await getNodeIds(page);
 
-    const drop = await findBlankPoint(page);
-    await assertTrue(page, !!drop, `ノードから十分離れた空白のドロップ先が見つかること（テスト前提。${label}）`);
-
+    // 開始ハンドルから見て dropSide 側（primary方向）の空白を探す。
+    // 画面座標とflow座標は同じ向きなので、画面座標のまま比較してよい
     const from = await handleCenter(page, sourceId, handleId);
+    const accept =
+      direction === 'RIGHT'
+        ? (x) => (dropSide === 'forward' ? x > from.x + DROP_MARGIN : x < from.x - DROP_MARGIN)
+        : (_x, y) => (dropSide === 'forward' ? y > from.y + DROP_MARGIN : y < from.y - DROP_MARGIN);
+    const drop = await findBlankPoint(page, accept);
+    await assertTrue(page, !!drop, `${label}: ノードから十分離れた空白のドロップ先が見つかること（テスト前提）`);
+
     await page.mouse.move(from.x, from.y);
     await page.mouse.down();
     await page.mouse.move(drop.x, drop.y, { steps: 12 });
@@ -145,7 +172,7 @@ async function assertDropCase({ direction, handleId, expectedSourceHandle, expec
 
     // 新規ノードの位置: ドロップ点が新規ノードの anchorX / anchorY 側の面になること。
     // ドロップ点はビューポート内なのでfitViewは走らず、作成直後の位置がそのまま残る。
-    // backwardケースのズレは EMPTY_NODE_WIDTH/HEIGHT（nodeContent.ts）とCustomNodeの実寸のズレでも
+    // backward側ケースのズレは EMPTY_NODE_WIDTH/HEIGHT（nodeContent.ts）とCustomNodeの実寸のズレでも
     // あるので、CSSを変えて定数を更新し忘れたらここで落ちる
     const box = await page.locator(`.react-flow__node[data-id="${newNodeId}"]`).boundingBox();
     const actualX = anchorX === 'right' ? box.x + box.width : box.x;
@@ -168,68 +195,46 @@ async function assertDropCase({ direction, handleId, expectedSourceHandle, expec
 }
 
 export async function run() {
-  // --- RIGHT（forward=right / backward=left） ---
-  // forward面から: 従来どおり新規ノードのbackward面（left）で受け、ドロップ点は左上
+  // --- RIGHT（forward=right / backward=left。primary方向=x）---
+  // 3面すべてについて forward 側・backward 側の両方へ離し、**開始ハンドルではなくドロップ方向で
+  // 決まる**ことを確認する（開始ハンドルで決めていた頃の規則ならright/bottom起点のbackward側が落ちる）
   await assertDropCase({
-    direction: 'RIGHT',
-    handleId: 'right',
-    expectedSourceHandle: 'right',
-    expectedTargetHandle: 'left',
-    anchorX: 'left',
-    anchorY: 'top',
-  });
-  // backward面から: 新規ノードのforward面（right）で受け、ドロップ点も右端になる
-  await assertDropCase({
-    direction: 'RIGHT',
-    handleId: 'left',
-    expectedSourceHandle: 'left',
-    expectedTargetHandle: 'right',
-    anchorX: 'right',
-    anchorY: 'top',
-  });
-  // cross面（top / bottom）から: 既定どおりbackward面（left）で受け、ドロップ点は左上
-  await assertDropCase({
-    direction: 'RIGHT',
-    handleId: 'bottom',
-    expectedSourceHandle: 'bottom',
-    expectedTargetHandle: 'left',
-    anchorX: 'left',
-    anchorY: 'top',
+    direction: 'RIGHT', handleId: 'right', dropSide: 'forward',
+    expectedSourceHandle: 'right', expectedTargetHandle: 'left', anchorX: 'left', anchorY: 'top',
   });
   await assertDropCase({
-    direction: 'RIGHT',
-    handleId: 'top',
-    expectedSourceHandle: 'top',
-    expectedTargetHandle: 'left',
-    anchorX: 'left',
-    anchorY: 'top',
+    direction: 'RIGHT', handleId: 'right', dropSide: 'backward',
+    expectedSourceHandle: 'right', expectedTargetHandle: 'right', anchorX: 'right', anchorY: 'top',
+  });
+  await assertDropCase({
+    direction: 'RIGHT', handleId: 'left', dropSide: 'backward',
+    expectedSourceHandle: 'left', expectedTargetHandle: 'right', anchorX: 'right', anchorY: 'top',
+  });
+  await assertDropCase({
+    direction: 'RIGHT', handleId: 'left', dropSide: 'forward',
+    expectedSourceHandle: 'left', expectedTargetHandle: 'left', anchorX: 'left', anchorY: 'top',
+  });
+  await assertDropCase({
+    direction: 'RIGHT', handleId: 'bottom', dropSide: 'forward',
+    expectedSourceHandle: 'bottom', expectedTargetHandle: 'left', anchorX: 'left', anchorY: 'top',
+  });
+  await assertDropCase({
+    direction: 'RIGHT', handleId: 'bottom', dropSide: 'backward',
+    expectedSourceHandle: 'bottom', expectedTargetHandle: 'right', anchorX: 'right', anchorY: 'top',
   });
 
-  // --- DOWN（forward=bottom / backward=top）: 90度回した規則になること ---
+  // --- DOWN（forward=bottom / backward=top。primary方向=y）: 90度回した規則になること ---
   await assertDropCase({
-    direction: 'DOWN',
-    handleId: 'top',
-    expectedSourceHandle: 'top',
-    expectedTargetHandle: 'bottom',
-    anchorX: 'left',
-    anchorY: 'bottom',
+    direction: 'DOWN', handleId: 'top', dropSide: 'backward',
+    expectedSourceHandle: 'top', expectedTargetHandle: 'bottom', anchorX: 'left', anchorY: 'bottom',
   });
   await assertDropCase({
-    direction: 'DOWN',
-    handleId: 'bottom',
-    expectedSourceHandle: 'bottom',
-    expectedTargetHandle: 'top',
-    anchorX: 'left',
-    anchorY: 'top',
+    direction: 'DOWN', handleId: 'bottom', dropSide: 'forward',
+    expectedSourceHandle: 'bottom', expectedTargetHandle: 'top', anchorX: 'left', anchorY: 'top',
   });
-  // DOWNではleft/rightがcross面なので、既定どおりbackward面（top）で受ける
   await assertDropCase({
-    direction: 'DOWN',
-    handleId: 'right',
-    expectedSourceHandle: 'right',
-    expectedTargetHandle: 'top',
-    anchorX: 'left',
-    anchorY: 'top',
+    direction: 'DOWN', handleId: 'right', dropSide: 'backward',
+    expectedSourceHandle: 'right', expectedTargetHandle: 'bottom', anchorX: 'left', anchorY: 'bottom',
   });
 }
 

@@ -24,12 +24,12 @@
 | [docs/tuning.md](docs/tuning.md) | 調整パラメータの索引（定数名・ファイル・現在値・意味） | チューニング定数を追加・変更したとき。値を変えたら表の現在値も直す。「既知の未対応事項」に載っている項目に対応したらそこから消す |
 | [docs/testing.md](docs/testing.md) | E2E の実行手順・テストケース一覧・**手動確認チェックリスト**・テストを書く流儀 | テストを追加・変更したとき、自動化できない確認項目が増えたとき |
 | [docs/layout-lab.md](docs/layout-lab.md) | 整列アルゴリズムの評価環境（コンタクトシート・ファズ・ベースライン）の使い方 | 評価環境そのものを変えたとき |
-| [docs/align-algorithms.md](docs/align-algorithms.md) | 整列アルゴリズム8方式の詳細仕様（フェーズ単位の入出力・手順・データ構造。採用理由や評価は書かない） | アルゴリズムの計算内容を変えたとき・方式を追加/削除したとき。**`src/utils/*Layout.ts` を編集したら行番号アンカー（`...ts#L12-L34`）がずれるので、行数が変わる編集をしたら該当リンクを直す**（コメント1行の増減でもずれる） |
-| [docs/align-branch-layout.md](docs/align-branch-layout.md) | 整列アルゴリズム各方式（uniform / branch / flat-axis / sugiyama-ext / sugiyama-port / elk-port / elk-port-ext / elk-port-pava）の設計メモと今後の運び | 整列方式の設計を変えたとき |
+| [docs/align-algorithms.md](docs/align-algorithms.md) | 整列アルゴリズム9方式の詳細仕様（フェーズ単位の入出力・手順・データ構造。採用理由や評価は書かない） | アルゴリズムの計算内容を変えたとき・方式を追加/削除したとき。**`src/utils/*Layout.ts` を編集したら行番号アンカー（`...ts#L12-L34`）がずれるので、行数が変わる編集をしたら該当リンクを直す**（コメント1行の増減でもずれる） |
+| [docs/align-branch-layout.md](docs/align-branch-layout.md) | 整列アルゴリズム各方式（uniform / branch / flat-axis / sugiyama-ext / sugiyama-port / elk-port / elk-port-ext / elk-port-pava / hola-lite）の設計メモと今後の運び | 整列方式の設計を変えたとき |
 | [docs/graph-drawing-primer.md](docs/graph-drawing-primer.md) / [docs/layout-prior-art.md](docs/layout-prior-art.md) | グラフ描画分野の背景知識・先行研究の地図（読み物、めったに変わらない） | 新しい先行事例を調べたとき |
 
 - **決定記録と tuning は相互リンクする**。同じ事実が README・decisions・tuning に分散するときは、片方だけ直さず必ず整合させる。
-- 整列（レイアウト）まわりを触る前に、少なくとも `decisions.md` の §25・§26・§39・§44・§49・§50 と `align-branch-layout.md` に目を通す（各方式が実際に何を計算しているかは `align-algorithms.md`）。過去に一度決めた方針を知らずに戻すのが一番起きやすい事故。
+- 整列（レイアウト）まわりを触る前に、少なくとも `decisions.md` の §25・§26・§39・§44・§49・§50・§53・§56 と `align-branch-layout.md` に目を通す（各方式が実際に何を計算しているかは `align-algorithms.md`）。過去に一度決めた方針を知らずに戻すのが一番起きやすい事故。
 
 ---
 
@@ -46,7 +46,7 @@ npm run test:e2e     # 別シェルで。dev サーバが起動していない�
 
 - **E2E は dev サーバ起動が前提**。初回は `npx playwright install chromium` が必要。失敗時のスクリーンショットは `e2e/screenshots/`（git 管理外）。
 - **dev サーバは自分の検証用に自由に立ててよいが、ユーザーにボールを返す直前に自分が立てたものは落とす**（落とした旨の報告は不要）。ユーザーは自分で確認するとき自分で立てるので、ポートが埋まっていると邪魔になる。
-- **整列アルゴリズムのチューニング定数（`src/utils/sugiyamaExtLayout.ts` / `src/utils/sugiyamaPortLayout.ts` / `src/utils/elkPortExtLayout.ts` 冒頭など）を変えたら**、追加でこれを回す:
+- **整列アルゴリズムのチューニング定数（`src/utils/sugiyamaExtLayout.ts` / `src/utils/sugiyamaPortLayout.ts` / `src/utils/elkPortExtLayout.ts` / `src/utils/holaLiteLayout.ts` 冒頭など）を変えたら**、追加でこれを回す:
   ```bash
   node scripts/layout-contact-sheet.mjs --scale --compare   # 改善と悪化の両方を確認
   npm run layout:baseline                                   # 意図した変更ならベースライン更新
@@ -78,5 +78,5 @@ npm run test:e2e     # 別シェルで。dev サーバが起動していない�
 - **ストレージキー**（`mindmeshmap-draft` ほか、一覧は [docs/tuning.md](docs/tuning.md)「ストレージキー」）は**既存ユーザーのデータを壊すので原則変更しない**。変える場合は旧キーからのマイグレーションをセットで実装する。Google Drive のフォルダ名 `MindMeshMap` も同様（変えると既存マップが一覧から消える）。
 - **ノード編集・IME まわり（armed-focus 方式）**は 3 回目の試行でようやく安定した領域（[decisions.md §13](docs/decisions.md)）。安易に触らず、変えるなら `e2e/ime-input.mjs` / `armed-focus-typing.mjs` を通した上で実 IME の手動確認まで行う。
 - **Undo/Redo には既知のバグがある**（連続 2 アクション直後の最初の Undo が 2 ステップ戻る）。原因・再現手順・修正方向は [docs/tuning.md](docs/tuning.md)「既知の未対応事項」に記録済み。触るならインデックス管理の再設計になる、と分かった上で着手する。
-- **整列アルゴリズムは現在 `sugiyama-port` が本番既定**（[decisions.md §53](docs/decisions.md)）で、`uniform` / `branch` / `flat-axis` / `sugiyama-ext` / `elk-port` / `elk-port-ext` / `elk-port-pava` は比較用に dev 限定 UI で残してある暫定状態。**`sugiyama-port` は `sugiyama-ext` の改善版**（親をハンドルの向きで選ぶ／同列の複数親を許す／cross群の置き場所を現在位置から判定する。[decisions.md §49・§50](docs/decisions.md)）で、既定を移した後も目視比較用に `sugiyama-ext` を残している。**`elk-port-ext` だけは評価軸が違う**（良いスコアではなく `elk-port` と同じ結果になることが目標。`npm run layout:parity` で一致度を測る）。アルゴリズムを追加するときに触る箇所の一覧は [layout-lab.md](docs/layout-lab.md)「拡張のしかた」。どれかに決めたら不採用側のファイル・切り替え UI・関連テストを削除する（[align-branch-layout.md](docs/align-branch-layout.md)「今後の運び」）。勝手に整理も、勝手に既定変更もしない。
+- **整列アルゴリズムは現在 `sugiyama-port` が本番既定**（[decisions.md §53](docs/decisions.md)）で、`uniform` / `branch` / `flat-axis` / `sugiyama-ext` / `elk-port` / `elk-port-ext` / `elk-port-pava` / `hola-lite` は比較用に dev 限定 UI で残してある暫定状態。**`sugiyama-port` は `sugiyama-ext` の改善版**（親をハンドルの向きで選ぶ／同列の複数親を許す／cross群の置き場所を現在位置から判定する。[decisions.md §49・§50](docs/decisions.md)）で、既定を移した後も目視比較用に `sugiyama-ext` を残している。**`elk-port-ext` だけは評価軸が違う**（良いスコアではなく `elk-port` と同じ結果になることが目標。`npm run layout:parity` で一致度を測る）。アルゴリズムを追加するときに触る箇所の一覧は [layout-lab.md](docs/layout-lab.md)「拡張のしかた」。どれかに決めたら不採用側のファイル・切り替え UI・関連テストを削除する（[align-branch-layout.md](docs/align-branch-layout.md)「今後の運び」）。勝手に整理も、勝手に既定変更もしない。
 - **整列は「ゼロから配置し直さない」差分的レイアウトが仕様**（現在の階層・兄弟順・循環エッジの向きを保つ。[decisions.md §26](docs/decisions.md)）。ここを崩す変更は `e2e/layout-stability.mjs` がドリフト検出で意図的に FAIL する。テストが落ちたら「テストを緩める」のではなく仕様に反していないか先に疑う。

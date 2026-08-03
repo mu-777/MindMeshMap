@@ -1,6 +1,6 @@
 # 整列アルゴリズムの詳細仕様
 
-現在実装されている8つの整列（Align）アルゴリズムが、**各フェーズで何を入力に取り、何を計算し、何を出力するか**だけを
+現在実装されている9つの整列（Align）アルゴリズムが、**各フェーズで何を入力に取り、何を計算し、何を出力するか**だけを
 書いたリファレンス。コードを開かずに手順を追えること、開くときは目的の関数へ直行できることを目的にしている。
 
 - なぜその方式を採ったか・不採用案・今後どれを残すか → [align-branch-layout.md](./align-branch-layout.md)
@@ -21,6 +21,7 @@
 | `elk-port` | [elkPortLayout.ts](../src/utils/elkPortLayout.ts) | `calculateElkPortLayout` | 1回 | `uniform` と同じELK layeredに、ハンドルをポートとして渡す |
 | `elk-port-ext` | [elkPortExtLayout.ts](../src/utils/elkPortExtLayout.ts) | `calculateElkPortExtLayout` | — | `elk-port` と同じ結果を出すことを目標に、ELK layeredをELK非依存で再実装したもの |
 | `elk-port-pava` | [elkPortPavaLayout.ts](../src/utils/elkPortPavaLayout.ts) | `calculateElkPortPavaLayout` | — | 同じ枠組みをELKに寄せず最小構成で書いた版。座標割当は等調回帰(PAVA)、現在位置を保つ |
+| `hola-lite` | [holaLiteLayout.ts](../src/utils/holaLiteLayout.ts) | `calculateHolaLiteLayout` | — | HOLA（人間らしい直交レイアウト）の最小構成再実装。層を持たず、子を4面へ対称に伸ばす |
 
 ---
 
@@ -1028,10 +1029,10 @@ LayoutResult
 |---|---|
 | 入力 | `nodes`, `edges`, `direction` |
 | 出力 | `Hierarchy`（下記） |
-| 実装 | [`buildHierarchy()` sugiyamaPortLayout.ts#L174-L318](../src/utils/sugiyamaPortLayout.ts#L174-L318) |
+| 実装 | [`buildHierarchy()` sugiyamaPortLayout.ts#L182-L326](../src/utils/sugiyamaPortLayout.ts#L182-L326) |
 
 循環除去（DFSで後退辺を除外）とトポロジカル順は§4と同じ。違うのは**入辺の採点**
-（[L254-L315](../src/utils/sugiyamaPortLayout.ts#L254-L315)）。トポロジカル順に各ノードを見て、
+（[L260-L323](../src/utils/sugiyamaPortLayout.ts#L260-L323)）。トポロジカル順に各ノードを見て、
 その**入辺すべてを3要素の辞書式キーで採点し、最大キーの入辺を全部**親にする。
 
 | 順位 | キー | 意味 |
@@ -1040,7 +1041,7 @@ LayoutResult
 | 2 | `outbound` = ソース面が `forward` か（RIGHT時: 右ハンドルから出ている） | エッジは「自分の**出口**の面」から出ているのが正規 |
 | 3 | `depth` = `layer[source] + layerDelta(...)` | ここまで同点なら§4と同じロンゲストパス |
 
-`layerDelta`（[L136-L146](../src/utils/sugiyamaPortLayout.ts#L136-L146)）は§4の `roleDelta` の拡張で、
+`layerDelta`（[L144-L154](../src/utils/sugiyamaPortLayout.ts#L144-L154)）は§4の `roleDelta` の拡張で、
 **ソース面だけでなくターゲット面も見る**:
 
 | ソース面の役割 | ターゲット面 | 増分 | 意味 |
@@ -1068,7 +1069,7 @@ LayoutResult
 （＝ハンドル向きの保証は§4と同じ仕組みで担保される）。
 
 複数親の子の取り付け先は**木の上での最小共通祖先（LCA）**
-（[`lcaOf()` L235-L247](../src/utils/sugiyamaPortLayout.ts#L235-L247)）。トポロジカル順に処理するので
+（[`lcaOf()` L243-L255](../src/utils/sugiyamaPortLayout.ts#L243-L255)）。トポロジカル順に処理するので
 子を見る時点で親の木上の位置は確定しており、1パスで決まる。親が別ツリーに散っていてLCAが無い場合は、
 先頭の親の普通の子として扱う（＝§4と同じ挙動へフォールバック）。
 
@@ -1078,12 +1079,12 @@ LayoutResult
 |---|---|
 | 入力 | `nodeId`, `nodesById`, `Hierarchy`, `direction` |
 | 出力 | `Box`（§4と同一） |
-| 実装 | [`layoutSubtree()` sugiyamaPortLayout.ts#L365-L640](../src/utils/sugiyamaPortLayout.ts#L365-L640) |
+| 実装 | [`layoutSubtree()` sugiyamaPortLayout.ts#L367-L652](../src/utils/sugiyamaPortLayout.ts#L367-L652) |
 
 **確定させる順番が§4と違う**。自分を `(0,0)` に置いたあと:
 
 0. **cross群（crossNeg / crossPos）ごとに配置パターンを決める**
-   （[`crossPlacementMode()` L416-L432](../src/utils/sugiyamaPortLayout.ts#L416-L432)）。判定材料は
+   （[`crossPlacementMode()` L428-L453](../src/utils/sugiyamaPortLayout.ts#L428-L453)）。判定材料は
    **Align実行時点の現在位置だけ**で、構造は見ない。
 
    | パターン | 意味 | 扱い |
@@ -1091,23 +1092,29 @@ LayoutResult
    | `hug` | 親の補足情報 | 親のすぐ隣を確保し、forward群をprimary方向へ逃がす（1.） |
    | `outside` | 親と並ぶ別の情報 | forward群の外側へ積む（§4と同じ扱い。3.） |
 
-   判定は「そのバケットのうち**親にいちばん近い子**の親側の端」が、
-   「親自身の端」と「forward/backward群の**直接の子**の端」のうち外側（＝内側の枠）より
+   判定は「そのバケットのうち**親にいちばん近い子ノード**の親側の端」が、
+   「親自身の端」と「forward/backward群の**直接の子ノード**の端」のうち外側（＝内側の枠）より
    **外にあるか**。外にあれば `outside`。バケット単位・面ごと（上と下で独立）に決める。
+   見るのは**ノードの矩形**（サブツリーの根そのもの）で、サブツリー全体の広がりではない。
    - **なぜ「いちばん近い子」だけを見るか**: 2番目以降の子は1番目の外側に積まれるので、全員を見ると
-     整列後の位置が別パターンに分類され、**Alignを押すたびに2つの配置を往復する**。
+     整列後の位置が別パターンに分類され、**Alignを押すたびに配置が変わる**。
    - **なぜ「直接の子」だけか**: 孫まで含めると、深いforward群を持つ親でほぼ常に `hug` になり、
      パターン分けが効かなくなる。
-1. **`hug` のcross群（[`placeCrossBucket()` L442-L464](../src/utils/sugiyamaPortLayout.ts#L442-L464)）を最初に置く**。
+   - **既知の制限**: 判定はノード本体を見るが配置はサブツリーの箱ごと動かすので、cross子が自分の子を
+     cross方向に持つと、**箱が親にくっついていてもノード本体は親から離れる**。その結果
+     **Alignの1回目と2回目で判定が反転して配置が変わることがある**（3回目以降は安定）。
+     判定を箱に揃えれば不動点にできるが `hug` が増えて貫通が悪化するため、意図して受け入れている
+     （[decisions.md §57](./decisions.md)）。
+1. **`hug` のcross群（[`placeCrossBucket()` L455-L478](../src/utils/sugiyamaPortLayout.ts#L455-L478)）を最初に置く**。
    親のcross方向の端から `CROSS_GAP` だけ外へ、現在のcross座標の順を保って積む（crossNegは反転して
    親側から積む）。primary方向は§4と同じ「親の帯に被せる」揃えだが、**被り量は2択**:
    その子がforward群の帯（±`fanHalf`）に入り込むなら `CROSS_OVERLAP_RATIO_INSIDE`(0.2)、
-   入り込まないなら `CROSS_OVERLAP_RATIO`(0.8)。
+   入り込まないなら `CROSS_OVERLAP_RATIO`(0.7)。
    **被りを深くする目的は「forward群を前へ押し出す量を減らすこと」だけ**なので、押し出しが起きない子には
    効かせない。これは同時に、**パターン判定が揺れうるケース（forward群が親より小さいとき）で
    `hug` と `outside` の出力を一致させる**役目も持つ（＝Alignを繰り返しても見た目が変わらない）。
    置いた箱の外接範囲は `crossExtents` に控える。
-2. **forward / backward群（[`placeForwardLike()` L481-L524](../src/utils/sugiyamaPortLayout.ts#L481-L524)）**:
+2. **forward / backward群（[`placeForwardLike()` L494-L536](../src/utils/sugiyamaPortLayout.ts#L494-L536)）**:
    並び順（バリセンタ）とcross方向の積み方・中央寄せは§4と同じ。違いは primary の基準線で、
    **`crossExtents` のどれかと cross方向で重なる子は、その箱の前(後)へ `PRIMARY_GAP` 空けて逃がす**。
    逃がす単位は `ESCAPE_FORWARD_AS_GROUP` で切り替わる: `true` なら**いちばん遠くまで逃げる子に
@@ -1116,13 +1123,13 @@ LayoutResult
 3. **`outside` のcross群を、親＋forward群の外側へ積む**（§4のcross群と同じ扱い。
    `box.cMax + CROSS_GAP` / `box.cMin - CROSS_GAP` から積む）。forward群の外に出るので、
    **forward群をprimary方向へ押し出さない**＝primary方向に伸びない。
-4. **複数親の子（[L534-L637](../src/utils/sugiyamaPortLayout.ts#L534-L637)）を最後に置く**。すべての親が
+4. **複数親の子（[L547-L650](../src/utils/sugiyamaPortLayout.ts#L547-L650)）を最後に置く**。すべての親が
    同じ箱の中に置き終わっているので、親たちの確定位置から決められる。
    **まず親IDの集合でグループ分けし、集合が同じ子どうしは「同列の兄弟」として1つの群にまとめる**
    （`A→B,A→C` / `B→D,C→D` / `B→E,C→E` の `D`・`E` のように、同じ親を共有する子は兄弟だから）。
    群ごとに:
    - 各子について、親たちが望む「箱の中心位置」と「後端の最小位置」を求める
-     （[`sharedAnchor()` L552-L586](../src/utils/sugiyamaPortLayout.ts#L552-L586)）。望む中心は `role` ごとに決まる
+     （[`sharedAnchor()` L565-L600](../src/utils/sugiyamaPortLayout.ts#L565-L600)）。望む中心は `role` ごとに決まる
      （forward/backward = 親のcross中心、crossNeg/crossPos = 親の端から `CROSS_GAP` 外）。
    - **cross方向**: 群の子を（forward群と同じバリセンタ順で）`SIBLING_GAP` を空けて積み、
      **群全体の中心を「親たちが望む中心」の平均へ合わせる**。
@@ -1159,6 +1166,125 @@ LayoutResult
 
 ---
 
+## 9. `hola-lite` — HOLA の最小構成再実装（方針I）
+
+原典は Kieffer, Dwyer, Marriott, Wybrow, *"HOLA: Human-like Orthogonal Network Layout"*（IEEE TVCG 2016）。
+公式実装は C++ の **libdialect**（Adaptagrams。約2万行・libcola/libvpsc/libavoid 依存・JS/WASM ポート無し）なので、
+**パイプラインの構成だけを借りて、このアプリの問題設定に意味のある段を自前実装**したもの
+（原典との差分・採用理由は [align-branch-layout.md](./align-branch-layout.md)「方針I」）。
+
+原典の DiAlEcT（D=Decompose / A=Arrange / E=Expand / T=Transform）に対応させた4段。
+**実装上は箱のサイズが要るので E → A の順に走る**。
+
+```
+MapNode[] + MapEdge[] + direction
+      ↓  D: peelCore() + buildEnforcedForest()
+coreIds（2-core）, Forest{ childEdges, rootIds, parentOf }
+      ↓  E: layoutSubtree()（root ごとにボトムアップ再帰）
+Component[]（剛体の箱 Box ＋ 箱中心の初期位置 seed）
+      ↓  A: stressPositions()（core を含み、かつ他成分と繋がっている成分だけ）
+成分ごとの箱中心（絶対座標）
+      ↓  T: separateComponents()
+LayoutResult
+```
+
+### 9.0 中間データ構造
+
+| 型 | 実装 | 中身 |
+|---|---|---|
+| `Box` | [holaLiteLayout.ts#L63](../src/utils/holaLiteLayout.ts#L63) | あるノードを根とするサブツリーの箱。`positions` は**そのノードの左上を原点(0,0)としたローカル座標**（上/左へ伸びた子孫があるので負もある）、`minX/minY/maxX/maxY` は原点から見た外接矩形 |
+| `Group` | [#L202](../src/utils/holaLiteLayout.ts#L202) | 同じ面（上下左右のどれか）に付いた子サブツリーの群。**群まるごと剛体として動かす**ための単位 |
+| `Component` | [#L373](../src/utils/holaLiteLayout.ts#L373) | 強制フォレストの1本＝1成分。箱・箱中心のオフセット・初期位置（seed）・ストレス対象かどうか・半径 |
+
+### 9.1 D段: peel と強制フォレスト
+
+| | |
+|---|---|
+| 入力 | `nodes`, `edges` |
+| 出力 | `coreIds: Set<string>`, `Forest { childEdges, rootIds, parentOf }` |
+| 実装 | `peelCore()` [#L75](../src/utils/holaLiteLayout.ts#L75) / `buildEnforcedForest()` [#L126](../src/utils/holaLiteLayout.ts#L126) |
+
+1. **peel**: 次数1のノードを、増えなくなるまで反復的に取り除く（自己ループは無視、多重辺は1本）。
+   残ったのが core（2-core）＝循環・複数親が住んでいる部分。剥がれたぶんが周辺ツリー。
+   このアルゴリズムでは core を「**A段の対象成分を選ぶ**」ためだけに使う。
+2. **強制フォレスト F**: 次の2条件を満たすエッジだけを親子関係として採用する。
+   - target の入次数が1（親候補が1つしかない）
+   - DFS の後退辺（循環を閉じる辺）でない
+   これは評価環境の `unambiguousTreeEdges()`（[layout-metrics.mjs](../e2e/lib/layout-metrics.mjs)）と**同一の判定**で、
+   「向き一致」を課される集合そのもの。各ノードの親は高々1つ・後退辺が無いので、結果は必ず森になる。
+   採用されなかったエッジ（循環・複数親の非採用側・自己ループ）は位置計算から外れ、A段でだけ効く。
+   > **触るときの注意**: この判定を metrics 側とズラすと HANDLE_DIRECTION 契約が静かに破れる。片方を変えたら必ず両方直す。
+3. F で親を持たないノードが各成分の**根**（`nodes` 配列順）。入次数2以上の子（複数親）は
+   どちらの親も採らず、**独立した成分の根**になる。
+
+### 9.2 E段: 4方向対称の箱合成
+
+| | |
+|---|---|
+| 入力 | 根ID, `Forest`, 現在位置（兄弟の並び順） |
+| 出力 | `Box`（成分の中身がローカル座標で全部入っている） |
+| 実装 | `layoutSubtree()` [#L313](../src/utils/holaLiteLayout.ts#L313) / `buildGroup()` [#L215](../src/utils/holaLiteLayout.ts#L215) / `resolveQuadrantConflict()` [#L279](../src/utils/holaLiteLayout.ts#L279) |
+
+ノード v について、子を `classifyEdgeSide()` の面ごとに4つの群へ分け、**その面の向きへ伸ばす**。
+
+1. 子を先に再帰でレイアウトして箱にする。並び順は**現在位置**（右/左の群は現在のy、上/下の群は現在のx。同値はエッジ配列順）。
+2. 群の中の積み方: right/left は縦に積み、top/bottom は横に並べる。間隔は `SIBLING_GAP`。積む方向は**親の中心に対して中央揃え**。
+3. 群の成長方向のオフセットは、**群の中で一番はみ出した子に合わせて**決める（子の根の線が揃う）:
+
+   | 面 | オフセット |
+   |---|---|
+   | right | `親幅 + GROWTH_GAP + max(-box.minX)` |
+   | left | `-GROWTH_GAP - max(box.maxX)` |
+   | bottom | `親高さ + GROWTH_GAP + max(-box.minY)` |
+   | top | `-GROWTH_GAP - max(box.maxY)` |
+
+   これで**群の外接矩形ごと**親から `GROWTH_GAP` 以上離れる＝「上ハンドルの子はサブツリーごと親より上」になる。
+4. **四隅の衝突**（例: 右の群と上の群が右上で重なる）は、上/下の群を動かして解く。上/下の群は
+   「親より上（下）」さえ守れば横に自由なので、(a) 西へ逃がす → (b) 東へ逃がす → (c) どちらもふさがっていれば
+   さらに上（下）へ押し出す、の順。間隔は `QUADRANT_GAP`。親との位置関係は変わらないので契約は壊れない。
+5. v の箱＝v の矩形と全群の外接矩形の合併。
+
+### 9.3 A段: 成分どうしのストレス最適化
+
+| | |
+|---|---|
+| 入力 | `Component[]`（箱の大きさと初期位置）、成分をまたぐエッジ |
+| 出力 | 成分ごとの箱中心（絶対座標） |
+| 実装 | `stressPositions()` [#L393](../src/utils/holaLiteLayout.ts#L393) |
+
+- **対象**: 「core のノードを含み、かつ他成分と繋がっている成分」だけ。対象が2未満なら**この段はまるごと飛ぶ**
+  （純粋な木のマップでは core が空になるので、実測では43ケース中37件がここを通らない）。
+- **理想距離**: 成分グラフ（頂点＝成分、辺＝成分をまたぐエッジ）の辺長を「両端の箱の半径（外接円）＋ `STRESS_LINK_GAP`」とし、
+  その重み付き最短距離をダイクストラで求める。繋がっていない対（距離∞）は引き合わない。
+- **反復**: SMACOF の局所更新を最大 `STRESS_MAX_ITER` 回、最大移動量が `STRESS_EPSILON` 未満になったら打ち切り。
+  初期値は**現在位置**（＝ユーザーの配置をシードにする。§26 のメンタルマップ保持）。乱数を使わず、
+  完全に重なった対の向きも配列順から決めるので決定的。
+- 成分の**中身は動かさない**（剛体の箱の中心だけが動く）。これが契約とストレス最適化を両立させるための制約。
+
+### 9.4 T段: 押し離しと絶対座標
+
+| | |
+|---|---|
+| 入力 | 成分ごとの箱中心と外接矩形 |
+| 出力 | `LayoutResult` |
+| 実装 | `separateComponents()` [#L474](../src/utils/holaLiteLayout.ts#L474) / `calculateHolaLiteLayout()` [#L531](../src/utils/holaLiteLayout.ts#L531) |
+
+箱を中心の位置へ置き、外接矩形が重なる成分だけを最小移動で押し離す（`COMPONENT_MARGIN`、
+sugiyama系の `separateTrees` と同じ手順）。重ならない成分は動かさない。
+
+### この手順から言えること
+
+- **契約（重なり無し・ハンドル向き一致）が構造で保証される**。向きは9.1の F の作り方＋9.2の群のオフセット式から、
+  重なりは「群どうしが離れている」＋「成分どうしを押し離す」から出る。後段に修復パスを持たない。
+- **大域的な流れ方向（層）を持たない**。`direction` は「`sourceHandle` が無い旧データのフォールバック」にしか
+  使わないので、ハンドルが全部付いていれば RIGHT と DOWN で結果が同一になる（sugiyama系との決定的な違い）。
+- **ストレス最適化の効き所は「成分の置き場所」だけ**。HANDLE_DIRECTION を契約に入れた以上、幾何は F で決まるため。
+  原典が core のノードそのものを動かすのに対し、こちらは剛体の箱を動かすところまでしかできない。
+- **面積は大きくなりやすい**。4面へ対称に伸ばすぶん、層に畳む sugiyama系よりも外接矩形が広がる（実測で最大）。
+  代わりに縦横比・エッジ長ばらつき・移動量は良く、**エッジのノード貫通は `sugiyama-ext` と並ぶ最小水準**。
+
+---
+
 ## 付録A: どのアルゴリズムがどの入力を見るか
 
 | | `sourceHandle` | `targetHandle` | 現在位置 | 実測サイズ | ELK |
@@ -1171,6 +1297,7 @@ LayoutResult
 | `elk-port` | ✅ | ✅ | ヒント | ✅ | 1回 |
 | `elk-port-ext` | ✅ | ✅ | 循環除去・層・並び順 | ✅ | — |
 | `elk-port-pava` | ✅ | ✅ | 循環除去・層・並び順・基準 | ✅ | — |
+| `hola-lite` | ✅ | — | 並び順・成分配置の初期値・基準 | ✅ | — |
 
 「基準」＝結果の絶対位置がその値を基準に決まる（＝原点付近へ正規化しない）。
 
@@ -1187,6 +1314,7 @@ LayoutResult
 | `sugiyama-port` | DFS の後退辺を除去 | **ハンドルの向きが正規に近い入辺**（同点なら深さ、それでも同点なら**両方採る**＝複数親を許す） |
 | `elk-port` | ELK の `cycleBreaking: INTERACTIVE` | ELK任せ |
 | `elk-port-ext` / `elk-port-pava` | 現在のprimary順の全順序に対して逆行する辺を**反転**（除外ではない） | 除外しない（全入辺が層と座標に効く） |
+| `hola-lite` | DFS の後退辺を除去 | **どちらも採らない**（入次数2以上の子は強制フォレストの外＝独立した成分になり、A段のストレスで親たちの間へ引き寄せられる） |
 
 評価環境がハンドルの向きを採点するとき、この違いのせいで不公平にならないよう
 「targetの入次数が1、かつDFSの後退辺でない」エッジだけを対象にしている

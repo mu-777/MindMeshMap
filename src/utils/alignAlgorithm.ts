@@ -12,6 +12,7 @@ import { calculateSugiyamaPortLayout } from './sugiyamaPortLayout';
 import { calculateElkPortLayout } from './elkPortLayout';
 import { calculateElkPortExtLayout } from './elkPortExtLayout';
 import { calculateElkPortPavaLayout } from './elkPortPavaLayout';
+import { calculateHolaLiteLayout } from './holaLiteLayout';
 
 export async function calculateLayoutForAlign(
   nodes: MapNode[],
@@ -34,6 +35,8 @@ export async function calculateLayoutForAlign(
       return calculateElkPortExtLayout(nodes, edges, direction);
     case 'elk-port-pava':
       return calculateElkPortPavaLayout(nodes, edges, direction);
+    case 'hola-lite':
+      return calculateHolaLiteLayout(nodes, edges, direction);
     case 'uniform':
     default:
       return calculateLayout(nodes, edges, direction);
